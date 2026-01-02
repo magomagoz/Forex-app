@@ -6,6 +6,43 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 from datetime import datetime
 import time
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def get_correlation_matrix(pairs_list):
+    """Scarica i dati per più coppie e calcola la correlazione"""
+    combined_data = pd.DataFrame()
+    
+    for p in pairs_list:
+        df = yf.download(p, period="60d", interval="1d", progress=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        combined_data[p] = df['Close']
+    
+    return combined_data.corr()
+
+# --- SEZIONE DA AGGIUNGERE NELL'INTERFACCIA ---
+st.markdown("---")
+st.subheader("📊 Matrice di Correlazione (Sentiment di Mercato)")
+
+with st.expander("Analizza Correlazioni tra Major"):
+    major_pairs = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X"]
+    
+    with st.spinner("Calcolo correlazioni in corso..."):
+        corr_matrix = get_correlation_matrix(major_pairs)
+        
+        # Creazione del grafico con Matplotlib/Seaborn
+        fig, ax = plt.subplots(figsize=(10, 8))
+        sns.heatmap(corr_matrix, annot=True, cmap="RdYlGn", center=0, ax=ax)
+        plt.title("Correlazione a 60 giorni")
+        st.pyplot(fig)
+    
+    st.info("""
+    **Come leggere la mappa:**
+    * **Vicino a 1 (Verde):** Le coppie si muovono insieme. 
+    * **Vicino a -1 (Rosso):** Le coppie si muovono in direzioni opposte.
+    * **Vicino a 0:** Movimenti indipendenti.
+    """)
 
 # --- 1. CONFIGURAZIONE PAGINA E STATO ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
