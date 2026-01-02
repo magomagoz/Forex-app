@@ -211,39 +211,39 @@ if df_d is not None:
     if last_rsi < 40: score += 5
     elif last_rsi > 60: score -= 5
 
-    # --- SISTEMA DI ALERT LAMPEGGIANTE (Punteggio > 80 o < 20) ---
-    color_score = "green" if score > 65 else "red" if score < 35 else "orange"
-    
+    # --- SISTEMA DI ALERT & SENTINEL ---
     if score >= 80 or score <= 20:
-        alert_msg = "🔥 ALTA PROBABILITÀ RILEVATA!" if score >= 80 else "⚠️ ATTENZIONE: FORTE PRESSIONE RIBASSISTA!"
+        alert_msg = "🔥 ALTA PROBABILITÀ RILEVATA!" if score >= 80 else "⚠️ FORTE PRESSIONE RIBASSISTA!"
+        
+        # Suono di notifica (usiamo un link a un suono pulito di sistema)
+        audio_url = "https://www.soundjay.com/buttons/beep-07a.mp3"
+        
         st.markdown(f"""
             <style>
-            @keyframes blink {{
-                0% {{ opacity: 1; }}
-                50% {{ opacity: 0.3; }}
-                100% {{ opacity: 1; }}
-            }}
-            .blink-div {{
+            @keyframes blink {{ 0% {{opacity: 1;}} 50% {{opacity: 0.3;}} 100% {{opacity: 1;}} }}
+            .sentinel-alert {{
                 background-color: {color_score};
                 color: white;
-                padding: 20px;
-                border-radius: 10px;
+                padding: 30px;
+                border-radius: 15px;
                 text-align: center;
-                font-weight: bold;
-                font-size: 24px;
                 animation: blink 1s infinite;
-                margin-bottom: 20px;
+                border: 4px solid white;
             }}
             </style>
-            <div class="blink-div">
-                {alert_msg} <br> <span style="font-size: 18px;">Punteggio: {score}/100</span>
+            <div class="sentinel-alert">
+                <h1>{alert_msg}</h1>
+                <h2>Punteggio Confluenza: {score}/100</h2>
             </div>
+            <audio autoplay>
+                <source src="{audio_url}" type="audio/mpeg">
+            </audio>
             """, unsafe_allow_html=True)
-    
-    # Visualizzazione Standard della Scorecard
-    st.markdown(f"""<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 10px solid {color_score};">
-        <h2 style="color: {color_score}; margin: 0;">Analisi Dettagliata: {score}/100</h2>
-        <p style="margin: 10px 0;"><b>Fattori di confluenza:</b> {', '.join(reasons)}</p></div>""", unsafe_allow_html=True)
+
+    # --- AUTO-REFRESH (Ogni 300 secondi = 5 minuti) ---
+    # Questo pezzo di codice forza l'app a ricaricarsi da sola
+    from streamlit_autorefresh import st_autorefresh
+    count = st_autorefresh(interval=300 * 1000, key="sentinel_refresh")
     
     # --- 11. CORRELAZIONE ---
     with st.expander("📊 Vedi Matrice di Correlazione"):
