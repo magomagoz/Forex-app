@@ -35,7 +35,7 @@ def calculate_squeeze(df):
     bb = ta.bbands(df['Close'], length=length, std=mult_bb)
     kc = ta.kc(df['High'], df['Low'], df['Close'], length=length, scalar=mult_kc)
     
-    # Selezione sicura colonne per evitare NameError
+    # Selezione sicura colonne
     lower_bb, upper_bb = bb.iloc[:, 0], bb.iloc[:, 2]
     lower_kc, upper_kc = kc.iloc[:, 0], kc.iloc[:, 2]
 
@@ -45,8 +45,10 @@ def calculate_squeeze(df):
 def get_correlation_matrix(pairs_list):
     combined_data = pd.DataFrame()
     for p in pairs_list:
-        df = get_market_data(p, "60d", "1d")
-        if df is not None:
+        df = yf.download(p, period="60d", interval="1d", progress=False)
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+        if not df.empty:
             combined_data[p] = df['Close']
     return combined_data.corr()
 
@@ -122,22 +124,23 @@ if df_d is not None:
     # --- 7. MODELLO PREDITTIVO ---
     st.markdown("---")
     st.subheader("🔮 Modello Predittivo AI (+1h)")
+    drift = 0.0 # Inizializzazione per scorecard
     if df_h is not None and len(df_h) > 24:
         recent_h = df_h['Close'].tail(24).values.reshape(-1, 1)
         model = LinearRegression().fit(np.arange(24).reshape(-1, 1), recent_h)
         pred = model.predict(np.array([[24]]))[0][0]
         curr_h = recent_h[-1][0]
+        drift = pred - curr_h
         
         cp1, cp2, cp3 = st.columns(3)
         cp1.metric("Prezzo Attuale", price_fmt.format(curr_h))
-        cp2.metric("Previsione +1h", price_fmt.format(pred), f"{pred-curr_h:.5f}")
+        cp2.metric("Previsione +1h", price_fmt.format(pred), f"{drift:.5f}")
         
-        # Reality Check logic
         if st.button("📸 Salva per Reality Check"):
             st.session_state.prediction_log = {"time": datetime.now().strftime("%H:%M"), "pred": pred, "pair": pair}
         
         st.line_chart(pd.DataFrame(recent_h, columns=['Prezzo']))
-    
+
     # --- 8. ANALISI SQUEEZE & VOLATILITÀ ---
     st.markdown("---")
     st.subheader("🌋 Analisi Volatilità & Squeeze")
@@ -165,7 +168,6 @@ if df_d is not None:
     m3.metric("Divergenza", div)
     m4.metric("ATR", price_fmt.format(last_atr))
 
-    # Logica Segnale
     action = None
     if (div == "📈 BULLISH" or last_rsi < 35) and last_adx > 20: action = "LONG"
     elif (div == "📉 BEARISH" or last_rsi > 65) and last_adx > 20: action = "SHORT"
@@ -180,52 +182,41 @@ if df_d is not None:
         st.success(f"**Segnale {action}** | Entry: {price_fmt.format(last_c)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}")
         st.info(f"Size: {lots:.2f} Lotti per rischiare ${risk_val:.2f}")
 
-# --- DASHBOARD DI SINTESI (SCORECARD) ---
-st.markdown("---")
-st.subheader("📊 Valutazione Opportunità (Confluenza)")
-
-# Calcolo del Punteggio (Max 100)
-score = 50  # Base neutrale
-reasons = []
-
-# 1. Check AI Momentum
-if drift > (pip_unit * 5): 
-    score += 15
-    reasons.append("AI: Inerzia Rialzista")
-elif drift < -(pip_unit * 5):
-    score -= 15
-    reasons.append("AI: Inerzia Ribassista")
-
-# 2. Check Currency Strength
-if strength_data.index[0] in pair[:3]: # La valuta base è la più forte
-    score += 20
-    reasons.append(f"Strength: {pair[:3]} è la valuta dominante")
-elif strength_data.index[-1] in pair[:3]: # La valuta base è la più debole
-    score -= 20
-    reasons.append(f"Strength: {pair[:3]} è la valuta più debole")
-
-# 3. Check Squeeze
-if not is_sqz:
-    score += 10 # Punti extra se siamo in fase di espansione
-    reasons.append("Volatilità: Release in corso")
-else:
-    reasons.append("Volatilità: Squeeze (Attenzione al Breakout)")
-
-# 4. Check RSI
-if last_rsi < 40: score += 5
-elif last_rsi > 60: score -= 5
-
-# Visualizzazione Gauge/Colore
-color_score = "green" if score > 65 else "red" if score < 35 else "orange"
-
-st.markdown(f"""
-<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 10px solid {color_score};">
-    <h2 style="color: {color_score}; margin: 0;">Punteggio Opportunità: {score}/100</h2>
-    <p style="margin: 10px 0;"><b>Fattori rilevati:</b> {', '.join(reasons)}</p>
-</div>
-""", unsafe_allow_html=True)
+    # --- 10. DASHBOARD DI SINTESI (SCORECARD) ---
+    st.markdown("---")
+    st.subheader("📊 Valutazione Opportunità (Confluenza)")
+    score = 50
+    reasons = []
     
-    # --- 10. CORRELAZIONE ---
+    if drift > (pip_unit * 5): 
+        score += 15
+        reasons.append("AI: Inerzia Rialzista")
+    elif drift < -(pip_unit * 5):
+        score -= 15
+        reasons.append("AI: Inerzia Ribassista")
+
+    if strength_data.index[0] in pair[:3]:
+        score += 20
+        reasons.append(f"Strength: {pair[:3]} Dominante")
+    elif strength_data.index[-1] in pair[:3]:
+        score -= 20
+        reasons.append(f"Strength: {pair[:3]} Debole")
+
+    if not is_sqz:
+        score += 10
+        reasons.append("Volatilità: Release")
+    else:
+        reasons.append("Volatilità: Squeeze")
+
+    if last_rsi < 40: score += 5
+    elif last_rsi > 60: score -= 5
+
+    color_score = "green" if score > 65 else "red" if score < 35 else "orange"
+    st.markdown(f"""<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 10px solid {color_score};">
+        <h2 style="color: {color_score}; margin: 0;">Punteggio Opportunità: {score}/100</h2>
+        <p style="margin: 10px 0;"><b>Fattori:</b> {', '.join(reasons)}</p></div>""", unsafe_allow_html=True)
+    
+    # --- 11. CORRELAZIONE ---
     with st.expander("📊 Vedi Matrice di Correlazione"):
         corr = get_correlation_matrix(["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"])
         fig_c, ax_c = plt.subplots()
