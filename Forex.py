@@ -211,10 +211,39 @@ if df_d is not None:
     if last_rsi < 40: score += 5
     elif last_rsi > 60: score -= 5
 
+    # --- SISTEMA DI ALERT LAMPEGGIANTE (Punteggio > 80 o < 20) ---
     color_score = "green" if score > 65 else "red" if score < 35 else "orange"
+    
+    if score >= 80 or score <= 20:
+        alert_msg = "🔥 ALTA PROBABILITÀ RILEVATA!" if score >= 80 else "⚠️ ATTENZIONE: FORTE PRESSIONE RIBASSISTA!"
+        st.markdown(f"""
+            <style>
+            @keyframes blink {{
+                0% {{ opacity: 1; }}
+                50% {{ opacity: 0.3; }}
+                100% {{ opacity: 1; }}
+            }}
+            .blink-div {{
+                background-color: {color_score};
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                text-align: center;
+                font-weight: bold;
+                font-size: 24px;
+                animation: blink 1s infinite;
+                margin-bottom: 20px;
+            }}
+            </style>
+            <div class="blink-div">
+                {alert_msg} <br> <span style="font-size: 18px;">Punteggio: {score}/100</span>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Visualizzazione Standard della Scorecard
     st.markdown(f"""<div style="background-color: #f0f2f6; padding: 20px; border-radius: 10px; border-left: 10px solid {color_score};">
-        <h2 style="color: {color_score}; margin: 0;">Punteggio Opportunità: {score}/100</h2>
-        <p style="margin: 10px 0;"><b>Fattori:</b> {', '.join(reasons)}</p></div>""", unsafe_allow_html=True)
+        <h2 style="color: {color_score}; margin: 0;">Analisi Dettagliata: {score}/100</h2>
+        <p style="margin: 10px 0;"><b>Fattori di confluenza:</b> {', '.join(reasons)}</p></div>""", unsafe_allow_html=True)
     
     # --- 11. CORRELAZIONE ---
     with st.expander("📊 Vedi Matrice di Correlazione"):
