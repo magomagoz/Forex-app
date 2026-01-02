@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas_ta as ta
+import pandas as ta
 import yfinance as download
 import yfinance as yf
 
