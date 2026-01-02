@@ -103,6 +103,45 @@ with st.spinner("Calcolo forza valute..."):
 
 st.info("**Strategia Professionale:** Cerca di accoppiare la valuta più forte (Top) con quella più debole (Worst). Quella coppia avrà il momentum più pulito e prevedibile.")
 
+def calculate_squeeze(df):
+    # Parametri standard: Bollinger (20, 2), Keltner (20, 1.5)
+    length = 20
+    mult_bb = 2
+    mult_kc = 1.5
+    
+    # Bollinger Bands
+    bb = ta.bbands(df['Close'], length=length, std=mult_bb)
+    # Keltner Channels
+    kc = ta.kc(df['High'], df['Low'], df['Close'], length=length, scalar=mult_kc)
+    
+    # Logica di Squeeze
+    # Se la banda superiore di BB è minore della superiore di KC 
+    # E la banda inferiore di BB è maggiore della inferiore di KC
+    is_sqz = (bb[f'BBU_{length}_{mult_bb}.0'] < kc[f'KCUe_{length}_{mult_kc}']) & \
+             (bb[f'BBL_{length}_{mult_bb}.0'] > kc[f'KCLe_{length}_{mult_kc}'])
+    
+    return is_sqz.iloc[-1], is_sqz
+
+# --- SEZIONE UI STREAMLIT ---
+st.markdown("---")
+st.subheader("🌋 Analisi Volatilità & Squeeze")
+
+is_squeezing, squeeze_series = calculate_squeeze(df_d)
+
+col_sqz1, col_sqz2 = st.columns([1, 2])
+
+with col_sqz1:
+    if is_squeezing:
+        st.warning("⚠️ SQUEEZE ATTIVO: Il mercato sta comprimendo volatilità. Grande movimento in arrivo.")
+    else:
+        st.success("🚀 RELEASE: Il momentum è in fase di espansione.")
+
+with col_sqz2:
+    # Mostriamo un piccolo grafico dello stato di squeeze (ultimi 50 giorni)
+    # 1 = Squeeze, 0 = No Squeeze
+    st.line_chart(squeeze_series.tail(50).astype(int))
+    st.caption("1.0 indica compressione (Squeeze), 0.0 indica espansione del prezzo.")
+
 # --- 2. FUNZIONI CORE (DATA & ANALYSIS) ---
 
 @st.cache_data(ttl=600)  # Cache di 10 minuti per evitare ban da Yahoo
