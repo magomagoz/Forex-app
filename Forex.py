@@ -11,6 +11,19 @@ import matplotlib.pyplot as plt
 # --- 1. CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
+# --- BANNER DI TESTATA ---
+st.markdown("""
+    <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
+                padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 25px;">
+        <h1 style="color: #00ffcc; font-family: 'Courier New', Courier, monospace; letter-spacing: 5px; margin: 0;">
+            📊 FOREX MOMENTUM PRO
+        </h1>
+        <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">
+            AI-Driven Market Analysis & Sentinel System
+        </p>
+    </div>
+""", unsafe_allow_html=True)
+
 # Inizializzazione Session State per il Reality Check
 if 'prediction_log' not in st.session_state:
     st.session_state['prediction_log'] = None
