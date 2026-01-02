@@ -2,151 +2,223 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-from streamlit_autorefresh import st_autorefresh
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from datetime import datetime
+import time
 
-# Aggiorna l'app ogni 5 minuti (300.000 millisecondi)
-#st_autorefresh(interval=300000, key="datarefresh")
+# --- 1. CONFIGURAZIONE PAGINA E STATO ---
+st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# 1. Funzione con Cache (scade ogni 10 minuti per non sovraccaricare)
-@st.cache_data(ttl=600)
-def get_clean_data(ticker):
-    df = yf.download(ticker, period="2y", interval="1d", progress=False)
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    return df.dropna()
+# Inizializzazione Session State per il Reality Check
+if 'prediction_log' not in st.session_state:
+    st.session_state['prediction_log'] = None
 
-# 2. Layout per il tasto di aggiornamento e timestamp
-col_title, col_btn = st.columns([4, 1])
+# --- 2. FUNZIONI CORE (DATA & ANALYSIS) ---
 
-with col_title:
-    st.title(f"Analisi Momentum: {pair}")
-
-with col_btn:
-    if st.button("🔄 AGGIORNA DATI"):
-        st.cache_data.clear()  # Pulisce la cache per forzare il nuovo download
-        st.rerun()
-
-# Mostra l'ultimo aggiornamento
-st.caption(f"Ultimo aggiornamento: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-# --- CONFIGURAZIONE PAGINA ---
-st.set_page_config(page_title="Forex Momentum Pro", layout="wide")
-
-def get_clean_data(ticker):
+@st.cache_data(ttl=600)  # Cache di 10 minuti per evitare ban da Yahoo
+def get_market_data(ticker, period, interval):
     try:
-        # Periodo 2y per avere abbastanza dati per medie mobili e indicatori
-        df = yf.download(ticker, period="2y", interval="1d", progress=False)
-        if df.empty:
-            return None
-        
-        # FIX: yfinance restituisce MultiIndex se non gestito
+        df = yf.download(ticker, period=period, interval=interval, progress=False)
+        # Fix per MultiIndex di yfinance recente
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-            
-        df = df.dropna()
+        
+        if df.empty: return None
+        df.dropna(inplace=True)
         return df
     except Exception as e:
-        st.error(f"Errore nel download dei dati: {e}")
+        st.error(f"Errore API Dati: {e}")
         return None
 
 def detect_divergence(df):
-    """
-    Rileva divergenze semplici tra Prezzo e RSI nelle ultime 10 sessioni
-    """
-    if len(df) < 15: return "Dati insufficienti"
+    """Logica avanzata per divergenze RSI su 14 periodi"""
+    if len(df) < 20: return "Dati Insufficienti"
     
-    current_close = df['Close'].iloc[-1]
-    prev_max_close = df['Close'].iloc[-11:-1].max()
-    prev_min_close = df['Close'].iloc[-11:-1].min()
+    # Prezzi e Indicatori recenti
+    price = df['Close']
+    rsi = df['RSI']
     
-    current_rsi = df['RSI'].iloc[-1]
-    prev_max_rsi = df['RSI'].iloc[-11:-1].max()
-    prev_min_rsi = df['RSI'].iloc[-11:-1].min()
+    # Swing High/Low logic (Semplificata per velocità)
+    curr_p = price.iloc[-1]
+    curr_r = rsi.iloc[-1]
+    prev_max_p = price.iloc[-15:-1].max()
+    prev_max_r = rsi.iloc[-15:-1].max()
+    prev_min_p = price.iloc[-15:-1].min()
+    prev_min_r = rsi.iloc[-15:-1].min()
     
-    # Divergenza Bearish (Prezzo sale, RSI scende)
-    if current_close > prev_max_close and current_rsi < prev_max_rsi:
-        return "Divergenza Bearish 📉"
-    # Divergenza Bullish (Prezzo scende, RSI sale)
-    elif current_close < prev_min_close and current_rsi > prev_min_rsi:
-        return "Divergenza Bullish 📈"
+    if curr_p > prev_max_p and curr_r < prev_max_r and curr_r > 50:
+        return "📉 BEARISH (Prezzo sale, Momentum scende)"
+    elif curr_p < prev_min_p and curr_r > prev_min_r and curr_r < 50:
+        return "📈 BULLISH (Prezzo scende, Momentum sale)"
     
-    return "Nessuna Divergenza"
+    return "Neutrale / Trend Following"
 
-# --- SIDEBAR: INPUT UTENTE ---
-st.sidebar.title("🛠 Configurazione Trader")
-pair = st.sidebar.selectbox("Coppia Valutaria", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "EURGBP=X"])
-balance = st.sidebar.number_input("Capitale Portafoglio ($)", value=10000)
-risk_percent = st.sidebar.slider("Rischio per Operazione (%)", 0.1, 5.0, 1.0)
-
-# --- MAIN APP ---
-st.title(f"Analisi Momentum Giornaliero: {pair}")
-
-data = get_clean_data(pair)
-
-if data is not None:
-    # --- CALCOLO INDICATORI ---
-    data['RSI'] = ta.rsi(data['Close'], length=14)
-    data['ATR'] = ta.atr(data['High'], data['Low'], data['Close'], length=14)
-    adx_df = ta.adx(data['High'], data['Low'], data['Close'], length=14)
-    data['ADX'] = adx_df['ADX_14']
-
-    # Valori attuali
-    last_price = data['Close'].iloc[-1]
-    last_rsi = data['RSI'].iloc[-1]
-    last_adx = data['ADX'].iloc[-1]
-    last_atr = data['ATR'].iloc[-1]
-    div_signal = detect_divergence(data)
-
-    # --- VISUALIZZAZIONE METRICHE ---
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Prezzo Attuale", f"{last_price:.4f}")
-    col2.metric("RSI (14)", f"{last_rsi:.2f}")
-    col3.metric("ADX (Trend Strength)", f"{last_adx:.2f}")
-    col4.metric("Segnale Divergenza", div_signal)
-
-    st.divider()
-
-    # --- LOGICA DI TRADING & RISK MANAGEMENT ---
-    st.subheader("🎯 Strategia e Punti di Entrata")
-    
-    # Esempio logica combinata: Momentum + Divergenza
-    if "Bullish" in div_signal and last_rsi < 40:
-        st.success("✅ SEGNALE BUY: Possibile inversione rialzista (Divergenza + Ipervenduto)")
-        
-        # Calcolo Livelli
-        stop_loss = last_price - (last_atr * 2)
-        take_profit = last_price + (last_atr * 4)
-        
-        # Calcolo Size (1 pip = 0.0001 per la maggior parte dei cross)
-        risk_amount = balance * (risk_percent / 100)
-        pip_distance = abs(last_price - stop_loss)
-        # Semplificazione per lotti standard (10$ a pip per 1 lotto su EURUSD)
-        position_size = risk_amount / (pip_distance * 100000) 
-        
-        st.write(f"**Entry Price:** {last_price:.4f}")
-        st.write(f"**Stop Loss (2xATR):** {stop_loss:.4f}")
-        st.write(f"**Take Profit (RR 1:2):** {take_profit:.4f}")
-        st.info(f"💰 **Size Suggerita:** {position_size:.2f} Lotti per rischiare {risk_amount:.2f}$")
-
-    elif "Bearish" in div_signal and last_rsi > 60:
-        st.error("⚠️ SEGNALE SELL: Possibile inversione ribassista (Divergenza + Ipercomprato)")
-        
-        stop_loss = last_price + (last_atr * 2)
-        take_profit = last_price - (last_atr * 4)
-        
-        risk_amount = balance * (risk_percent / 100)
-        pip_distance = abs(last_price - stop_loss)
-        position_size = risk_amount / (pip_distance * 100000)
-
-        st.write(f"**Entry Price:** {last_price:.4f}")
-        st.write(f"**Stop Loss (2xATR):** {stop_loss:.4f}")
-        st.write(f"**Take Profit (RR 1:2):** {take_profit:.4f}")
-        st.info(f"💰 **Size Suggerita:** {position_size:.2f} Lotti per rischiare {risk_amount:.2f}$")
-
+def get_pip_value(pair):
+    """Restituisce il valore di 1 pip e la formattazione corretta"""
+    if "JPY" in pair:
+        return 0.01, "{:.2f}"
     else:
-        st.info("Market Watch: Nessuna divergenza rilevante al momento. Il momentum attuale è guidato dal trend principale.")
+        return 0.0001, "{:.4f}"
 
-    # --- GRAFICO ---
-    st.line_chart(data['Close'].tail(50))
+# --- 3. INTERFACCIA LATERALE (TRADING DESK) ---
+st.sidebar.header("🛠 Trading Desk")
+pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "BTC-USD"])
+balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
+risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
+
+# Gestione JPY per formattazione
+pip_unit, price_fmt = get_pip_value(pair)
+
+# --- 4. HEADER & AGGIORNAMENTO ---
+col1, col2 = st.columns([5, 1])
+with col1:
+    st.title(f"Analisi & Previsione: {pair}")
+    st.caption(f"Ultimo Check: {datetime.now().strftime('%H:%M:%S')}")
+with col2:
+    if st.button("🔄 AGGIORNA"):
+        st.cache_data.clear()
+        st.rerun()
+
+# --- 5. LOGICA PREVISIONALE (HOURLY / INTRADAY) ---
+st.markdown("---")
+st.subheader("🔮 Modello Predittivo (Prossima Ora)")
+
+# Scarico dati orari per il modello ML
+df_h = get_market_data(pair, period="5d", interval="1h")
+
+if df_h is not None and len(df_h) > 24:
+    # Preparazione dati per Regressione Lineare (ultime 24 ore)
+    lookback = 24
+    recent_data = df_h['Close'].tail(lookback).values
+    X = np.arange(len(recent_data)).reshape(-1, 1)
+    y = recent_data.reshape(-1, 1)
+    
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    # Previsione t+1
+    next_index = np.array([[lookback]])
+    predicted_price = model.predict(next_index)[0][0]
+    current_price = y[-1][0]
+    drift = predicted_price - current_price
+    
+    # Visualizzazione Previsione
+    col_pred1, col_pred2, col_pred3 = st.columns(3)
+    
+    col_pred1.metric("Prezzo Attuale", price_fmt.format(current_price))
+    col_pred2.metric("Previsione +1h", price_fmt.format(predicted_price), 
+                     f"{drift:.5f} (Momentum Drift)")
+    
+    strength = "ALTA" if abs(drift) > (pip_unit * 10) else "BASSA"
+    direction = "RIALZISTA" if drift > 0 else "RIBASSISTA"
+    col_pred3.info(f"Inerzia: **{direction}** (Forza: {strength})")
+    
+    # --- MODULO REALITY CHECK (Didattico) ---
+    with st.expander("🧪 Test Accuratezza Modello (Reality Check)"):
+        st.write("Salva la previsione attuale e torna tra un'ora per vedere se il modello aveva ragione.")
+        
+        if st.button("📸 Salva Previsione Corrente"):
+            st.session_state['prediction_log'] = {
+                'time': datetime.now().strftime('%H:%M'),
+                'predicted': predicted_price,
+                'start_price': current_price,
+                'pair': pair
+            }
+            st.success("Previsione Salvata nel registro temporaneo!")
+            
+        # Verifica se esiste un log
+        if st.session_state['prediction_log'] and st.session_state['prediction_log']['pair'] == pair:
+            log = st.session_state['prediction_log']
+            st.write(f"**Previsione Salvata alle {log['time']}:** {price_fmt.format(log['predicted'])}")
+            
+            # Calcolo errore
+            error_pips = abs(current_price - log['predicted']) / pip_unit
+            accuracy_color = "green" if error_pips < 10 else "red"
+            st.markdown(f"Scostamento attuale: :**{accuracy_color}[{error_pips:.1f} pips]** dal target.")
+
+    # Grafico Proiezione
+    chart_data = pd.DataFrame({
+        'Storico (24h)': pd.Series(recent_data.flatten()),
+        'Trend Line': pd.Series(model.predict(X).flatten())
+    })
+    st.line_chart(chart_data)
+
 else:
-    st.warning("In attesa dei dati di mercato...")
+    st.warning("Dati orari insufficienti per il modello predittivo.")
+
+# --- 6. ANALISI STRATEGICA (DAILY / SWING) ---
+st.markdown("---")
+st.subheader("🎯 Setup Operativo (Daily)")
+
+df_d = get_market_data(pair, period="1y", interval="1d")
+
+if df_d is not None:
+    # Calcolo Indicatori
+    df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
+    df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
+    adx = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])
+    df_d['ADX'] = adx['ADX_14']
+    
+    # Ultimi valori
+    last_close = df_d['Close'].iloc[-1]
+    last_atr = df_d['ATR'].iloc[-1]
+    last_rsi = df_d['RSI'].iloc[-1]
+    last_adx = df_d['ADX'].iloc[-1]
+    signal_div = detect_divergence(df_d)
+    
+    # Dashboard Indicatori
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("RSI (Momentum)", f"{last_rsi:.1f}")
+    c2.metric("ATR (Volatilità)", price_fmt.format(last_atr))
+    c3.metric("ADX (Forza Trend)", f"{last_adx:.1f}")
+    c4.metric("Analisi Divergenza", signal_div)
+    
+    # --- GENERAZIONE SEGNALE DI TRADING ---
+    st.markdown("#### 💡 Suggerimento Operativo")
+    
+    trend_state = "Laterale"
+    if last_adx > 25: trend_state = "Trend Definito"
+    
+    # Logica Decisionale
+    action = None
+    if "BULLISH" in signal_div or (last_rsi < 40 and last_adx > 20):
+        action = "LONG"
+        sl_price = last_close - (2 * last_atr)
+        tp_price = last_close + (3 * last_atr) # RR 1:1.5 prudenziale
+        color = "success"
+    elif "BEARISH" in signal_div or (last_rsi > 60 and last_adx > 20):
+        action = "SHORT"
+        sl_price = last_close + (2 * last_atr)
+        tp_price = last_close - (3 * last_atr)
+        color = "error"
+    
+    if action:
+        # Calcolo Size
+        risk_amount = balance * (risk_pc / 100)
+        dist_pips = abs(last_close - sl_price) / pip_unit
+        
+        # Formula approssimata per lotti standard (1 lotto = 100k units)
+        # Assumendo conto in USD. Per precisione assoluta servirebbe tasso di cambio cross.
+        # Valore pip stimato: 10$ per coppie USD standard, variabile per cross.
+        val_pip_standard = 10 if "JPY" not in pair else 9 # approx
+        lot_size = risk_amount / (dist_pips * val_pip_standard)
+        
+        container = st.container(border=True)
+        container.subheader(f"Segnale: {action}")
+        
+        c_sig1, c_sig2 = container.columns(2)
+        c_sig1.write(f"**Entry:** {price_fmt.format(last_close)}")
+        c_sig1.write(f"**Stop Loss:** {price_fmt.format(sl_price)}")
+        c_sig1.write(f"**Take Profit:** {price_fmt.format(tp_price)}")
+        
+        c_sig2.info(f"💰 **Risk Management:**\n\n"
+                    f"- Capitale a rischio: ${risk_amount:.2f}\n"
+                    f"- Distanza SL: {dist_pips:.1f} pips\n"
+                    f"- **Size Consigliata:** {lot_size:.2f} Lotti")
+    else:
+        st.info("🚧 Nessun setup ad alta probabilità rilevato. Il mercato è in fase di attesa o consolidamento. Meglio non operare.")
+
+else:
+    st.error("Impossibile caricare i dati Daily. Riprova più tardi.")
+
