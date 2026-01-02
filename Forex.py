@@ -51,6 +51,58 @@ st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon=
 if 'prediction_log' not in st.session_state:
     st.session_state['prediction_log'] = None
 
+def get_currency_strength():
+    # Definiamo un set di coppie "cross" per isolare le valute
+    tickers = [
+        "EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", 
+        "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURJPY=X", 
+        "GBPJPY=X", "EURGBP=X"
+    ]
+    data = yf.download(tickers, period="2d", interval="1d", progress=False)
+    if isinstance(data.columns, pd.MultiIndex):
+        data = data['Close']
+    
+    # Calcolo variazione percentuale
+    returns = data.pct_change().iloc[-1] * 100
+    
+    # Isollamento delle singole valute (Semplificato)
+    strength = {
+        "USD": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
+        "EUR": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
+        "GBP": (returns["GBPUSD=X"] + returns["GBPJPY=X"] - returns["EURGBP=X"]) / 3,
+        "JPY": (-returns["USDJPY=X"] - returns["EURJPY=X"] - returns["GBPJPY=X"]) / 3,
+        "AUD": (returns["AUDUSD=X"]) / 1, # Semplificato
+        "CAD": (-returns["USDCAD=X"]) / 1,
+    }
+    return pd.Series(strength).sort_values(ascending=False)
+
+# --- VISUALIZZAZIONE IN STREAMLIT ---
+st.markdown("---")
+st.subheader("⚡ Currency Strength Meter (Intraday)")
+
+with st.spinner("Calcolo forza valute..."):
+    strength_data = get_currency_strength()
+    
+    # Creazione di colonne per i primi e gli ultimi
+    col_str1, col_str2 = st.columns([2, 1])
+    
+    with col_str1:
+        # Grafico a barre orizzontali
+        fig_str, ax_str = plt.subplots(figsize=(8, 4))
+        colors = ['green' if x > 0 else 'red' for x in strength_data.values]
+        strength_data.plot(kind='barh', color=colors, ax=ax_str)
+        ax_str.set_title("Forza Relativa %")
+        ax_str.grid(axis='x', linestyle='--', alpha=0.7)
+        st.pyplot(fig_str)
+
+    with col_str2:
+        st.write("**Top Momentum:**")
+        st.success(f"🥇 {strength_data.index[0]}")
+        st.write("**Worst Momentum:**")
+        st.error(f"😴 {strength_data.index[-1]}")
+
+st.info("**Strategia Professionale:** Cerca di accoppiare la valuta più forte (Top) con quella più debole (Worst). Quella coppia avrà il momentum più pulito e prevedibile.")
+
 # --- 2. FUNZIONI CORE (DATA & ANALYSIS) ---
 
 @st.cache_data(ttl=600)  # Cache di 10 minuti per evitare ban da Yahoo
