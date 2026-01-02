@@ -3,6 +3,28 @@ import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
 
+# 1. Funzione con Cache (scade ogni 10 minuti per non sovraccaricare)
+@st.cache_data(ttl=600)
+def get_clean_data(ticker):
+    df = yf.download(ticker, period="2y", interval="1d", progress=False)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
+    return df.dropna()
+
+# 2. Layout per il tasto di aggiornamento e timestamp
+col_title, col_btn = st.columns([4, 1])
+
+with col_title:
+    st.title(f"Analisi Momentum: {pair}")
+
+with col_btn:
+    if st.button("🔄 AGGIORNA DATI"):
+        st.cache_data.clear()  # Pulisce la cache per forzare il nuovo download
+        st.rerun()
+
+# Mostra l'ultimo aggiornamento
+st.caption(f"Ultimo aggiornamento: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
 # --- CONFIGURAZIONE PAGINA ---
 st.set_page_config(page_title="Forex Momentum Pro", layout="wide")
 
