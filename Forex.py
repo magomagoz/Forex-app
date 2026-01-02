@@ -73,12 +73,12 @@ def get_currency_strength():
     returns = data.pct_change().iloc[-1] * 100
     
     strength = {
-        "USD": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
-        "EUR": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
-        "GBP": (returns["GBPUSD=X"] + returns["GBPJPY=X"] - returns["EURGBP=X"]) / 3,
-        "JPY": (-returns["USDJPY=X"] - returns["EURJPY=X"] - returns["GBPJPY=X"]) / 3,
-        "AUD": (returns["AUDUSD=X"]) / 1,
-        "CAD": (-returns["USDCAD=X"]) / 1,
+        "USD 🇺🇸": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
+        "EUR 🇪🇺": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
+        "GBP 🇬🇧": (returns["GBPUSD=X"] + returns["GBPJPY=X"] - returns["EURGBP=X"]) / 3,
+        "JPY 🇯🇵": (-returns["USDJPY=X"] - returns["EURJPY=X"] - returns["GBPJPY=X"]) / 3,
+        "AUD 🇦🇺": (returns["AUDUSD=X"]) / 1,
+        "CAD 🇨🇦": (-returns["USDCAD=X"]) / 1,
     }
     return pd.Series(strength).sort_values(ascending=False)
 
