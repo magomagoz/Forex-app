@@ -2,6 +2,10 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
+from streamlit_autorefresh import st_autorefresh
+
+# Aggiorna l'app ogni 5 minuti (300.000 millisecondi)
+#st_autorefresh(interval=300000, key="datarefresh")
 
 # 1. Funzione con Cache (scade ogni 10 minuti per non sovraccaricare)
 @st.cache_data(ttl=600)
