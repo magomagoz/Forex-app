@@ -9,6 +9,34 @@ import time
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+# --- DEFINIZIONE FUNZIONE (Spostala in alto nel file se necessario) ---
+def calculate_squeeze(df):
+    # Parametri: Bollinger (20, 2), Keltner (20, 1.5)
+    length = 20
+    mult_bb = 2
+    mult_kc = 1.5
+    
+    # Calcolo Bande di Bollinger
+    bb = ta.bbands(df['Close'], length=length, std=mult_bb)
+    # Calcolo Canali di Keltner
+    kc = ta.kc(df['High'], df['Low'], df['Close'], length=length, scalar=mult_kc)
+    
+    # Se le colonne hanno nomi complessi (tipico di pandas_ta), usiamo questo fix:
+    lower_bb = bb.iloc[:, 0] # Banda inferiore
+    upper_bb = bb.iloc[:, 2] # Banda superiore
+    lower_kc = kc.iloc[:, 0] # Canale inferiore
+    upper_kc = kc.iloc[:, 2] # Canale superiore
+
+    # Logica Squeeze: Bollinger dentro Keltner
+    is_sqz = (upper_bb < upper_kc) & (lower_bb > lower_kc)
+    return is_sqz.iloc[-1], is_sqz
+
+# --- CHIAMATA DELLA FUNZIONE (Riga 129) ---
+# Assicurati che df_d esista e non sia vuoto
+if df_d is not None:
+    is_squeezing, squeeze_series = calculate_squeeze(df_d)
+    # ... resto del codice per visualizzare lo squeeze
+
 def get_correlation_matrix(pairs_list):
     """Scarica i dati per più coppie e calcola la correlazione"""
     combined_data = pd.DataFrame()
