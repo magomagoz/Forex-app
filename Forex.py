@@ -279,12 +279,12 @@ if df_d is not None and df_h is not None:
 else:
     st.error("Connessione dati fallita. Ricarica.")
         
-        # Log Automatico
-        new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
-        if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
-            st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
+    # Log Automatico
+    new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
+    if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
+       st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
         
-        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+    st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
 
     st.line_chart(pd.DataFrame({'Price': recent_data, 'AI Trend': model.predict(X).flatten()}))
 
