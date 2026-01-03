@@ -342,5 +342,5 @@ else:
     with st.expander("📜 Registro Segnali Sessione"):
         st.dataframe(st.session_state['signal_history'].tail(10))
 
-    else:
-        st.warning("Connessione ai mercati in corso...")
+else:
+    st.warning("Connessione ai mercati in corso...")
