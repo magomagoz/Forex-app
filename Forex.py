@@ -216,17 +216,55 @@ if df_d is not None and df_h is not None:
     # --- 7. ORACLE SCORE & SENTINEL ---
     final_score = 50
     reasons = []
-    
+        
     if drift > (pip_unit * 2): final_score += 20; reasons.append("Inerzia Rialzista")
     elif drift < -(pip_unit * 2): final_score -= 20; reasons.append("Inerzia Ribassista")
     
     if display_strength.index[0] in pair[:3]: final_score += 20; reasons.append(f"{pair[:3]} Forte")
     elif display_strength.index[-1] in pair[:3]: final_score -= 20; reasons.append(f"{pair[:3]} Debole")
 
+    action = "LONG" if (score >= 75 and last_rsi < 60) else "SHORT" if (score <= 25 and last_rsi > 40) else None
+
     if final_score >= 80 or final_score <= 20:
         st.toast("🚨 SEGNALE SENTINEL ATTIVO", icon="🎯")
         st.error(f"SENTINEL ALERT: Confluenza ({final_score}/100) - {', '.join(reasons)}")
         st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+    
+    # --- VISUALIZZAZIONE SEGNALE & MONEY MANAGEMENT ---
+    st.markdown("---")
+    if action:
+        # Calcolo Livelli
+        sl = last_c - (1.5 * last_atr) if action == "LONG" else last_c + (1.5 * last_atr)
+        tp = last_c + (3 * last_atr) if action == "LONG" else last_c - (3 * last_atr)
+        
+        # CALCOLO SIZE (LOTTI)
+        risk_cash = balance * (risk_pc / 100)
+        dist_pips = abs(last_c - sl) / pip_unit
+        # Formula: Lotti = Rischio($) / (Pips Stop Loss * Valore Pip)
+        # 1 lotto standard = 10 unità di valuta per pip (per coppie USD)
+        lotti = risk_cash / (dist_pips * pip_mult)
+        
+        color = "#00ffcc" if action == "LONG" else "#ff4b4b"
+        st.markdown(f"""
+            <div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
+                <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE SENTINEL: {action}</h2>
+                <table style="width:100%; color: white; font-size: 18px;">
+                    <tr>
+                        <td><b>Entry:</b> {price_fmt.format(last_c)}</td>
+                        <td><b>Stop Loss:</b> {price_fmt.format(sl)}</td>
+                        <td><b>Take Profit:</b> {price_fmt.format(tp)}</td>
+                    </tr>
+                    <tr style="color: #ffcc00;">
+                        <td><b>Rischio:</b> ${risk_cash:.2f}</td>
+                        <td><b>Distanza SL:</b> {dist_pips:.1f} pips</td>
+                        <td><b>SIZE CONSIGLIATA:</b> {lotti:.2f} Lotti</td>
+                    </tr>
+                </table>
+            </div>
+        """, unsafe_allow_html=True)
+        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+    else:
+        st.info("🔎 Sentinel in scansione... Nessun setup ad alta probabilità al momento.")
 
     # --- 8. SETUP OPERATIVO DAILY ---
     st.markdown("---")
@@ -298,3 +336,11 @@ else:
     else:
         st.error("Dati non disponibili. Riconnessione...")
 
+    # --- GRAFICO ---
+    st.line_chart(df_h['Close'].tail(50))
+    
+    with st.expander("📜 Registro Segnali Sessione"):
+        st.dataframe(st.session_state['signal_history'].tail(10))
+
+    else:
+        st.warning("Connessione ai mercati in corso...")
