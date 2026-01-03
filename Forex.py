@@ -20,7 +20,7 @@ st.markdown("""
             📊 FOREX MOMENTUM PRO
         </h1>
         <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">
-            Sentinel System • Font Optimized for iPad
+            Sentinel System • AI Confluence • Notification v2.0
         </p>
     </div>
 """, unsafe_allow_html=True)
@@ -83,12 +83,13 @@ df_d = get_market_data(pair, "1y", "1d")
 df_h = get_market_data(pair, "5d", "1h")
 
 if df_d is not None and df_h is not None:
-    # Calcoli AI e Squeeze (stessi della versione precedente)
+    # --- CALCOLO AI & DRIFT ---
     recent_h = df_h['Close'].tail(24).values.reshape(-1, 1)
     model = LinearRegression().fit(np.arange(24).reshape(-1, 1), recent_h)
     pred_1h = model.predict(np.array([[24]]))[0][0]
     drift = pred_1h - recent_h[-1][0]
     
+    # --- CALCOLO SQUEEZE ---
     std = df_d['Close'].rolling(20).std()
     ma = df_d['Close'].rolling(20).mean()
     upper_bb = ma + (2 * std)
@@ -97,45 +98,49 @@ if df_d is not None and df_h is not None:
     upper_kc = ma + (1.5 * atr_val)
     is_sqz = (upper_bb.iloc[-1] < upper_kc.iloc[-1])
 
+    # --- CALCOLO FORZA VALUTE ---
     strength_data = get_currency_strength()
 
-    # --- 5. ORACLE SCORE ---
+    # --- 5. ORACLE SCORE & NOTIFICHE TESTUALI ---
     final_score = 50
     reasons = []
-    if drift > (pip_unit * 2): final_score += 20; reasons.append("AI Bullish")
-    elif drift < -(pip_unit * 2): final_score -= 20; reasons.append("AI Bearish")
-    if strength_data.index[0] in pair[:3]: final_score += 20; reasons.append(f"{pair[:3]} Strong")
-    elif strength_data.index[-1] in pair[:3]: final_score -= 20; reasons.append(f"{pair[:3]} Weak")
+    
+    if drift > (pip_unit * 2): final_score += 20; reasons.append("AI Bullish Inerzia")
+    elif drift < -(pip_unit * 2): final_score -= 20; reasons.append("AI Bearish Inerzia")
+    
+    if strength_data.index[0] in pair[:3]: final_score += 20; reasons.append(f"Forza: {pair[:3]} Dominante")
+    elif strength_data.index[-1] in pair[:3]: final_score -= 20; reasons.append(f"Forza: {pair[:3]} Debole")
 
-    # Alert Box
-    if final_score >= 80 or final_score <= 20:
-        st.error(f"⚠️ SENTINEL ALERT ({final_score}/100): {', '.join(reasons)}")
-        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+    # --- NOTIFICA PERSISTENTE IN ALTO ---
+    if final_score >= 80:
+        st.toast(f"🚀 SEGNALE LONG RILEVATO: {pair}", icon="🔥")
+        st.error(f"⚠️ SENTINEL ALERT: Confluenza Rialzista ({final_score}/100) - {', '.join(reasons)}")
+    elif final_score <= 20:
+        st.toast(f"📉 SEGNALE SHORT RILEVATO: {pair}", icon="⚠️")
+        st.error(f"⚠️ SENTINEL ALERT: Confluenza Ribassista ({final_score}/100) - {', '.join(reasons)}")
 
-    # --- 6. VISUALIZZAZIONE BOX VALUTE (FONT BIANCO) ---
+    # --- 6. VISUALIZZAZIONE ---
     st.subheader("⚡ Currency Strength Meter")
     cols = st.columns(6)
     for i, curr in enumerate(strength_data.index[:6]):
         val = strength_data[curr]
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
-        # AGGIUNTO color: white per il nome della valuta
-        cols[i].markdown(f"""
-            <div style='text-align:center; border:1px solid #444; border-radius:10px; padding:12px; background:#1e1e1e; box-shadow: 2px 2px 5px rgba(0,0,0,0.3);'>
-                <b style='color: white; font-size: 16px; letter-spacing: 1px;'>{curr}</b><br>
-                <span style='color:{col_c}; font-size: 20px; font-weight: bold;'>{val:.2f}%</span>
-            </div>
-            """, unsafe_allow_html=True)
+        cols[i].markdown(f"<div style='text-align:center; border:1px solid #333; border-radius:10px; padding:10px; background:#111;'><b>{curr}</b><br><span style='color:{col_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
     st.markdown("---")
     m1, m2, m3 = st.columns(3)
     m1.metric("Prezzo", price_fmt.format(recent_h[-1][0]))
-    m2.metric("AI Pred. (+1h)", price_fmt.format(pred_1h), f"{drift:.5f}")
+    m2.metric("AI Prediction (+1h)", price_fmt.format(pred_1h), f"{drift:.5f}")
     m3.metric("Oracle Score", f"{final_score}/100")
 
     st.line_chart(df_h['Close'].tail(50))
     
     if is_sqz:
-        st.warning("🌋 SQUEEZE ATTIVO: Compressione volatilità.")
+        st.warning("🌋 SQUEEZE ATTIVO: Possibile movimento esplosivo imminente.")
+    
+    # Audio Alert
+    if final_score >= 80 or final_score <= 20:
+        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
 
 else:
-    st.info("Sincronizzazione dati...")
+    st.info("In attesa di dati freschi dal mercato...")
