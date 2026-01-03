@@ -24,39 +24,7 @@ if 'signal_history' not in st.session_state:
 if 'prediction_log' not in st.session_state:
     st.session_state['prediction_log'] = None
 
-# --- BANNER DI TESTATA ---
-st.markdown("""
-    <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
-                padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 25px; border: 1px solid #00ffcc;">
-        <h1 style="color: #00ffcc; font-family: 'Courier New', Courier, monospace; letter-spacing: 5px; margin: 0;">
-            📊 FOREX MOMENTUM PRO
-        </h1>
-        <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">
-            Sentinel System • Visual Analytics v3.0 • AI Drift Engine
-        </p>
-    </div>
-""", unsafe_allow_html=True)
-
-# --- 2. SIDEBAR & COUNTDOWN ---
-st.sidebar.header("🛠 Trading Desk")
-
-# Countdown Timer Visivo
-st.sidebar.subheader("⏳ Prossimo Update")
-container_timer = st.sidebar.empty()
-# Nota: Streamlit riesegue tutto il codice al refresh, qui simuliamo la percezione del tempo
-container_timer.info("Aggiornamento in corso...")
-
-pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "BTC-USD"])
-balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
-risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
-
-st.sidebar.markdown("---")
-status_sessions = get_session_status()
-for s, op in status_sessions.items():
-    color = "🟢" if op else "🔴"
-    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
-
-# --- 3. FUNZIONI TECNICHE ---
+# --- FUNZIONI TECNICHE (Spostate in alto per essere disponibili) ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
@@ -108,9 +76,9 @@ def detect_divergence(df):
         return "📈 BULLISH (Div. Positiva)"
     return "Neutrale"
 
-def get_pip_value(pair):
-    if "JPY" in pair: return 0.01, "{:.2f}"
-    return 0.0001, "{:.4f}"
+def get_pip_info(pair):
+    if "JPY" in pair: return 0.01, "{:.2f}", 1000 
+    return 0.0001, "{:.4f}", 10
 
 def calculate_squeeze(df):
     length, mult_bb, mult_kc = 20, 2, 1.5
@@ -130,27 +98,47 @@ def get_correlation_matrix(pairs_list):
             combined_data[p] = df['Close']
     return combined_data.corr()
 
+# --- BANNER DI TESTATA ---
+st.markdown("""
+    <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
+                padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 25px; border: 1px solid #00ffcc;">
+        <h1 style="color: #00ffcc; font-family: 'Courier New', Courier, monospace; letter-spacing: 5px; margin: 0;">
+            📊 FOREX MOMENTUM PRO
+        </h1>
+        <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">
+            Sentinel System • AI Drift Engine • Risk Management v4.0
+        </p>
+    </div>
+""", unsafe_allow_html=True)
 
-# --- 5. HEADER & DATA FETCH ---
-col_head1, col_head2 = st.columns([5, 1])
-with col_head1:
-    st.title(f"Analisi: {pair}")
-    st.caption(f"Ultimo Check: {datetime.now().strftime('%H:%M:%S')}")
-with col_head2:
-    if st.button("🔄 AGGIORNA"):
-        st.cache_data.clear()
-        st.rerun()
+# --- 2. SIDEBAR & COUNTDOWN ---
+st.sidebar.header("🛠 Trading Desk")
+container_timer = st.sidebar.empty()
+container_timer.info("Prossimo Update: 120s")
 
-    df_d = get_market_data(pair, "1y", "1d")
-    df_h = get_market_data(pair, "5d", "1h")
+pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
+balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
+risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
+
+st.sidebar.markdown("---")
+status_sessions = get_session_status()
+for s, op in status_sessions.items():
+    color = "🟢" if op else "🔴"
+    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
+
+# --- 3. DATA FETCH ---
+pip_unit, price_fmt, pip_mult = get_pip_info(pair)
+df_d = get_market_data(pair, "1y", "1d")
+df_h = get_market_data(pair, "5d", "1h")
 
 if df_d is not None and df_h is not None:
-    
-    # --- 5. STRENGTH METER & CHART ---
+    # --- HEADER ---
+    st.title(f"Analisi: {pair}")
+    st.caption(f"Ultimo Check: {datetime.now().strftime('%H:%M:%S')}")
+
+    # --- STRENGTH METER ---
     st.subheader("⚡ Currency Strength Meter")
     strength_series = get_currency_strength()
-    
-    # Box Orizzontali
     display_strength = strength_series.sort_values(ascending=False)
     cols = st.columns(6)
     for i, curr in enumerate(display_strength.index[:6]):
@@ -158,84 +146,52 @@ if df_d is not None and df_h is not None:
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
         cols[i].markdown(f"""
             <div style='text-align:center; border:1px solid #444; border-radius:10px; padding:12px; background:#1e1e1e;'>
-                <b style='color: white; font-size: 16px;'>{curr}</b><br>
-                <span style='color:{col_c}; font-size: 18px; font-weight: bold;'>{val:.2f}%</span>
+                <b style='color: white; font-size: 14px;'>{curr}</b><br>
+                <span style='color:{col_c}; font-size: 16px; font-weight: bold;'>{val:.2f}%</span>
             </div>
             """, unsafe_allow_html=True)
 
-    with st.expander("📊 Analisi Comparativa Forza", expanded=True):
-        fig, ax = plt.subplots(figsize=(10, 3))
-        fig.patch.set_facecolor('#0e1117')
-        ax.set_facecolor('#0e1117')
-        colors = ['#00ffcc' if x > 0 else '#ff4b4b' for x in strength_series.values]
-        strength_series.plot(kind='barh', color=colors, ax=ax)
-        ax.tick_params(colors='white')
-        st.pyplot(fig)
-    
-    # --- 6. AI PREDICTION ENGINE ---
+    # --- AI PREDICTION ---
     st.markdown("---")
-    st.subheader("🔮 Modello Predittivo AI (+1h)")
-    
     lookback = 24
-    recent_data = df_h['Close'].tail(lookback).values
-    X = np.arange(len(recent_data)).reshape(-1, 1)
-    y = recent_data.reshape(-1, 1)
-    
-    model = LinearRegression().fit(X, y)
-    predicted_price = model.predict(np.array([[lookback]]))[0][0]
-    current_price = y[-1][0]
-    drift = predicted_price - current_price
+    recent_h = df_h['Close'].tail(lookback).values.reshape(-1, 1)
+    X_model = np.arange(len(recent_h)).reshape(-1, 1)
+    model = LinearRegression().fit(X_model, recent_h)
+    pred_price = model.predict(np.array([[lookback]]))[0][0]
+    drift = pred_price - recent_h[-1][0]
 
-    col_p1, col_p2, col_p3 = st.columns(3)
-    col_p1.metric("Prezzo Attuale", price_fmt.format(current_price))
-    col_p2.metric("Previsione AI", price_fmt.format(predicted_price), f"{drift:.5f}")
-    
-    # Reality Check
-    with st.expander("🧪 Reality Check"):
-        if st.button("📸 Salva Previsione"):
-            st.session_state['prediction_log'] = {'time': datetime.now().strftime('%H:%M'), 'pred': predicted_price, 'pair': pair}
-        if st.session_state['prediction_log']:
-            log = st.session_state['prediction_log']
-            st.write(f"Ultimo salvataggio: {log['pred']:.5f} alle {log['time']}")
+    # --- INDICATORI TECNICI ---
+    df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
+    df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
+    df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
+    last_c, last_rsi, last_adx, last_atr = df_d['Close'].iloc[-1], df_d['RSI'].iloc[-1], df_d['ADX'].iloc[-1], df_d['ATR'].iloc[-1]
+    div_sig = detect_divergence(df_d)
+    is_sqz, _ = calculate_squeeze(df_d)
 
-    st.line_chart(pd.DataFrame({'Storico': recent_data, 'Trend': model.predict(X).flatten()}))
+    # --- SENTINEL SCORE ---
+    final_score = 50
+    reasons = []
+    if drift > (pip_unit * 2): final_score += 25; reasons.append("AI Bullish")
+    elif drift < -(pip_unit * 2): final_score -= 25; reasons.append("AI Bearish")
+    if display_strength.index[0] in pair[:3]: final_score += 25; reasons.append(f"{pair[:3]} Forte")
+    elif display_strength.index[-1] in pair[:3]: final_score -= 25; reasons.append(f"{pair[:3]} Debole")
 
+    # Metrics Display
     m1, m2, m3 = st.columns(3)
-    m1.metric("Prezzo Attuale", price_fmt.format(y[-1][0]))
+    m1.metric("Prezzo Attuale", price_fmt.format(last_c))
     m2.metric("Inerzia AI (+1h)", price_fmt.format(pred_price), f"{drift:.5f}")
     m3.metric("Sentinel Score", f"{final_score}/100")
 
-    
-    # --- 7. ORACLE SCORE & SENTINEL ---
-    final_score = 50
-    reasons = []
-        
-    if drift > (pip_unit * 2): final_score += 20; reasons.append("Inerzia Rialzista")
-    elif drift < -(pip_unit * 2): final_score -= 20; reasons.append("Inerzia Ribassista")
-    
-    if display_strength.index[0] in pair[:3]: final_score += 20; reasons.append(f"{pair[:3]} Forte")
-    elif display_strength.index[-1] in pair[:3]: final_score -= 20; reasons.append(f"{pair[:3]} Debole")
-
-    action = "LONG" if (score >= 75 and last_rsi < 60) else "SHORT" if (score <= 25 and last_rsi > 40) else None
-
-    if final_score >= 80 or final_score <= 20:
-        st.toast("🚨 SEGNALE SENTINEL ATTIVO", icon="🎯")
-        st.error(f"SENTINEL ALERT: Confluenza ({final_score}/100) - {', '.join(reasons)}")
-        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
-    
-    # --- VISUALIZZAZIONE SEGNALE & MONEY MANAGEMENT ---
+    # --- SEGNALE OPERATIVO ---
     st.markdown("---")
+    action = "LONG" if (final_score >= 75 and last_rsi < 65) else "SHORT" if (final_score <= 25 and last_rsi > 35) else None
+
     if action:
-        # Calcolo Livelli
         sl = last_c - (1.5 * last_atr) if action == "LONG" else last_c + (1.5 * last_atr)
         tp = last_c + (3 * last_atr) if action == "LONG" else last_c - (3 * last_atr)
-        
-        # CALCOLO SIZE (LOTTI)
         risk_cash = balance * (risk_pc / 100)
         dist_pips = abs(last_c - sl) / pip_unit
-        # Formula: Lotti = Rischio($) / (Pips Stop Loss * Valore Pip)
-        # 1 lotto standard = 10 unità di valuta per pip (per coppie USD)
-        lotti = risk_cash / (dist_pips * pip_mult)
+        lotti = risk_cash / (dist_pips * pip_mult) if dist_pips > 0 else 0
         
         color = "#00ffcc" if action == "LONG" else "#ff4b4b"
         st.markdown(f"""
@@ -250,81 +206,44 @@ if df_d is not None and df_h is not None:
                     <tr style="color: #ffcc00;">
                         <td><b>Rischio:</b> ${risk_cash:.2f}</td>
                         <td><b>Distanza SL:</b> {dist_pips:.1f} pips</td>
-                        <td><b>SIZE CONSIGLIATA:</b> {lotti:.2f} Lotti</td>
+                        <td><b>SIZE:</b> {lotti:.2f} Lotti</td>
                     </tr>
                 </table>
             </div>
         """, unsafe_allow_html=True)
+        st.toast(f"🚨 SEGNALE {action} RILEVATO", icon="🎯")
         st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+        
+        # Log History
+        new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
+        if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
+            st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
     else:
-        st.info("🔎 Sentinel in scansione... Nessun setup ad alta probabilità al momento.")
+        st.info("🔎 Sentinel in scansione... Nessun setup ad alta probabilità.")
 
-    # --- 8. SETUP OPERATIVO DAILY ---
-    st.markdown("---")
-    st.subheader("🎯 Analisi Strategica (Daily)")
-
-
-    # --- SENTINEL ALERT & LOGGING ---
-    df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
-    df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
-    df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
+    # --- GRAFICI E STRUMENTI ---
+    st.line_chart(df_h['Close'].tail(50))
     
-    is_sqz, sqz_series = calculate_squeeze(df_d)
-    div_sig = detect_divergence(df_d)
-    
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("RSI", f"{df_d['RSI'].iloc[-1]:.1f}")
-    c2.metric("ADX", f"{df_d['ADX'].iloc[-1]:.1f}")
-    c3.metric("Divergenza", div_sig)
-    c4.metric("Squeeze", "ATTIVO" if is_sqz else "RELEASE")
-    
-    last_c, last_rsi, last_adx, last_atr = df_d['Close'].iloc[-1], df_d['RSI'].iloc[-1], df_d['ADX'].iloc[-1], df_d['ATR'].iloc[-1]
-    
-    action = None
-    if (last_rsi < 35 or final_score >= 75) and last_adx > 18: action = "LONG"
-    elif (last_rsi > 65 or final_score <= 25) and last_adx > 18: action = "SHORT"
+    col_inf1, col_inf2 = st.columns(2)
+    with col_inf1:
+        with st.expander("📊 Strategia Daily Details"):
+            st.write(f"RSI: {last_rsi:.1f} | ADX: {last_adx:.1f}")
+            st.write(f"Divergenza: {div_sig}")
+            st.write(f"Squeeze: {'ATTIVO' if is_sqz else 'RELEASE'}")
+    with col_inf2:
+        with st.expander("📊 Correlazione Asset"):
+            corr = get_correlation_matrix(["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"])
+            fig_corr, ax_corr = plt.subplots()
+            sns.heatmap(corr, annot=True, cmap="RdYlGn", ax=ax_corr)
+            st.pyplot(fig_corr)
 
-    if action:
-        sl = last_c - (1.5 * last_atr) if action == "LONG" else last_c + (1.5 * last_atr)
-        tp = last_c + (3 * last_atr) if action == "LONG" else last_c - (3 * last_atr)
-        st.success(f"🎯 **SEGNALE RILEVATO: {action}** | Entry: {price_fmt.format(last_c)}")
-
-    # Trading Signal Logic
-    last_close = df_d['Close'].iloc[-1]
-    last_atr = df_d['ATR'].iloc[-1]
-    action = None
-    if (div_sig == "📈 BULLISH" or df_d['RSI'].iloc[-1] < 35) and df_d['ADX'].iloc[-1] > 20: action = "LONG"
-    elif (div_sig == "📉 BEARISH" or df_d['RSI'].iloc[-1] > 65) and df_d['ADX'].iloc[-1] > 20: action = "SHORT"
-
-    if action:
-        sl = last_close - (2 * last_atr) if action == "LONG" else last_close + (2 * last_atr)
-        tp = last_close + (4 * last_atr) if action == "LONG" else last_close - (4 * last_atr)
-        st.success(f"**SEGNALE {action}** | Entry: {price_fmt.format(last_close)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}")
-    
-    with st.expander("📊 Correlazione Asset"):
-        corr = get_correlation_matrix(["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"])
-        fig_corr, ax_corr = plt.subplots()
-        sns.heatmap(corr, annot=True, cmap="RdYlGn", ax=ax_corr)
-        st.pyplot(fig_corr)
+    # Sidebar History
+    if not st.session_state['signal_history'].empty:
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📜 Registro Segnali")
+        st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
+        csv = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+        st.sidebar.download_button("Scarica CSV", csv, "segnali.csv", "text/csv")
 
 else:
-    st.error("Connessione dati fallita. Ricarica.")
-        
-    # Log Automatico
-    new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
-    if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
-       st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
-        
-    st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
-
-    st.line_chart(pd.DataFrame({'Price': recent_data, 'AI Trend': model.predict(X).flatten()}))
-
-    # Esposizione registro
-    if not st.session_state['signal_history'].empty:
-        with st.sidebar.expander("📜 Registro Sessione"):
-            st.dataframe(st.session_state['signal_history'].tail(10))
-            csv = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
-            st.download_button("Scarica CSV", csv, "segnali.csv", "text/csv")
-
-    else:
-        st.error("Dati non disponibili. Riconnessione...")
+    st.error("Dati non disponibili o errore API.")
