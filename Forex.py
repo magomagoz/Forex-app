@@ -12,13 +12,13 @@ from streamlit_autorefresh import st_autorefresh
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# Refresh globale ogni 120 secondi
-st_autorefresh(interval=120 * 1000, key="sentinel_full_refresh")
+# Refresh automatico ogni 120 secondi (Sistema Sentinel)
+st_autorefresh(interval=120 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
 
-# --- 2. FUNZIONI TECNICHE (Tutte le tue logiche originali) ---
+# --- 2. FUNZIONI TECNICHE ORIGINALI ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
@@ -35,7 +35,7 @@ def is_low_liquidity():
 @st.cache_data(ttl=110)
 def get_market_data(ticker, period, interval):
     try:
-        df = yf.download(ticker, period=period, interval=interval, progress=False, timeout=10)
+        df = yf.download(ticker, period=period, interval=interval, progress=False, timeout=15)
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         return df.dropna()
@@ -65,28 +65,39 @@ def get_pip_info(pair):
     if "JPY" in pair: return 0.01, "{:.2f}", 1000 
     return 0.0001, "{:.4f}", 10
 
+def detect_divergence(df):
+    if len(df) < 20: return "Dati Insufficienti"
+    price, rsi = df['Close'], df['RSI']
+    curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
+    prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
+    prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
+    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 BEARISH (Div.)"
+    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 BULLISH (Div.)"
+    return "Neutrale"
+
 # --- 3. SIDEBAR & TIMER SCORREVOLE ---
 st.sidebar.header("🕹 Trading Desk")
 
-if "timer_start" not in st.session_state:
-    st.session_state.timer_start = time_lib.time()
+# Logica Timer visivo (120s)
+if "start_time" not in st.session_state:
+    st.session_state.start_time = time_lib.time()
 
-elapsed = time_lib.time() - st.session_state.timer_start
+elapsed = time_lib.time() - st.session_state.start_time
 remaining = max(0, int(120 - elapsed))
 
 if remaining <= 0:
-    st.session_state.timer_start = time_lib.time()
+    st.session_state.start_time = time_lib.time()
     remaining = 120
 
-st.sidebar.metric("⏳ Prossimo Update Dati", f"{remaining}s")
+st.sidebar.metric("⏳ Update Sentinel", f"{remaining}s")
 
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
-if st.sidebar.button("🔄 AGGIORNA ORA"):
+if st.sidebar.button("🔄 RESET & AGGIORNA"):
     st.cache_data.clear()
-    st.session_state.timer_start = time_lib.time()
+    st.session_state.start_time = time_lib.time()
     st.rerun()
 
 st.sidebar.markdown("---")
@@ -98,7 +109,7 @@ st.markdown("""
     <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
                 padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 25px; border: 1px solid #00ffcc;">
         <h1 style="color: #00ffcc; font-family: 'Courier New', Courier, monospace; letter-spacing: 5px; margin: 0;">📊 FOREX MOMENTUM PRO</h1>
-        <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">Sentinel System • AI Drift Engine • Visual Analytics v6.0</p>
+        <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">Sentinel System • Full Logic Engine v6.5 • iPad Optimized</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -108,14 +119,15 @@ df_h = get_market_data(pair, "1d", "5m")
 df_d = get_market_data(pair, "1y", "1d")
 
 if df_h is not None and not df_h.empty and df_d is not None:
-    # GRAFICO LINEARE (Fix per iPad)
-    st.subheader(f"📈 Analisi Intraday: {pair}")
+    # --- GRAFICO INTRADAY (Line Chart per evitare il blu pieno) ---
+    st.subheader(f"📈 Analisi Intraday Live: {pair}")
     st.line_chart(df_h['Close'])
     
-    prezzo_attuale = df_h['Close'].iloc[-1]
-    st.metric("Prezzo Attuale", price_fmt.format(prezzo_attuale), f"{prezzo_attuale - df_h['Close'].iloc[-2]:.5f}")
+    prezzo_attuale = float(df_h['Close'].iloc[-1])
+    diff = prezzo_attuale - float(df_h['Close'].iloc[-2])
+    st.metric("Ultimo Prezzo", price_fmt.format(prezzo_attuale), f"{diff:.5f}")
 
-    # STRENGTH METER
+    # --- STRENGTH METER ---
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()
@@ -125,7 +137,7 @@ if df_h is not None and not df_h.empty and df_d is not None:
             col_c = "#00ffcc" if val > 0 else "#ff4b4b"
             cols[i].markdown(f"<div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-    # AI ANALYSIS
+    # --- INDICATORI & AI ---
     st.markdown("---")
     lookback = 24
     recent_prices = df_h['Close'].tail(lookback).values.reshape(-1, 1)
@@ -135,8 +147,14 @@ if df_h is not None and not df_h.empty and df_d is not None:
 
     df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
     df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
-    last_rsi, last_atr = df_d['RSI'].iloc[-1], df_d['ATR'].iloc[-1]
+    df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
+    
+    last_rsi = float(df_d['RSI'].iloc[-1])
+    last_atr = float(df_d['ATR'].iloc[-1])
+    last_adx = float(df_d['ADX'].iloc[-1])
+    div_sig = detect_divergence(df_d)
 
+    # Sentinel Score
     score = 50
     if drift > (pip_unit * 2): score += 25
     elif drift < -(pip_unit * 2): score -= 25
@@ -144,15 +162,15 @@ if df_h is not None and not df_h.empty and df_d is not None:
         if s_data.index[0] in pair[:3]: score += 25
         elif s_data.index[-1] in pair[:3]: score -= 25
 
-    m1, m2, m3 = st.columns(3)
-    m1.metric("RSI (Daily)", f"{last_rsi:.1f}")
-    m2.metric("Inerzia AI (1h)", price_fmt.format(pred_price), f"{drift:.5f}")
-    m3.metric("Sentinel Score", f"{score}/100")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("RSI Daily", f"{last_rsi:.1f}", div_sig)
+    c2.metric("Inerzia AI (1h)", price_fmt.format(pred_price), f"{drift:.5f}")
+    c3.metric("Sentinel Score", f"{score}/100")
 
-    # SEGNALE
+    # --- SEGNALE ---
     st.markdown("---")
     if is_low_liquidity():
-        st.warning("⚠️ FILTRO LIQUIDITÀ ATTIVO (Pausa Rollover)")
+        st.warning("⚠️ FILTRO LIQUIDITÀ: Mercato in pausa rollover.")
         action = None
     else:
         action = "LONG" if (score >= 75 and last_rsi < 65) else "SHORT" if (score <= 25 and last_rsi > 35) else None
@@ -170,7 +188,7 @@ if df_h is not None and not df_h.empty and df_d is not None:
                 <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE: {action}</h2>
                 <table style="width:100%; color: white; font-size: 18px;">
                     <tr><td><b>Entry:</b> {price_fmt.format(prezzo_attuale)}</td><td><b>SL:</b> {price_fmt.format(sl)}</td><td><b>TP:</b> {price_fmt.format(tp)}</td></tr>
-                    <tr style="color: #ffcc00;"><td><b>Rischio:</b> ${risk_cash:.2f}</td><td><b>Pips:</b> {dist_pips:.1f}</td><td><b>SIZE: {lotti:.2f} Lotti</b></td></tr>
+                    <tr style="color: #ffcc00;"><td><b>Rischio:</b> ${risk_cash:.2f}</td><td><b>Lotti: {lotti:.2f}</b></td><td><b>Pips:</b> {dist_pips:.1f}</td></tr>
                 </table>
             </div>
         """, unsafe_allow_html=True)
@@ -179,15 +197,21 @@ if df_h is not None and not df_h.empty and df_d is not None:
         new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': prezzo_attuale, 'SL': sl, 'TP': tp}])
         st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
 
+    # --- REGISTRO ---
     if not st.session_state['signal_history'].empty:
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📜 Registro")
+        st.sidebar.subheader("📜 Storico")
         st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
 
-else:
-    st.error("Caricamento dati in corso...")
+    # --- EXTRA INFO ---
+    with st.expander("📊 Analisi Volatilità & Trend"):
+        st.write(f"ADX (Forza Trend): {last_adx:.1f}")
+        st.write(f"ATR (Volatilità): {last_atr:.5f}")
 
-# LOOP TIMER (Cruciale per lo scorrimento visivo)
+else:
+    st.error("Connessione ai mercati in corso...")
+
+# LOOP PER IL TIMER (Garantisce che i secondi scorrano visivamente)
 if remaining > 0:
     time_lib.sleep(1)
     st.rerun()
