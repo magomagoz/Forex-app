@@ -8,23 +8,19 @@ from datetime import datetime, time
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pytz
-import time as time_lib
 from streamlit_autorefresh import st_autorefresh
 
 # --- 1. CONFIGURAZIONE ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# Refresh ogni 120 secondi (2 minuti)
+# Refresh ogni 120 secondi
 st_autorefresh(interval=120 * 1000, key="sentinel_refresh")
 
 # Inizializzazione Session State
 if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
 
-if 'prediction_log' not in st.session_state:
-    st.session_state['prediction_log'] = None
-
-# --- FUNZIONI TECNICHE (Spostate in alto per essere disponibili) ---
+# --- FUNZIONI TECNICHE ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
@@ -33,6 +29,11 @@ def get_session_status():
         "New York 🇺🇸": (time(13,0), time(22,0))
     }
     return {name: start <= now_utc <= end for name, (start, end) in sessions.items()}
+
+def is_low_liquidity():
+    # Filtro per evitare il rollover (23:00 - 01:00) dove lo spread è altissimo
+    now_utc = datetime.now(pytz.utc).time()
+    return time(23, 0) <= now_utc or now_utc <= time(1, 0)
 
 @st.cache_data(ttl=110)
 def get_market_data(ticker, period, interval):
@@ -43,7 +44,7 @@ def get_market_data(ticker, period, interval):
         if df is None or df.empty: return None
         df.dropna(inplace=True)
         return df
-    except Exception as e:
+    except:
         return None
 
 def get_currency_strength():
@@ -52,7 +53,6 @@ def get_currency_strength():
     if isinstance(data.columns, pd.MultiIndex):
         data = data['Close']
     returns = data.pct_change().iloc[-1] * 100
-    
     strength = {
         "USD 🇺🇸": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
         "EUR 🇪🇺": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
@@ -63,42 +63,11 @@ def get_currency_strength():
     }
     return pd.Series(strength).sort_values(ascending=True)
 
-def detect_divergence(df):
-    if len(df) < 20: return "Dati Insufficienti"
-    price, rsi = df['Close'], df['RSI']
-    curr_p, curr_r = price.iloc[-1], rsi.iloc[-1]
-    prev_max_p, prev_max_r = price.iloc[-15:-1].max(), rsi.iloc[-15:-1].max()
-    prev_min_p, prev_min_r = price.iloc[-15:-1].min(), rsi.iloc[-15:-1].min()
-    
-    if curr_p > prev_max_p and curr_r < prev_max_r and curr_r > 50:
-        return "📉 BEARISH (Div. Negativa)"
-    elif curr_p < prev_min_p and curr_r > prev_min_r and curr_r < 50:
-        return "📈 BULLISH (Div. Positiva)"
-    return "Neutrale"
-
 def get_pip_info(pair):
     if "JPY" in pair: return 0.01, "{:.2f}", 1000 
     return 0.0001, "{:.4f}", 10
 
-def calculate_squeeze(df):
-    length, mult_bb, mult_kc = 20, 2, 1.5
-    bb = ta.bbands(df['Close'], length=length, std=mult_bb)
-    kc = ta.kc(df['High'], df['Low'], df['Close'], length=length, scalar=mult_kc)
-    is_sqz = (bb.iloc[:, 2] < kc.iloc[:, 2]) & (bb.iloc[:, 0] > kc.iloc[:, 0])
-    return is_sqz.iloc[-1], is_sqz
-
-@st.cache_data(ttl=600)
-def get_correlation_matrix(pairs_list):
-    combined_data = pd.DataFrame()
-    for p in pairs_list:
-        df = yf.download(p, period="60d", interval="1d", progress=False)
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
-        if not df.empty:
-            combined_data[p] = df['Close']
-    return combined_data.corr()
-
-# --- BANNER DI TESTATA ---
+# --- BANNER ---
 st.markdown("""
     <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
                 padding: 20px; border-radius: 15px; text-align: center; margin-bottom: 25px; border: 1px solid #00ffcc;">
@@ -106,19 +75,20 @@ st.markdown("""
             📊 FOREX MOMENTUM PRO
         </h1>
         <p style="color: white; font-size: 14px; opacity: 0.8; margin: 5px 0 0 0;">
-            Sentinel System • AI Drift Engine • Risk Management v4.0
+            Sentinel System • AI Drift Engine • Risk Calculator v5.0
         </p>
     </div>
 """, unsafe_allow_html=True)
 
-# --- 2. SIDEBAR & COUNTDOWN ---
-st.sidebar.header("🛠 Trading Desk")
-container_timer = st.sidebar.empty()
-container_timer.info("Prossimo Update: 120s")
-
+# --- 2. SIDEBAR ---
+st.sidebar.header("🕹 Trading Desk")
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
+
+if st.sidebar.button("🔄 AGGIORNA E PULISCI CACHE"):
+    st.cache_data.clear()
+    st.rerun()
 
 st.sidebar.markdown("---")
 status_sessions = get_session_status()
@@ -126,69 +96,60 @@ for s, op in status_sessions.items():
     color = "🟢" if op else "🔴"
     st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
 
-# --- 3. DATA FETCH ---
+# --- 3. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult = get_pip_info(pair)
 df_d = get_market_data(pair, "1y", "1d")
 df_h = get_market_data(pair, "5d", "1h")
 
 if df_d is not None and df_h is not None:
-    # --- HEADER ---
-    st.title(f"Analisi: {pair}")
-    st.caption(f"Ultimo Check: {datetime.now().strftime('%H:%M:%S')}")
-
     # --- STRENGTH METER ---
     st.subheader("⚡ Currency Strength Meter")
-    strength_series = get_currency_strength()
-    display_strength = strength_series.sort_values(ascending=False)
+    s_series = get_currency_strength()
+    display_strength = s_series.sort_values(ascending=False)
     cols = st.columns(6)
     for i, curr in enumerate(display_strength.index[:6]):
         val = display_strength[curr]
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
-        cols[i].markdown(f"""
-            <div style='text-align:center; border:1px solid #444; border-radius:10px; padding:12px; background:#1e1e1e;'>
-                <b style='color: white; font-size: 14px;'>{curr}</b><br>
-                <span style='color:{col_c}; font-size: 16px; font-weight: bold;'>{val:.2f}%</span>
-            </div>
-            """, unsafe_allow_html=True)
+        cols[i].markdown(f"<div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-    # --- AI PREDICTION ---
+    # --- AI ANALYSIS ---
     st.markdown("---")
     lookback = 24
     recent_h = df_h['Close'].tail(lookback).values.reshape(-1, 1)
-    X_model = np.arange(len(recent_h)).reshape(-1, 1)
-    model = LinearRegression().fit(X_model, recent_h)
+    model = LinearRegression().fit(np.arange(lookback).reshape(-1, 1), recent_h)
     pred_price = model.predict(np.array([[lookback]]))[0][0]
     drift = pred_price - recent_h[-1][0]
 
-    # --- INDICATORI TECNICI ---
+    # Indicatori
     df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
     df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
-    df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
-    last_c, last_rsi, last_adx, last_atr = df_d['Close'].iloc[-1], df_d['RSI'].iloc[-1], df_d['ADX'].iloc[-1], df_d['ATR'].iloc[-1]
-    div_sig = detect_divergence(df_d)
-    is_sqz, _ = calculate_squeeze(df_d)
+    last_c, last_rsi, last_atr = df_d['Close'].iloc[-1], df_d['RSI'].iloc[-1], df_d['ATR'].iloc[-1]
 
-    # --- SENTINEL SCORE ---
-    final_score = 50
-    reasons = []
-    if drift > (pip_unit * 2): final_score += 25; reasons.append("AI Bullish")
-    elif drift < -(pip_unit * 2): final_score -= 25; reasons.append("AI Bearish")
-    if display_strength.index[0] in pair[:3]: final_score += 25; reasons.append(f"{pair[:3]} Forte")
-    elif display_strength.index[-1] in pair[:3]: final_score -= 25; reasons.append(f"{pair[:3]} Debole")
+    # Sentinel Score
+    score = 50
+    if drift > (pip_unit * 2): score += 25
+    elif drift < -(pip_unit * 2): score -= 25
+    if display_strength.index[0] in pair[:3]: score += 25
+    elif display_strength.index[-1] in pair[:3]: score -= 25
 
-    # Metrics Display
     m1, m2, m3 = st.columns(3)
     m1.metric("Prezzo Attuale", price_fmt.format(last_c))
     m2.metric("Inerzia AI (+1h)", price_fmt.format(pred_price), f"{drift:.5f}")
-    m3.metric("Sentinel Score", f"{final_score}/100")
+    m3.metric("Sentinel Score", f"{score}/100")
 
-    # --- SEGNALE OPERATIVO ---
+    # --- LOGICA SEGNALE ---
     st.markdown("---")
-    action = "LONG" if (final_score >= 75 and last_rsi < 65) else "SHORT" if (final_score <= 25 and last_rsi > 35) else None
+    if is_low_liquidity():
+        st.warning("⚠️ FILTRO LIQUIDITÀ: Operatività sconsigliata durante il rollover (23:00-01:00 UTC).")
+        action = None
+    else:
+        action = "LONG" if (score >= 75 and last_rsi < 60) else "SHORT" if (score <= 25 and last_rsi > 40) else None
 
     if action:
         sl = last_c - (1.5 * last_atr) if action == "LONG" else last_c + (1.5 * last_atr)
         tp = last_c + (3 * last_atr) if action == "LONG" else last_c - (3 * last_atr)
+        
+        # Calcolo Lotti
         risk_cash = balance * (risk_pc / 100)
         dist_pips = abs(last_c - sl) / pip_unit
         lotti = risk_cash / (dist_pips * pip_mult) if dist_pips > 0 else 0
@@ -196,7 +157,7 @@ if df_d is not None and df_h is not None:
         color = "#00ffcc" if action == "LONG" else "#ff4b4b"
         st.markdown(f"""
             <div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
-                <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE SENTINEL: {action}</h2>
+                <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE RILEVATO: {action}</h2>
                 <table style="width:100%; color: white; font-size: 18px;">
                     <tr>
                         <td><b>Entry:</b> {price_fmt.format(last_c)}</td>
@@ -206,44 +167,30 @@ if df_d is not None and df_h is not None:
                     <tr style="color: #ffcc00;">
                         <td><b>Rischio:</b> ${risk_cash:.2f}</td>
                         <td><b>Distanza SL:</b> {dist_pips:.1f} pips</td>
-                        <td><b>SIZE:</b> {lotti:.2f} Lotti</td>
+                        <td><b>SIZE CONSIGLIATA:</b> {lotti:.2f} Lotti</td>
                     </tr>
                 </table>
             </div>
         """, unsafe_allow_html=True)
-        st.toast(f"🚨 SEGNALE {action} RILEVATO", icon="🎯")
-        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
         
-        # Log History
+        # Audio e Log
+        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
         new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
         if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
             st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
     else:
         st.info("🔎 Sentinel in scansione... Nessun setup ad alta probabilità.")
 
-    # --- GRAFICI E STRUMENTI ---
+    # Grafico
     st.line_chart(df_h['Close'].tail(50))
     
-    col_inf1, col_inf2 = st.columns(2)
-    with col_inf1:
-        with st.expander("📊 Strategia Daily Details"):
-            st.write(f"RSI: {last_rsi:.1f} | ADX: {last_adx:.1f}")
-            st.write(f"Divergenza: {div_sig}")
-            st.write(f"Squeeze: {'ATTIVO' if is_sqz else 'RELEASE'}")
-    with col_inf2:
-        with st.expander("📊 Correlazione Asset"):
-            corr = get_correlation_matrix(["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X"])
-            fig_corr, ax_corr = plt.subplots()
-            sns.heatmap(corr, annot=True, cmap="RdYlGn", ax=ax_corr)
-            st.pyplot(fig_corr)
-
-    # Sidebar History
+    # Registro in Sidebar
     if not st.session_state['signal_history'].empty:
         st.sidebar.markdown("---")
-        st.sidebar.subheader("📜 Registro Segnali")
+        st.sidebar.subheader("📜 Registro Sessione")
         st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
         csv = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
-        st.sidebar.download_button("Scarica CSV", csv, "segnali.csv", "text/csv")
+        st.sidebar.download_button("Scarica CSV", csv, "segnali_sentinel.csv", "text/csv")
 
 else:
-    st.error("Dati non disponibili o errore API.")
+    st.error("Errore nel caricamento dei dati.")
