@@ -50,8 +50,6 @@ pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUS
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
-pip_unit, price_fmt = get_pip_value(pair)
-
 st.sidebar.markdown("---")
 status_sessions = get_session_status()
 for s, op in status_sessions.items():
