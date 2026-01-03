@@ -121,8 +121,8 @@ if df_d is not None and df_h is not None:
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
         cols[i].markdown(f"<div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-    except Exception:
-        st.write("Calcolo forza valute in corso...")
+except Exception:
+    st.write("Calcolo forza valute in corso...")
 else:
     st.error("In attesa di dati dal mercato... Controlla la connessione.")
 
