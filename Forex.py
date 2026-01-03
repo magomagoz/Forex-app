@@ -12,13 +12,13 @@ from streamlit_autorefresh import st_autorefresh
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# Refresh globale ogni 120 secondi (Sistema stabile per iPad)
+# Refresh globale ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
 
-# --- 2. FUNZIONI TECNICHE (VERSIONE INTEGRALE) ---
+# --- 2. FUNZIONI TECNICHE ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
@@ -32,10 +32,9 @@ def is_low_liquidity():
     now_utc = datetime.now(pytz.utc).time()
     return time(23, 0) <= now_utc or now_utc <= time(1, 0)
 
-@st.cache_data(ttl=50) # Cache ridotta per dati real-time
+@st.cache_data(ttl=50)
 def get_realtime_data(ticker):
     try:
-        # Scarica l'ultima ora con candele da 1 minuto
         df = yf.download(ticker, period="1d", interval="1m", progress=False, timeout=10)
         if df is None or df.empty: return None
         if isinstance(df.columns, pd.MultiIndex):
@@ -111,19 +110,19 @@ st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #2
 
 # --- 5. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult = get_pip_info(pair)
-df_rt = get_realtime_data(pair) # Dati 1 minuto per grafico
-df_d = yf.download(pair, period="1y", interval="1d", progress=False) # Dati Daily per RSI/ATR
+df_rt = get_realtime_data(pair) 
+df_d = yf.download(pair, period="1y", interval="1d", progress=False) 
 
 if df_rt is not None and not df_rt.empty:
     # GRAFICO REAL-TIME
     st.subheader(f"📈 Grafico Real-Time (Intervallo 1m): {pair}")
-    # Visualizziamo solo gli ultimi 60 minuti per massima precisione
     st.line_chart(df_rt['Close'].tail(60), use_container_width=True)
     
     curr_price = float(df_rt['Close'].iloc[-1])
-    st.metric("Prezzo Live (Yahoo)", price_fmt.format(prezzo_attuale), f"{prezzo_attuale - float(df_rt['Close'].iloc[-2]):.5f}")
+    diff_prezzo = curr_price - float(df_rt['Close'].iloc[-2])
+    st.metric("Prezzo Live (Yahoo)", price_fmt.format(curr_price), f"{diff_prezzo:.5f}")
 
-    # STRENGTH METER (Con Fix per errore riga 135)
+    # STRENGTH METER
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()
@@ -139,7 +138,9 @@ if df_rt is not None and not df_rt.empty:
 
     # ANALISI AI & SENTINEL
     if df_d is not None and not df_d.empty:
-        if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
+        if isinstance(df_d.columns, pd.MultiIndex): 
+            df_d.columns = df_d.columns.get_level_values(0)
+        
         st.markdown("---")
         df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
         df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
@@ -166,8 +167,8 @@ if df_rt is not None and not df_rt.empty:
 
         c1, c2, c3 = st.columns(3)
         c1.metric("RSI Daily", f"{last_rsi:.1f}", div_sig)
-        c2.metric("Inerzia AI (15m)", price_fmt.format(prezzo_attuale + drift), f"{drift:.5f}")
-        c3.metric("Sentinel Score", "Analisi...")
+        c2.metric("Inerzia AI (15m)", price_fmt.format(curr_price + drift), f"{drift:.5f}")
+        c3.metric("Sentinel Score", f"{score}/100")
         
         # LOGICA SEGNALE
         if not is_low_liquidity():
@@ -176,8 +177,6 @@ if df_rt is not None and not df_rt.empty:
                 sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
                 tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
                 
-            st.success(f"🚀 SEGNALE {action}: Entry {price_fmt.format(prezzo_attuale)} | SL {price_fmt.format(sl)}")
-                                
                 risk_cash = balance * (risk_pc / 100)
                 dist_pips = abs(curr_price - sl) / pip_unit
                 lotti = risk_cash / (dist_pips * pip_mult) if dist_pips > 0 else 0
@@ -189,35 +188,28 @@ if df_rt is not None and not df_rt.empty:
                         <p style="font-size:18px;">Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
                         <p style="color:#ffcc00; font-weight:bold;">SIZE CONSIGLIATA: {lotti:.2f} LOTTI</p>
                     </div>
-                		unsafe_allow_html=True)
+                """, unsafe_allow_html=True)
+                
                 st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
                 
                 # Update History
                 new_sig = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
                 st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_sig], ignore_index=True)
 
+        # INFO EXTRA
+        with st.expander("📊 Dettagli Analisi"):
+            st.write(f"ADX (Forza Trend): {last_adx:.1f}")
+            st.write(f"ATR (Volatilità): {last_atr:.5f}")
 
 else:
-    st.error("In attesa di connessione a Yahoo Finance...")
-
-# Registro storico
-if not st.session_state['signal_history'].empty:
-    st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
-
-# Loop Timer per iPad
-time_lib.sleep(1)
-st.rerun()
-
-    # INFO EXTRA
-    with st.expander("📊 Dettagli Analisi"):
-        st.write(f"ADX (Forza Trend): {last_adx:.1f}")
-        st.write(f"ATR (Volatilità): {last_atr:.5f}")
-
-else:
-    st.error("Dati mercati non disponibili. Attendi il prossimo scan o ricarica la pagina.")
+    st.error("In attesa di connessione a Yahoo Finance o dati non disponibili...")
 
 # REGISTRO NELLA SIDEBAR
 if not st.session_state['signal_history'].empty:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📜 Storico Segnali")
     st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
+
+# Loop Timer per refresh fluido
+time_lib.sleep(1)
+st.rerun()
