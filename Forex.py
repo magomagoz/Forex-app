@@ -295,6 +295,6 @@ else:
             csv = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
             st.download_button("Scarica CSV", csv, "segnali.csv", "text/csv")
 
-else:
-    st.error("Dati non disponibili. Riconnessione...")
+    else:
+        st.error("Dati non disponibili. Riconnessione...")
 
