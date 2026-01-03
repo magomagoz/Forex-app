@@ -38,7 +38,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 2. SIDEBAR & COUNTDOWN ---
-st.sidebar.header("🕹 Trading Desk")
+st.sidebar.header("🛠 Trading Desk")
 
 # Countdown Timer Visivo
 st.sidebar.subheader("⏳ Prossimo Update")
@@ -50,6 +50,13 @@ pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUS
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
+pip_unit, price_fmt = get_pip_value(pair)
+
+st.sidebar.markdown("---")
+status_sessions = get_session_status()
+for s, op in status_sessions.items():
+    color = "🟢" if op else "🔴"
+    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
 
 # --- 3. FUNZIONI TECNICHE ---
 def get_session_status():
@@ -125,18 +132,6 @@ def get_correlation_matrix(pairs_list):
             combined_data[p] = df['Close']
     return combined_data.corr()
 
-# --- 4. SIDEBAR ---
-st.sidebar.header("🛠 Trading Desk")
-pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "BTC-USD"])
-balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
-risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
-pip_unit, price_fmt = get_pip_value(pair)
-
-st.sidebar.markdown("---")
-status_sessions = get_session_status()
-for s, op in status_sessions.items():
-    color = "🟢" if op else "🔴"
-    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
 
 # --- 5. HEADER & DATA FETCH ---
 col_head1, col_head2 = st.columns([5, 1])
