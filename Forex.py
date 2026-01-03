@@ -8,11 +8,18 @@ from datetime import datetime, time
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pytz
+import time as time_lib
 from streamlit_autorefresh import st_autorefresh
 
 # --- 1. CONFIGURAZIONE ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
-st_autorefresh(interval=300 * 1000, key="sentinel_refresh")
+
+# Refresh ogni 120 secondi (2 minuti)
+st_autorefresh(interval=120 * 1000, key="sentinel_refresh")
+
+# Inizializzazione Session State
+if 'signal_history' not in st.session_state:
+    st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
 
 if 'prediction_log' not in st.session_state:
     st.session_state['prediction_log'] = None
@@ -30,7 +37,21 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# --- 2. FUNZIONI TECNICHE ---
+# --- 2. SIDEBAR & COUNTDOWN ---
+st.sidebar.header("🕹 Trading Desk")
+
+# Countdown Timer Visivo
+st.sidebar.subheader("⏳ Prossimo Update")
+container_timer = st.sidebar.empty()
+# Nota: Streamlit riesegue tutto il codice al refresh, qui simuliamo la percezione del tempo
+container_timer.info("Aggiornamento in corso...")
+
+pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "BTC-USD"])
+balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
+risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
+
+
+# --- 3. FUNZIONI TECNICHE ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
@@ -40,7 +61,7 @@ def get_session_status():
     }
     return {name: start <= now_utc <= end for name, (start, end) in sessions.items()}
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=110)
 def get_market_data(ticker, period, interval):
     try:
         df = yf.download(ticker, period=period, interval=interval, progress=False, timeout=10)
@@ -104,7 +125,7 @@ def get_correlation_matrix(pairs_list):
             combined_data[p] = df['Close']
     return combined_data.corr()
 
-# --- 3. SIDEBAR ---
+# --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk")
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "BTC-USD"])
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
@@ -117,7 +138,7 @@ for s, op in status_sessions.items():
     color = "🟢" if op else "🔴"
     st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
 
-# --- 4. HEADER & DATA FETCH ---
+# --- 5. HEADER & DATA FETCH ---
 col_head1, col_head2 = st.columns([5, 1])
 with col_head1:
     st.title(f"Analisi: {pair}")
@@ -157,7 +178,7 @@ if df_d is not None and df_h is not None:
         strength_series.plot(kind='barh', color=colors, ax=ax)
         ax.tick_params(colors='white')
         st.pyplot(fig)
-
+    
     # --- 6. AI PREDICTION ENGINE ---
     st.markdown("---")
     st.subheader("🔮 Modello Predittivo AI (+1h)")
@@ -186,6 +207,12 @@ if df_d is not None and df_h is not None:
 
     st.line_chart(pd.DataFrame({'Storico': recent_data, 'Trend': model.predict(X).flatten()}))
 
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Prezzo Attuale", price_fmt.format(y[-1][0]))
+    m2.metric("Inerzia AI (+1h)", price_fmt.format(pred_price), f"{drift:.5f}")
+    m3.metric("Sentinel Score", f"{final_score}/100")
+
+    
     # --- 7. ORACLE SCORE & SENTINEL ---
     final_score = 50
     reasons = []
@@ -204,7 +231,9 @@ if df_d is not None and df_h is not None:
     # --- 8. SETUP OPERATIVO DAILY ---
     st.markdown("---")
     st.subheader("🎯 Analisi Strategica (Daily)")
-    
+
+
+    # --- SENTINEL ALERT & LOGGING ---
     df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
     df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
     df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
@@ -217,6 +246,17 @@ if df_d is not None and df_h is not None:
     c2.metric("ADX", f"{df_d['ADX'].iloc[-1]:.1f}")
     c3.metric("Divergenza", div_sig)
     c4.metric("Squeeze", "ATTIVO" if is_sqz else "RELEASE")
+    
+    last_c, last_rsi, last_adx, last_atr = df_d['Close'].iloc[-1], df_d['RSI'].iloc[-1], df_d['ADX'].iloc[-1], df_d['ATR'].iloc[-1]
+    
+    action = None
+    if (last_rsi < 35 or final_score >= 75) and last_adx > 18: action = "LONG"
+    elif (last_rsi > 65 or final_score <= 25) and last_adx > 18: action = "SHORT"
+
+    if action:
+        sl = last_c - (1.5 * last_atr) if action == "LONG" else last_c + (1.5 * last_atr)
+        tp = last_c + (3 * last_atr) if action == "LONG" else last_c - (3 * last_atr)
+        st.success(f"🎯 **SEGNALE RILEVATO: {action}** | Entry: {price_fmt.format(last_c)}")
 
     # Trading Signal Logic
     last_close = df_d['Close'].iloc[-1]
@@ -238,3 +278,23 @@ if df_d is not None and df_h is not None:
 
 else:
     st.error("Connessione dati fallita. Ricarica.")
+        
+        # Log Automatico
+        new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': last_c, 'SL': sl, 'TP': tp}])
+        if st.session_state['signal_history'].empty or st.session_state['signal_history'].iloc[-1]['Orario'] != new_row.iloc[0]['Orario']:
+            st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
+        
+        st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
+
+    st.line_chart(pd.DataFrame({'Price': recent_data, 'AI Trend': model.predict(X).flatten()}))
+
+    # Esposizione registro
+    if not st.session_state['signal_history'].empty:
+        with st.sidebar.expander("📜 Registro Sessione"):
+            st.dataframe(st.session_state['signal_history'].tail(10))
+            csv = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+            st.download_button("Scarica CSV", csv, "segnali.csv", "text/csv")
+
+else:
+    st.error("Dati non disponibili. Riconnessione...")
+
