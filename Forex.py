@@ -8,6 +8,7 @@ from datetime import datetime, time
 import pytz
 import time as time_lib
 from streamlit_autorefresh import st_autorefresh
+import plotly.graph_objects as go
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
@@ -108,21 +109,43 @@ for s, op in get_session_status().items():
 # --- 4. BANNER ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 MOMENTUM PRO V9</h1><p style="color: white; opacity: 0.8;">Real-Time Data Stream (1m) • Sentinel AI</p></div>', unsafe_allow_html=True)
 
-# --- 5. DATA ENGINE ---
+# --- 5. DATA ENGINE (VERSIONE TOTALE CON STRENGTH METER) ---
 pip_unit, price_fmt, pip_mult = get_pip_info(pair)
-df_rt = get_realtime_data(pair) 
-df_d = yf.download(pair, period="1y", interval="1d", progress=False) 
+df_rt = get_realtime_data(pair)
+df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
 if df_rt is not None and not df_rt.empty:
-    # GRAFICO REAL-TIME
-    st.subheader(f"📈 Grafico Real-Time (Intervallo 1m): {pair}")
-    st.line_chart(df_rt['Close'].tail(60), use_container_width=True)
+    # 1. Calcolo Bollinger Bands (20, 2)
+    bb = ta.bbands(df_rt['Close'], length=20, std=2)
+    df_rt = pd.concat([df_rt, bb], axis=1)
+    
+    # 2. Grafico Candlestick Plotly Professional
+    st.subheader(f"📈 Real-Time (1m) & Bollinger: {pair}")
+    plot_df = df_rt.tail(60) 
+    
+    fig = go.Figure()
+    # Candele
+    fig.add_trace(go.Candlestick(
+        x=plot_df.index, 
+        open=plot_df['Open'], 
+        high=plot_df['High'], 
+        low=plot_df['Low'], 
+        close=plot_df['Close'], 
+        name='Prezzo'
+    ))
+    # Bollinger
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['BBU_20_2.0'], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Banda Sup'))
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['BBM_20_2.0'], line=dict(color='gray', dash='dash'), name='Media'))
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df['BBL_20_2.0'], line=dict(color='rgba(173, 216, 230, 0.4)'), fill='tonexty', name='Banda Inf'))
+    
+    fig.update_layout(height=400, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=0,b=0))
+    st.plotly_chart(fig, use_container_width=True)
     
     curr_price = float(df_rt['Close'].iloc[-1])
-    diff_prezzo = curr_price - float(df_rt['Close'].iloc[-2])
-    st.metric("Prezzo Live (Yahoo)", price_fmt.format(curr_price), f"{diff_prezzo:.5f}")
+    diff_val = curr_price - float(df_rt['Close'].iloc[-2])
+    st.metric("Prezzo Live", price_fmt.format(curr_price), f"{diff_val:.5f}")
 
-    # STRENGTH METER
+    # 3. STRENGTH METER (REINSERITO QUI)
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()
@@ -132,50 +155,47 @@ if df_rt is not None and not df_rt.empty:
         for i, (curr, val) in enumerate(s_data.items()):
             if i < 6:
                 col_c = "#00ffcc" if val > 0 else "#ff4b4b"
-                cols[i].markdown(f"<div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+                cols[i].markdown(f"""
+                    <div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'>
+                        <b style='color:white;'>{curr}</b><br>
+                        <span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span>
+                    </div>
+                """, unsafe_allow_html=True)
     else:
         st.warning("⚠️ Dati Forza Valute momentaneamente non disponibili.")
 
-    # ANALISI AI & SENTINEL
+    # 4. LOGICA AI & SEGNALI
     if df_d is not None and not df_d.empty:
         if isinstance(df_d.columns, pd.MultiIndex): 
             df_d.columns = df_d.columns.get_level_values(0)
-        
-        st.markdown("---")
+            
         df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
         df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
-        df_d['ADX'] = ta.adx(df_d['High'], df_d['Low'], df_d['Close'])['ADX_14']
         
         last_rsi = float(df_d['RSI'].iloc[-1])
         last_atr = float(df_d['ATR'].iloc[-1])
-        last_adx = float(df_d['ADX'].iloc[-1])
-        div_sig = detect_divergence(df_d)
-
-        # AI Drift (15 min)
-        lookback = 15
-        y = df_rt['Close'].tail(lookback).values
-        x = np.arange(lookback).reshape(-1, 1)
-        model = LinearRegression().fit(x, y)
-        drift = model.predict([[lookback]])[0] - curr_price
-
-        score = 50
-        if drift > (pip_unit * 2): score += 25
-        elif drift < -(pip_unit * 2): score -= 25
-        if not s_data.empty:
-            if s_data.index[0] in pair[:3]: score += 25
-            elif s_data.index[-1] in pair[:3]: score -= 25
-
-        c1, c2, c3 = st.columns(3)
-        c1.metric("RSI Daily", f"{last_rsi:.1f}", div_sig)
-        c2.metric("Inerzia AI (15m)", price_fmt.format(curr_price + drift), f"{drift:.5f}")
-        c3.metric("Sentinel Score", f"{score}/100")
         
-        # LOGICA SEGNALE
+        # AI Linear Drift (15 min)
+        lookback = 15
+        model = LinearRegression().fit(np.arange(lookback).reshape(-1, 1), df_rt['Close'].tail(lookback).values)
+        drift = model.predict([[lookback]])[0] - curr_price
+        
+        # Calcolo Score con Bollinger
+        score = 50
+        if curr_price < df_rt['BBL_20_2.0'].iloc[-1]: score += 20 
+        if curr_price > df_rt['BBU_20_2.0'].iloc[-1]: score -= 20 
+        
+        st.markdown("---")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("RSI Daily", f"{last_rsi:.1f}")
+        c2.metric("Inerzia AI (15m)", f"{drift:.5f}")
+        c3.metric("Sentinel Score", f"{score}/100")
+
         if not is_low_liquidity():
-            action = "LONG" if (score >= 75 and last_rsi < 65) else "SHORT" if (score <= 25 and last_rsi > 35) else None
+            action = "LONG" if (score >= 65 and last_rsi < 60) else "SHORT" if (score <= 35 and last_rsi > 40) else None
             if action:
                 sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
-                tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
+                tp = prezzo_attuale + (3 * last_atr) if action == "LONG" else prezzo_attuale - (3 * last_atr) # Corretto nome variabile
                 
                 risk_cash = balance * (risk_pc / 100)
                 dist_pips = abs(curr_price - sl) / pip_unit
@@ -184,32 +204,19 @@ if df_rt is not None and not df_rt.empty:
                 color = "#00ffcc" if action == "LONG" else "#ff4b4b"
                 st.markdown(f"""
                     <div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
-                        <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE SENTINEL: {action}</h2>
-                        <p style="font-size:18px;">Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
-                        <p style="color:#ffcc00; font-weight:bold;">SIZE CONSIGLIATA: {lotti:.2f} LOTTI</p>
+                        <h2 style="color: {color}; margin-top:0;">🚀 SEGNALE: {action}</h2>
+                        <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)}</p>
+                        <p style="color:#ffcc00; font-weight:bold;">LOTTI: {lotti:.2f}</p>
                     </div>
                 """, unsafe_allow_html=True)
-                
                 st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
-                
-                # Update History
-                new_sig = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
-                st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_sig], ignore_index=True)
 
-        # INFO EXTRA
-        with st.expander("📊 Dettagli Analisi"):
-            st.write(f"ADX (Forza Trend): {last_adx:.1f}")
-            st.write(f"ATR (Volatilità): {last_atr:.5f}")
-
-else:
-    st.error("In attesa di connessione a Yahoo Finance o dati non disponibili...")
+# Loop refresh iPad
+time_lib.sleep(1)
+st.rerun()
 
 # REGISTRO NELLA SIDEBAR
 if not st.session_state['signal_history'].empty:
     st.sidebar.markdown("---")
     st.sidebar.subheader("📜 Storico Segnali")
     st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
-
-# Loop Timer per refresh fluido
-time_lib.sleep(1)
-st.rerun()
