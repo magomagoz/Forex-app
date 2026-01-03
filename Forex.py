@@ -13,7 +13,7 @@ from streamlit_autorefresh import st_autorefresh
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
 # Refresh globale ogni 120 secondi (Sistema stabile per iPad)
-st_autorefresh(interval=120 * 1000, key="sentinel_refresh")
+st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
@@ -32,10 +32,11 @@ def is_low_liquidity():
     now_utc = datetime.now(pytz.utc).time()
     return time(23, 0) <= now_utc or now_utc <= time(1, 0)
 
-@st.cache_data(ttl=110)
-def get_market_data(ticker, period, interval):
+@st.cache_data(ttl=50) # Cache ridotta per dati real-time
+def get_realtime_data(ticker):
     try:
-        df = yf.download(ticker, period=period, interval=interval, progress=False, timeout=15)
+        # Scarica l'ultima ora con candele da 1 minuto
+        df = yf.download(ticker, period="1d", interval="1m", progress=False, timeout=10)
         if df is None or df.empty: return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -84,16 +85,16 @@ if "last_update" not in st.session_state:
     st.session_state.last_update = time_lib.time()
 
 elapsed = time_lib.time() - st.session_state.last_update
-remaining = max(0, int(120 - elapsed))
+remaining = max(0, int(60 - elapsed))
 
 if remaining <= 0:
     st.session_state.last_update = time_lib.time()
-    remaining = 120
+    remaining = 60
 
 st.sidebar.metric("⏳ Prossimo Scan", f"{remaining}s")
 
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
-balance = st.sidebar.number_input("Balance Conto ($)", value=10000)
+balance = st.sidebar.number_input("Balance Conto ($)", value=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
 if st.sidebar.button("🔄 FORZA AGGIORNAMENTO"):
@@ -106,26 +107,21 @@ for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
 # --- 4. BANNER ---
-st.markdown("""
-    <div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); 
-                padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #00ffcc;">
-        <h1 style="color: #00ffcc; margin: 0; letter-spacing: 2px;">📊 MOMENTUM PRO V8</h1>
-        <p style="color: white; opacity: 0.8; margin-top: 5px;">Sentinel AI • Anti-Freeze Engine • Full Logic</p>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 20px; border-radius: 15px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 MOMENTUM PRO V9</h1><p style="color: white; opacity: 0.8;">Real-Time Data Stream (1m) • Sentinel AI</p></div>', unsafe_allow_html=True)
 
-# --- 5. CORE ENGINE ---
+# --- 5. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult = get_pip_info(pair)
-df_h = get_market_data(pair, "1d", "5m")
-df_d = get_market_data(pair, "1y", "1d")
+df_rt = get_realtime_data(pair) # Dati 1 minuto per grafico
+df_d = yf.download(pair, period="1y", interval="1d", progress=False) # Dati Daily per RSI/ATR
 
-if df_h is not None and not df_h.empty:
-    st.subheader(f"📈 Price Action (5m): {pair}")
-    st.line_chart(df_h['Close'])
+if df_rt is not None and not df_rt.empty:
+    # GRAFICO REAL-TIME
+    st.subheader(f"📈 Grafico Real-Time (Intervallo 1m): {pair}")
+    # Visualizziamo solo gli ultimi 60 minuti per massima precisione
+    st.line_chart(df_rt['Close'].tail(60), use_container_width=True)
     
-    curr_price = float(df_h['Close'].iloc[-1])
-    diff_p = curr_price - float(df_h['Close'].iloc[-2])
-    st.metric("Prezzo Attuale", price_fmt.format(curr_price), f"{diff_p:.5f}")
+    curr_price = float(df_rt['Close'].iloc[-1])
+    st.metric("Prezzo Live (Yahoo)", price_fmt.format(prezzo_attuale), f"{prezzo_attuale - float(df_rt['Close'].iloc[-2]):.5f}")
 
     # STRENGTH METER (Con Fix per errore riga 135)
     st.markdown("---")
@@ -141,8 +137,9 @@ if df_h is not None and not df_h.empty:
     else:
         st.warning("⚠️ Dati Forza Valute momentaneamente non disponibili.")
 
-    # ANALISI AI & INDICATORI (df_d)
+    # ANALISI AI & SENTINEL
     if df_d is not None and not df_d.empty:
+        if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
         st.markdown("---")
         df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
         df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
@@ -153,13 +150,12 @@ if df_h is not None and not df_h.empty:
         last_adx = float(df_d['ADX'].iloc[-1])
         div_sig = detect_divergence(df_d)
 
-        # AI Prediction
-        lookback = 24
-        y_vals = df_h['Close'].tail(lookback).values
-        x_vals = np.arange(lookback).reshape(-1, 1)
-        model = LinearRegression().fit(x_vals, y_vals)
-        pred_price = model.predict([[lookback]])[0]
-        drift = pred_price - curr_price
+        # AI Drift (15 min)
+        lookback = 15
+        y = df_rt['Close'].tail(lookback).values
+        x = np.arange(lookback).reshape(-1, 1)
+        model = LinearRegression().fit(x, y)
+        drift = model.predict([[lookback]])[0] - curr_price
 
         score = 50
         if drift > (pip_unit * 2): score += 25
@@ -170,9 +166,9 @@ if df_h is not None and not df_h.empty:
 
         c1, c2, c3 = st.columns(3)
         c1.metric("RSI Daily", f"{last_rsi:.1f}", div_sig)
-        c2.metric("Inerzia AI (1h)", price_fmt.format(pred_price), f"{drift:.5f}")
-        c3.metric("Sentinel Score", f"{score}/100")
-
+        c2.metric("Inerzia AI (15m)", price_fmt.format(prezzo_attuale + drift), f"{drift:.5f}")
+        c3.metric("Sentinel Score", "Analisi...")
+        
         # LOGICA SEGNALE
         if not is_low_liquidity():
             action = "LONG" if (score >= 75 and last_rsi < 65) else "SHORT" if (score <= 25 and last_rsi > 35) else None
@@ -180,6 +176,8 @@ if df_h is not None and not df_h.empty:
                 sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
                 tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
                 
+            st.success(f"🚀 SEGNALE {action}: Entry {price_fmt.format(prezzo_attuale)} | SL {price_fmt.format(sl)}")
+                                
                 risk_cash = balance * (risk_pc / 100)
                 dist_pips = abs(curr_price - sl) / pip_unit
                 lotti = risk_cash / (dist_pips * pip_mult) if dist_pips > 0 else 0
@@ -191,12 +189,24 @@ if df_h is not None and not df_h.empty:
                         <p style="font-size:18px;">Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
                         <p style="color:#ffcc00; font-weight:bold;">SIZE CONSIGLIATA: {lotti:.2f} LOTTI</p>
                     </div>
-                """, unsafe_allow_html=True)
+                		unsafe_allow_html=True)
                 st.markdown(f'<audio autoplay><source src="https://www.soundjay.com/buttons/beep-07a.mp3" type="audio/mpeg"></audio>', unsafe_allow_html=True)
                 
                 # Update History
                 new_sig = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
                 st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_sig], ignore_index=True)
+
+
+else:
+    st.error("In attesa di connessione a Yahoo Finance...")
+
+# Registro storico
+if not st.session_state['signal_history'].empty:
+    st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
+
+# Loop Timer per iPad
+time_lib.sleep(1)
+st.rerun()
 
     # INFO EXTRA
     with st.expander("📊 Dettagli Analisi"):
