@@ -82,6 +82,11 @@ st.markdown("""
 
 # --- 2. SIDEBAR ---
 st.sidebar.header("🕹 Trading Desk")
+timer_placeholder = st.sidebar.empty() # Inizializzazione sicura
+
+# Countdown visivo semplice
+timer_placeholder.warning("Aggiornamento tra 120s")
+
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
@@ -90,16 +95,20 @@ if st.sidebar.button("🔄 AGGIORNA DATI"):
     st.cache_data.clear()
     st.rerun()
 
-st.sidebar.markdown("---")
-status_sessions = get_session_status()
-for s, op in status_sessions.items():
-    color = "🟢" if op else "🔴"
-    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
-
-# --- 3. DATA ENGINE ---
+# --- 4. ENGINE & GRAFICO ---
 pip_unit, price_fmt, pip_mult = get_pip_info(pair)
-df_d = get_market_data(pair, "1y", "1d")
-df_h = get_market_data(pair, "5d", "1h")
+df_h = get_market_data(pair, "2d", "5m") # Dati a breve termine per vedere movimento live
+
+if df_h is not None and not df_h.empty:
+    st.subheader(f"📈 Grafico Live: {pair}")
+    
+    # Grafico ad area che si aggiorna ogni 2 minuti
+    st.area_chart(df_h['Close'])
+    
+    # Prezzo attuale grande per iPad
+    prezzo_attuale = df_h['Close'].iloc[-1]
+    st.metric("Ultimo Prezzo", price_fmt.format(prezzo_attuale), 
+              f"{prezzo_attuale - df_h['Close'].iloc[-2]:.5f}")
 
 if df_d is not None and df_h is not None:
     # --- STRENGTH METER ---
@@ -111,6 +120,19 @@ if df_d is not None and df_h is not None:
         val = display_strength[curr]
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
         cols[i].markdown(f"<div style='text-align:center; border:1px solid #444; border-radius:10px; padding:10px; background:#1e1e1e;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+
+    except Exception:
+        st.write("Calcolo forza valute in corso...")
+else:
+    st.error("In attesa di dati dal mercato... Controlla la connessione.")
+
+
+st.sidebar.markdown("---")
+status_sessions = get_session_status()
+for s, op in status_sessions.items():
+    color = "🟢" if op else "🔴"
+    st.sidebar.markdown(f"**{s}**: {color} {'OPEN' if op else 'CLOSED'}")
+
 
     # --- AI ANALYSIS ---
     st.markdown("---")
