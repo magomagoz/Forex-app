@@ -335,12 +335,3 @@ else:
 
     else:
         st.error("Dati non disponibili. Riconnessione...")
-
-    # --- GRAFICO ---
-    st.line_chart(df_h['Close'].tail(50))
-    
-    with st.expander("📜 Registro Segnali Sessione"):
-        st.dataframe(st.session_state['signal_history'].tail(10))
-
-else:
-    st.warning("Connessione ai mercati in corso...")
