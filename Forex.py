@@ -86,7 +86,7 @@ pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUS
 balance = st.sidebar.number_input("Balance Conto ($)", value=10000, step=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
-if st.sidebar.button("🔄 AGGIORNA E PULISCI CACHE"):
+if st.sidebar.button("🔄 AGGIORNA DATI"):
     st.cache_data.clear()
     st.rerun()
 
@@ -194,3 +194,7 @@ if df_d is not None and df_h is not None:
 
 else:
     st.error("Errore nel caricamento dei dati.")
+
+# --- GESTIONE TIMER VISIVO (In fondo per non bloccare il caricamento) ---
+# Questo simula il countdown visivo tra i refresh di 120s
+timer_placeholder.warning(f"Aggiornamento tra 120s")
