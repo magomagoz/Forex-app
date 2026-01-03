@@ -148,8 +148,8 @@ with col_head2:
         st.cache_data.clear()
         st.rerun()
 
-df_d = get_market_data(pair, "1y", "1d")
-df_h = get_market_data(pair, "5d", "1h")
+    df_d = get_market_data(pair, "1y", "1d")
+    df_h = get_market_data(pair, "5d", "1h")
 
 if df_d is not None and df_h is not None:
     
