@@ -92,7 +92,7 @@ if "start_time" not in st.session_state: st.session_state.start_time = time_lib.
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
 st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
 
-pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", ETH-USD"])
+pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
 balance = st.sidebar.number_input("**Balance Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
