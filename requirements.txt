@@ -2,8 +2,10 @@ streamlit
 yfinance
 pandas
 pandas_ta
-scikit-learn
 numpy
-seaborn
-matplotlib
+scikit-learn
+plotly
 streamlit-autorefresh
+pytz
+matplotlib
+seaborn
