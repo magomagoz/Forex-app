@@ -47,12 +47,13 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURJPY=X", "GBPJPY=X", "EURGBP=X"]
+        tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
         if data is None or data.empty: return pd.Series(dtype=float)
         if isinstance(data.columns, pd.MultiIndex):
             data = data['Close']
         returns = data.pct_change().iloc[-1] * 100
+
         strength = {
             "USD 🇺🇸": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
             "EUR 🇪🇺": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
@@ -143,16 +144,19 @@ if df_rt is not None and not df_rt.empty:
     curr_price = float(df_rt['Close'].iloc[-1])
     st.metric("Prezzo Live", price_fmt.format(curr_price))
 
-    # --- STRENGTH METER ---
+    # --- STRENGTH METER DINAMICO ---
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
-    s_data = get_currency_strength()
+    s_data = get_currency_strength()      
     if not s_data.empty:
         s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
-        cols = st.columns(len(s_display))
-        for i, (curr, val) in enumerate(s_display.items()):
-            col_c = "#00ffcc" if val > 0 else "#ff4b4b"
-            cols[i].markdown(f"<div style='text-align:center; background:#1e1e1e; padding:10px; border-radius:10px; border:1px solid #444;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+        cols = st.columns(len(s_data))
+        for i, (curr, val) in enumerate(s_data.items()):
+            if val  > 0.15: bg_color, txt_color = "#006400", "#00FFCC" # Strong BUY (verde scuro)
+            elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B" # Strong SELL (Rosso scuro)
+            else: bg_color, txt_color = "#333333", "#FFFFFF" # Neutral 
+            
+            cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:10px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
     # --- ANALISI AI & SEGNALI (LOGICA COMPLETA) ---
     if df_d is not None and not df_d.empty:
