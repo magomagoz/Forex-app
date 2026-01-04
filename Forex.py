@@ -127,7 +127,7 @@ if df_rt is not None and not df_rt.empty:
     st.subheader(f"📈 Chart Real-Time: {pair}")
     plot_df = df_rt.tail(60)
     fig = go.Figure()
-    fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], name='Price'))
+    fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['open'], high=plot_df['high'], low=plot_df['low'], close=plot_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_mid], line=dict(color='gray', dash='dash'), name='Mid BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_lower], line=dict(color='rgba(173, 216, 230, 0.4)'), fill='tonexty', name='Lower BB'))
@@ -149,7 +149,7 @@ if df_rt is not None and not df_rt.empty:
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()      
     if not s_data.empty:
-        s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
+        #s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
         cols = st.columns(len(s_data))
         for i, (curr, val) in enumerate(s_data.items()):
             if val  > 0.15: bg_color, txt_color = "#006400", "#00FFCC" # Strong BUY (verde scuro)
