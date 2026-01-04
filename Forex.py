@@ -23,9 +23,9 @@ if 'signal_history' not in st.session_state:
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
-        "Tokyo 🇯🇵": (time(0,0), time(9,0)), 
-        "Londra 🇬🇧": (time(8,0), time(17,0)), 
-        "New York 🇺🇸": (time(13,0), time(22,0))
+        "**Tokyo** 🇯🇵": (time(0,0), time(9,0)), 
+        "**Londra** 🇬🇧": (time(8,0), time(17,0)), 
+        "**New York** 🇺🇸": (time(13,0), time(22,0))
     }
     return {name: start <= now_utc <= end for name, (start, end) in sessions.items()}
 
@@ -79,7 +79,7 @@ def detect_divergence(df):
     return "Neutrale"
 
 # --- 3. SIDEBAR & TIMER ---
-st.sidebar.header("🕹 Trading Desk")
+st.sidebar.header("🛠 Trading Desk")
 if "last_update" not in st.session_state:
     st.session_state.last_update = time_lib.time()
 
@@ -89,12 +89,12 @@ if remaining <= 0:
     st.session_state.last_update = time_lib.time()
     remaining = 60
 
-st.sidebar.metric("⏳ Prossimo Scan", f"{remaining}s")
-pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
-balance = st.sidebar.number_input("Balance Conto ($)", value=1000)
-risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
+st.sidebar.metric("⏳ **Prossimo Scan**", f"{remaining}s")
+pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
+balance = st.sidebar.number_input("**Balance Conto ($)**", value=1000)
+risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
-if st.sidebar.button("🔄 AGGIORNAMENTO"):
+if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
     st.cache_data.clear()
     st.session_state.last_update = time_lib.time()
     st.rerun()
