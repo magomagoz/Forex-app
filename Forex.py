@@ -118,8 +118,10 @@ if df_rt is not None and not df_rt.empty:
     # Bollinger Bands Dinamiche
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
-    
+
+    # Trova dinamicamente la colonna della banda superiore
     col_upper = [c for c in df_rt.columns if c.startswith('BBU')][0]
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], ...))
     col_mid = [c for c in df_rt.columns if c.startswith('BBM')][0]
     col_lower = [c for c in df_rt.columns if c.startswith('BBL')][0]
     
@@ -163,6 +165,8 @@ if df_rt is not None and not df_rt.empty:
         if isinstance(df_d.columns, pd.MultiIndex): 
             df_d.columns = df_d.columns.get_level_values(0)
             
+    # Forza i nomi delle colonne in minuscolo
+        df_d.columns = [c.lower() for c in df_d.columns]
         df_d['RSI'] = ta.rsi(df_d['close'], length=14)
         df_d['ATR'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
         
