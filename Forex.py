@@ -51,7 +51,7 @@ def get_currency_strength():
         data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
         if data is None or data.empty: return pd.Series(dtype=float)
         if isinstance(data.columns, pd.MultiIndex):
-            data = data['Close']
+            data = data['close']
         returns = data.pct_change().iloc[-1] * 100
 
         strength = {
@@ -78,7 +78,7 @@ def get_asset_params(pair):
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
-    price, rsi = df['Close'], df['RSI']
+    price, rsi = df['close'], df['RSI']
     curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
     prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
@@ -116,7 +116,7 @@ df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
 if df_rt is not None and not df_rt.empty:
     # Bollinger Bands Dinamiche
-    bb = ta.bbands(df_rt['Close'], length=20, std=2)
+    bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
     
     col_upper = [c for c in df_rt.columns if c.startswith('BBU')][0]
@@ -141,7 +141,7 @@ if df_rt is not None and not df_rt.empty:
     # Visualizzazione con reset axes (doppio click o tasto toolbar)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True, 'modeBarButtonsToAdd': ['resetScale2d']})
     
-    curr_price = float(df_rt['Close'].iloc[-1])
+    curr_price = float(df_rt['close'].iloc[-1])
     st.metric("Prezzo Live", price_fmt.format(curr_price))
 
     # --- STRENGTH METER DINAMICO ---
@@ -163,8 +163,8 @@ if df_rt is not None and not df_rt.empty:
         if isinstance(df_d.columns, pd.MultiIndex): 
             df_d.columns = df_d.columns.get_level_values(0)
             
-        df_d['RSI'] = ta.rsi(df_d['Close'], length=14)
-        df_d['ATR'] = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14)
+        df_d['RSI'] = ta.rsi(df_d['close'], length=14)
+        df_d['ATR'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
         
         last_rsi = float(df_d['RSI'].iloc[-1])
         last_atr = float(df_d['ATR'].iloc[-1])
