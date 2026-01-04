@@ -121,7 +121,7 @@ if df_rt is not None and not df_rt.empty:
 
     # Trova dinamicamente la colonna della banda superiore
     col_upper = [c for c in df_rt.columns if c.startswith('BBU')][0]
-    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], ...))
+    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper]))
     col_mid = [c for c in df_rt.columns if c.startswith('BBM')][0]
     col_lower = [c for c in df_rt.columns if c.startswith('BBL')][0]
     
