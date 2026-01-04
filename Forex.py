@@ -89,12 +89,12 @@ if remaining <= 0:
     st.session_state.last_update = time_lib.time()
     remaining = 60
 
-st.sidebar.metric("⏳ Prossimo Scan AI", f"{remaining}s")
+st.sidebar.metric("⏳ Prossimo Scan", f"{remaining}s")
 pair = st.sidebar.selectbox("Asset", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
 balance = st.sidebar.number_input("Balance Conto ($)", value=1000)
 risk_pc = st.sidebar.slider("Rischio %", 0.5, 5.0, 1.0)
 
-if st.sidebar.button("🔄 FORZA AGGIORNAMENTO"):
+if st.sidebar.button("🔄 AGGIORNAMENTO"):
     st.cache_data.clear()
     st.session_state.last_update = time_lib.time()
     st.rerun()
