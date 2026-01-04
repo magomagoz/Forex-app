@@ -100,6 +100,8 @@ if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
     st.rerun()
 
 #st.sidebar.markdown("---")
+st.sidebar.subheader("🌍 **Sessioni di Mercato**")
+
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
