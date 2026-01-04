@@ -99,7 +99,7 @@ if st.sidebar.button("🔄 AGGIORNAMENTO"):
     st.session_state.last_update = time_lib.time()
     st.rerun()
 
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
