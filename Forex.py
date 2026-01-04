@@ -58,6 +58,7 @@ def get_currency_strength():
             "EUR 🇪🇺": (returns["EURUSD=X"] + returns["EURJPY=X"] + returns["EURGBP=X"]) / 3,
             "GBP 🇬🇧": (returns["GBPUSD=X"] + returns["GBPJPY=X"] - returns["EURGBP=X"]) / 3,
             "JPY 🇯🇵": (-returns["USDJPY=X"] - returns["EURJPY=X"] - returns["GBPJPY=X"]) / 3,
+            "CHF 🇨🇭": (-returns["USDCHF=X"] - returns["EURCHF=X"] - returns["GBPCHF=X"]) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
             "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
         }
@@ -65,9 +66,14 @@ def get_currency_strength():
     except:
         return pd.Series(dtype=float)
 
-def get_pip_info(pair):
-    if "JPY" in pair: return 0.01, "{:.2f}", 1000 
-    return 0.0001, "{:.4f}", 10
+#def get_pip_info(pair):
+    #if "JPY" in pair: return 0.01, "{:.2f}", 1000 
+    #return 0.0001, "{:.4f}", 10
+
+def get_asset_params(pair):
+    if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
+    if "JPY" in pair: return 0.01, "{:.2f}", 1000, "FOREX" 
+    return 0.0001, "{:.5f}", 10, "FOREX"
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
@@ -81,18 +87,12 @@ def detect_divergence(df):
 
 # --- 3. SIDEBAR & TIMER ---
 st.sidebar.header("🛠 Trading Desk")
-if "last_update" not in st.session_state:
-    st.session_state.last_update = time_lib.time()
+if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
+countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
+st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
 
-elapsed = time_lib.time() - st.session_state.last_update
-remaining = max(0, int(60 - elapsed))
-if remaining <= 0:
-    st.session_state.last_update = time_lib.time()
-    remaining = 60
-
-st.sidebar.metric("⏳ **Prossimo Scan**", f"{remaining}s")
-pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "BTC-USD"])
-balance = st.sidebar.number_input("**Balance Conto ($)**", value=1000)
+pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD"])
+balance = st.sidebar.number_input("**Balance Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
 if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
@@ -102,15 +102,14 @@ if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
 
 #st.sidebar.markdown("---")
 st.sidebar.subheader("🌍 **Sessioni di Mercato**")
-
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
 # --- 4. BANNER ---
-st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8;">Sentinel AI Engine • Oracle Predictor</p></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 # --- 5. DATA ENGINE ---
-pip_unit, price_fmt, pip_mult = get_pip_info(pair)
+pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
@@ -124,7 +123,7 @@ if df_rt is not None and not df_rt.empty:
     col_lower = [c for c in df_rt.columns if c.startswith('BBL')][0]
     
     # Grafico Candlestick con Reset Zoom abilitato
-    st.subheader(f"📈 Chart: {pair}")
+    st.subheader(f"📈 Chart Real-Time: {pair}")
     plot_df = df_rt.tail(60)
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['Open'], high=plot_df['High'], low=plot_df['Low'], close=plot_df['Close'], name='Price'))
@@ -144,7 +143,7 @@ if df_rt is not None and not df_rt.empty:
     curr_price = float(df_rt['Close'].iloc[-1])
     st.metric("Prezzo Live", price_fmt.format(curr_price))
 
-    # --- STRENGTH METER (FIX LINEA 145) ---
+    # --- STRENGTH METER ---
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()
