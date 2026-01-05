@@ -89,7 +89,8 @@ def detect_divergence(df):
 st.sidebar.header("🛠 Trading Desk (M5)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
+#st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
+st.sidebar.metric(f"⏳ **Prossimo Scan**: {countdown}s")
 
 pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
 balance = st.sidebar.number_input("**Balance Conto (€)**", value=1000)
@@ -104,7 +105,7 @@ for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
 # --- 4. BANNER ---
-st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8;">Sentinel AI Engine • M5 Timeframe</p></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8;">Sentinel AI • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 # --- 5. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
