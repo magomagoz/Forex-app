@@ -11,7 +11,7 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
-st.set_page_config(page_title="Forex Momentum Pro AI (M5)", layout="wide", page_icon="📈")
+st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
 # Refresh globale ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -48,7 +48,7 @@ def get_realtime_data(ticker):
 def get_currency_strength():
     try:
         # Aggiungiamo le crypto alla lista dei ticker da scaricare
-        forex_tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
+        forex_tickers = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURCHF","EURJPY", "GBPJPY", "GBPCHF","EURGBP"]
         crypto_tickers = ["BTC-USD", "ETH-USD"]
         all_tickers = forex_tickers + crypto_tickers
         
