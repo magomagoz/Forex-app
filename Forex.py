@@ -118,7 +118,7 @@ pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 # Aggiungi questa riga subito dopo ogni yf.download
-df_d.columns = [c.lower() for c in df_d.columns]
+#df_d.columns = [c.lower() for c in df_d.columns]
 
 if df_rt is not None and not df_rt.empty:
     # Bollinger Bands Dinamiche
