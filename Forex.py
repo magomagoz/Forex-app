@@ -37,6 +37,7 @@ def is_low_liquidity():
 def get_realtime_data(ticker):
     try:
         df = yf.download(ticker, period="1d", interval="1m", progress=False, timeout=10)
+        
         if df is None or df.empty: return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -49,10 +50,13 @@ def get_currency_strength():
     try:
         tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
+        # Aggiungi questa riga subito dopo ogni yf.download
+        df_d.columns = [c.lower() for c in df_d.columns]
+
         if data is None or data.empty: return pd.Series(dtype=float)
         if isinstance(data.columns, pd.MultiIndex):
             data = data['close']
-        returns = data.pct_change().iloc[-1] * 100
+        return = data.pct_change().iloc[-1] * 100
 
         strength = {
             "USD 🇺🇸": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
@@ -113,6 +117,8 @@ st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #2
 pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
+# Aggiungi questa riga subito dopo ogni yf.download
+df_d.columns = [c.lower() for c in df_d.columns]
 
 if df_rt is not None and not df_rt.empty:
     # Bollinger Bands Dinamiche
@@ -124,11 +130,16 @@ if df_rt is not None and not df_rt.empty:
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper]))
     col_mid = [c for c in df_rt.columns if c.startswith('BBM')][0]
     col_lower = [c for c in df_rt.columns if c.startswith('BBL')][0]
+
+    if df_d is not None:
+        # Risolve l'errore RSI linea 166
+        df_d['rsi'] = ta.rsi(df_d['close'], length=14)
+        st.write(f"RSI Attuale: {df_d['rsi'].iloc[-1]:.2f}")
     
     # Grafico Candlestick con Reset Zoom abilitato
     st.subheader(f"📈 Chart Real-Time: {pair}")
     plot_df = df_rt.tail(60)
-    fig = go.Figure()
+    fig = go.Figure(data=[go.Candlestick(x=df_rt.index, open=df_rt['open'], high=df_rt['high'], low=df_rt['low'], close=df_rt['close'])])
     fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['open'], high=plot_df['high'], low=plot_df['low'], close=plot_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_mid], line=dict(color='gray', dash='dash'), name='Mid BB'))
@@ -159,7 +170,7 @@ if df_rt is not None and not df_rt.empty:
             else: bg_color, txt_color = "#333333", "#FFFFFF" # Neutral 
             
             cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:10px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
-
+    
     # --- ANALISI AI & SEGNALI (LOGICA COMPLETA) ---
     if df_d is not None and not df_d.empty:
         if isinstance(df_d.columns, pd.MultiIndex): 
