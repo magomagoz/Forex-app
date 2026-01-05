@@ -155,30 +155,20 @@ if df_rt is not None and not df_rt.empty:
     curr_price = float(df_rt['close'].iloc[-1])
     st.metric("Prezzo Live", price_fmt.format(curr_price))
 
+# Sezione Forza Valute
 st.markdown("---")
-st.subheader("⚡ Market Strength Meter (Forex & Crypto)")
-s_data = get_currency_strength()      
+st.subheader("⚡ Currency Strength Meter")
+s_data = get_currency_strength()
 
 if not s_data.empty:
-    # Creiamo le colonne dinamicamente in base al numero di elementi
     cols = st.columns(len(s_data))
     for i, (curr, val) in enumerate(s_data.items()):
-        # Colori dinamici: verde per positivo, rosso per negativo
-        if val > 0.15: 
-            bg, txt = "#006400", "#00FFCC"
-        elif val < -0.15: 
-            bg, txt = "#8B0000", "#FF4B4B"
-        else: 
-            bg, txt = "#333333", "#FFFFFF"
-            
-        cols[i].markdown(f"""
-            <div style='text-align:center; background:{bg}; padding:10px; border-radius:10px; border:1px solid {txt}; min-height:80px;'>
-                <b style='color:white; font-size:0.9em;'>{curr}</b><br>
-                <span style='color:{txt}; font-weight:bold; font-size:1.1em;'>{val:.2f}%</span>
-            </div>
-        """, unsafe_allow_html=True)
+        if val > 0.15: bg_color, txt_color = "#006400", "#00FFCC"
+        elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B"
+        else: bg_color, txt_color = "#333333", "#FFFFFF"
+        cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:10px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 else:
-    st.warning("⚠️ Dati forza mercato non disponibili.")
+    st.warning("⚠️ Dati forza valuta non disponibili al momento. Riprova tra poco.")
     
     # --- ANALISI AI ---
     if df_d is not None and not df_d.empty:
