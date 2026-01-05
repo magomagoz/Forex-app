@@ -82,7 +82,7 @@ def get_asset_params(pair):
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
-    price, rsi = df['close'], df['RSI']
+    price, rsi = df['close'], df['rsi']
     curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
     prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
@@ -178,11 +178,11 @@ if df_rt is not None and not df_rt.empty:
             
     # Forza i nomi delle colonne in minuscolo
         df_d.columns = [c.lower() for c in df_d.columns]
-        df_d['RSI'] = ta.rsi(df_d['close'], length=14)
-        df_d['ATR'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
+        df_d['rsi'] = ta.rsi(df_d['close'], length=14)
+        df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
         
-        last_rsi = float(df_d['RSI'].iloc[-1])
-        last_atr = float(df_d['ATR'].iloc[-1])
+        last_rsi = float(df_d['rsi'].iloc[-1])
+        last_atr = float(df_d['atr'].iloc[-1])
         div_sig = detect_divergence(df_d)
 
         # Inerzia AI (15 min Linear Drift)
