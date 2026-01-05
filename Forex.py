@@ -56,7 +56,7 @@ def get_currency_strength():
         if data is None or data.empty: return pd.Series(dtype=float)
         if isinstance(data.columns, pd.MultiIndex):
             data = data['close']
-        return = data.pct_change().iloc[-1] * 100
+        returns = data.pct_change().iloc[-1] * 100
 
         strength = {
             "USD 🇺🇸": (-returns["EURUSD=X"] - returns["GBPUSD=X"] + returns["USDJPY=X"] - returns["AUDUSD=X"] + returns["USDCAD=X"] + returns["USDCHF=X"] - returns["NZDUSD=X"]) / 7,
