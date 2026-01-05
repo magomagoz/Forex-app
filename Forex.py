@@ -89,8 +89,7 @@ def detect_divergence(df):
 st.sidebar.header("🛠 Trading Desk (M5)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-#st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
-st.sidebar.metric(f"⏳ **Prossimo Scan**: {countdown}s")
+st.sidebar.metric("⏳ **Prossimo Scan**" f"{countdown}s")
 
 pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
 balance = st.sidebar.number_input("**Balance Conto (€)**", value=1000)
