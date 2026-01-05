@@ -47,8 +47,12 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
-        data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
+        # Aggiungiamo le crypto alla lista dei ticker da scaricare
+        forex_tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
+        crypto_tickers = ["BTC-USD", "ETH-USD"]
+        all_tickers = forex_tickers + crypto_tickers
+        
+        data = yf.download(all_tickers, period="2d", interval="1d", progress=False, timeout=15)
         if data is None or data.empty: return pd.Series(dtype=float)
         
         if isinstance(data.columns, pd.MultiIndex):
@@ -57,17 +61,20 @@ def get_currency_strength():
             close_data = data
 
         returns = close_data.pct_change().iloc[-1] * 100
+        
+        # Calcolo forza (Forex basato su panieri, Crypto basato su performance secca)
         strength = {
             "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
             "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0)) / 3,
             "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0)) / 3,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
-            "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
+            "BTC ₿": returns.get("BTC-USD", 0),
+            "ETH 💎": returns.get("ETH-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
-    except:
+    except Exception as e:
+        print(f"Errore Strength: {e}")
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
@@ -90,8 +97,14 @@ st.sidebar.header("🛠 Trading Desk (M5)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
 #st.sidebar.metric("⏳ **Prossimo Scan**", f"{countdown}s")
-st.sidebar.markdown(f"⏳ **Prossimo Scan:** `{countdown}s`")
+#st.sidebar.markdown(f"⏳ **Prossimo Scan:** `{countdown}s`")
 
+# Crea due colonne nella sidebar
+col_label, col_time = st.sidebar.columns([2, 1])
+
+# Inserisce il testo nella prima e il tempo nella seconda
+col_label.markdown("⏳ **Prossimo Scan**")
+col_time.markdown(f"**{countdown}s**")
 
 pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
 balance = st.sidebar.number_input("**Balance Conto (€)**", value=1000)
@@ -142,16 +155,30 @@ if df_rt is not None and not df_rt.empty:
     curr_price = float(df_rt['close'].iloc[-1])
     st.metric("Prezzo Live", price_fmt.format(curr_price))
 
-    # --- STRENGTH METER ---
-    st.markdown("---")
-    st.subheader("⚡ Currency Strength Meter")
-    s_data = get_currency_strength()      
-    if not s_data.empty:
-        cols = st.columns(len(s_data))
-        for i, (curr, val) in enumerate(s_data.items()):
-            bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
-            txt = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
-            cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:10px; border:1px solid {txt};'><b style='color:white;'>{curr}</b><br><span style='color:{txt}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+st.markdown("---")
+st.subheader("⚡ Market Strength Meter (Forex & Crypto)")
+s_data = get_currency_strength()      
+
+if not s_data.empty:
+    # Creiamo le colonne dinamicamente in base al numero di elementi
+    cols = st.columns(len(s_data))
+    for i, (curr, val) in enumerate(s_data.items()):
+        # Colori dinamici: verde per positivo, rosso per negativo
+        if val > 0.15: 
+            bg, txt = "#006400", "#00FFCC"
+        elif val < -0.15: 
+            bg, txt = "#8B0000", "#FF4B4B"
+        else: 
+            bg, txt = "#333333", "#FFFFFF"
+            
+        cols[i].markdown(f"""
+            <div style='text-align:center; background:{bg}; padding:10px; border-radius:10px; border:1px solid {txt}; min-height:80px;'>
+                <b style='color:white; font-size:0.9em;'>{curr}</b><br>
+                <span style='color:{txt}; font-weight:bold; font-size:1.1em;'>{val:.2f}%</span>
+            </div>
+        """, unsafe_allow_html=True)
+else:
+    st.warning("⚠️ Dati forza mercato non disponibili.")
     
     # --- ANALISI AI ---
     if df_d is not None and not df_d.empty:
