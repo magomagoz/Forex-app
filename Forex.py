@@ -135,7 +135,7 @@ if df_rt is not None and not df_rt.empty:
 
 # --- 6. STRENGTH METER ---
 st.markdown("---")
-st.subheader("⚡ Market Strength Meter (Forex & Crypto)")
+st.subheader("⚡ Market Strength Meter (Crypto & Forex)")
 s_data = get_currency_strength()
 if not s_data.empty:
     cols = st.columns(len(s_data))
