@@ -48,7 +48,7 @@ def get_realtime_data(ticker):
 def get_currency_strength():
     try:
         # Aggiungiamo le crypto alla lista dei ticker da scaricare
-        forex_tickers = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "EURCHF","EURJPY", "GBPJPY", "GBPCHF","EURGBP"]
+        forex_tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         crypto_tickers = ["BTC-USD", "ETH-USD"]
         all_tickers = forex_tickers + crypto_tickers
         
@@ -63,13 +63,13 @@ def get_currency_strength():
         returns = close_data.pct_change().iloc[-1] * 100
 
         strength = {
-            "USD 🇺🇸": (-returns.get("EURUSD",0) - returns.get("GBPUSD",0) + returns.get("USDJPY",0) - returns.get("AUDUSD",0) + returns.get("USDCAD",0) + returns.get("USDCHF",0) - returns.get("NZDUSD",0)) / 7,
-            "EUR 🇪🇺": (returns.get("EURUSD",0) + returns.get("EURJPY",0) + returns.get("EURGBP",0)) / 3,
-            "GBP 🇬🇧": (returns.get("GBPUSD",0) + returns.get("GBPJPY",0) - returns.get("EURGBP",0)) / 3,
-            "JPY 🇯🇵": (-returns.get("USDJPY",0) - returns.get("EURJPY",0) - returns.get("GBPJPY",0)) / 3,
-            "CHF 🇨🇭": (-returns.get("USDCHF",0) - returns.get("EURCHF",0) - returns.get("GBPCHF",0)) / 3,
-            "AUD 🇦🇺": returns.get("AUDUSD", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD", 0),
+            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
+            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0)) / 3,
+            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0)) / 3,
+            "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
+            "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
+            "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
             "BTC ₿": returns.get("BTC-USD", 0),
             "ETH 💎": returns.get("ETH-USD", 0)
         }
