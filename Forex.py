@@ -50,8 +50,8 @@ def get_currency_strength():
     try:
         tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
-        # Aggiungi questa riga subito dopo ogni yf.download
-        df_d.columns = [c.lower() for c in df_d.columns]
+
+        data.columns = [c.lower() for c in data.columns]
 
         if data is None or data.empty: return pd.Series(dtype=float)
         if isinstance(data.columns, pd.MultiIndex):
@@ -140,6 +140,7 @@ if df_rt is not None and not df_rt.empty:
     st.subheader(f"📈 Chart Real-Time: {pair}")
     plot_df = df_rt.tail(60)
     fig = go.Figure(data=[go.Candlestick(x=df_rt.index, open=df_rt['open'], high=df_rt['high'], low=df_rt['low'], close=df_rt['close'])])
+    
     fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['open'], high=plot_df['high'], low=plot_df['low'], close=plot_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_mid], line=dict(color='gray', dash='dash'), name='Mid BB'))
