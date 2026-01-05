@@ -169,8 +169,8 @@ if not s_data.empty:
         elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B"
         else: bg_color, txt_color = "#333333", "#FFFFFF"
         cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:5px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
-else:
-    st.warning("⚠️ Dati forza valuta non disponibili al momento. Riprova tra poco.")
+    else:
+        st.warning("⚠️ Dati forza valuta non disponibili al momento. Riprova tra poco.")
     
     # --- ANALISI AI ---
     if df_d is not None and not df_d.empty:
