@@ -50,12 +50,24 @@ def get_currency_strength():
     try:
         tickers = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         data = yf.download(tickers, period="2d", interval="1d", progress=False, timeout=15)
-
-        data.columns = [c.lower() for c in data.columns]
-
+        
         if data is None or data.empty: return pd.Series(dtype=float)
+        
+        # Gestione MultiIndex se presente
         if isinstance(data.columns, pd.MultiIndex):
-            data = data['close']
+            # Cerca di estrarre solo la colonna Close/close indipendentemente dal livello
+            try:
+                data = data['Close']
+            except KeyError:
+                try:
+                    data = data['close']
+                except KeyError:
+                    # Fallback: prende il primo livello se ambiguo
+                    data.columns = data.columns.get_level_values(0)
+
+        # Normalizza colonne in minuscolo per sicurezza
+        data.columns = [c.lower() for c in data.columns]
+        
         returns = data.pct_change().iloc[-1] * 100
 
         strength = {
@@ -70,10 +82,6 @@ def get_currency_strength():
         return pd.Series(strength).sort_values(ascending=False)
     except:
         return pd.Series(dtype=float)
-
-#def get_pip_info(pair):
-    #if "JPY" in pair: return 0.01, "{:.2f}", 1000 
-    #return 0.0001, "{:.4f}", 10
 
 def get_asset_params(pair):
     if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
@@ -105,7 +113,6 @@ if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
     st.session_state.last_update = time_lib.time()
     st.rerun()
 
-#st.sidebar.markdown("---")
 st.sidebar.subheader("🌍 **Sessioni di Mercato**")
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
@@ -117,8 +124,6 @@ st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #2
 pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
-# Aggiungi questa riga subito dopo ogni yf.download
-#df_d.columns = [c.lower() for c in df_d.columns]
 
 if df_rt is not None and not df_rt.empty:
     # Bollinger Bands Dinamiche
@@ -127,19 +132,13 @@ if df_rt is not None and not df_rt.empty:
 
     # Trova dinamicamente la colonna della banda superiore
     col_upper = [c for c in df_rt.columns if c.startswith('BBU')][0]
-    fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper]))
     col_mid = [c for c in df_rt.columns if c.startswith('BBM')][0]
     col_lower = [c for c in df_rt.columns if c.startswith('BBL')][0]
-
-    if df_d is not None:
-        # Risolve l'errore RSI linea 166
-        df_d['rsi'] = ta.rsi(df_d['close'], length=14)
-        st.write(f"RSI Attuale: {df_d['rsi'].iloc[-1]:.2f}")
     
-    # Grafico Candlestick con Reset Zoom abilitato
+    # Grafico Candlestick
     st.subheader(f"📈 Chart Real-Time: {pair}")
     plot_df = df_rt.tail(60)
-    fig = go.Figure(data=[go.Candlestick(x=df_rt.index, open=df_rt['open'], high=df_rt['high'], low=df_rt['low'], close=df_rt['close'])])
+    fig = go.Figure()
     
     fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['open'], high=plot_df['high'], low=plot_df['low'], close=plot_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
@@ -149,10 +148,9 @@ if df_rt is not None and not df_rt.empty:
     fig.update_layout(
         height=450, template="plotly_dark", xaxis_rangeslider_visible=False,
         margin=dict(l=0,r=0,t=0,b=0),
-        modebar_add=['drawline', 'drawopenpath', 'eraseshape', 'resetscale'] # Toolbar estesa
+        modebar_add=['drawline', 'drawopenpath', 'eraseshape', 'resetscale']
     )
     
-    # Visualizzazione con reset axes (doppio click o tasto toolbar)
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True, 'modeBarButtonsToAdd': ['resetScale2d']})
     
     curr_price = float(df_rt['close'].iloc[-1])
@@ -163,21 +161,20 @@ if df_rt is not None and not df_rt.empty:
     st.subheader("⚡ Currency Strength Meter")
     s_data = get_currency_strength()      
     if not s_data.empty:
-        #s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
         cols = st.columns(len(s_data))
         for i, (curr, val) in enumerate(s_data.items()):
-            if val  > 0.15: bg_color, txt_color = "#006400", "#00FFCC" # Strong BUY (verde scuro)
-            elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B" # Strong SELL (Rosso scuro)
-            else: bg_color, txt_color = "#333333", "#FFFFFF" # Neutral 
+            if val  > 0.15: bg_color, txt_color = "#006400", "#00FFCC"
+            elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B"
+            else: bg_color, txt_color = "#333333", "#FFFFFF"
             
             cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:10px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
     
-    # --- ANALISI AI & SEGNALI (LOGICA COMPLETA) ---
+    # --- ANALISI AI & SEGNALI ---
     if df_d is not None and not df_d.empty:
         if isinstance(df_d.columns, pd.MultiIndex): 
             df_d.columns = df_d.columns.get_level_values(0)
             
-    # Forza i nomi delle colonne in minuscolo
+        # Forza i nomi delle colonne in minuscolo
         df_d.columns = [c.lower() for c in df_d.columns]
         df_d['rsi'] = ta.rsi(df_d['close'], length=14)
         df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
@@ -186,9 +183,9 @@ if df_rt is not None and not df_rt.empty:
         last_atr = float(df_d['atr'].iloc[-1])
         div_sig = detect_divergence(df_d)
 
-        # Inerzia AI (15 min Linear Drift)
+        # Inerzia AI (15 min Linear Drift) - CORRETTO 'close' in minuscolo
         lookback = 15
-        model = LinearRegression().fit(np.arange(lookback).reshape(-1, 1), df_rt['Close'].tail(lookback).values)
+        model = LinearRegression().fit(np.arange(lookback).reshape(-1, 1), df_rt['close'].tail(lookback).values)
         drift = model.predict([[lookback]])[0] - curr_price
         
         # Sentiment Score
@@ -208,7 +205,6 @@ if df_rt is not None and not df_rt.empty:
                 sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
                 tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
                 
-                # Money Management calcolato
                 risk_cash = balance * (risk_pc / 100)
                 dist_pips = abs(curr_price - sl) / pip_unit
                 lotti = risk_cash / (dist_pips * pip_mult) if dist_pips > 0 else 0
@@ -232,6 +228,5 @@ if not st.session_state['signal_history'].empty:
     st.sidebar.subheader("📜 Storico Segnali")
     st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
 
-# Refresh automatico
 time_lib.sleep(1)
 st.rerun()
