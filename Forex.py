@@ -17,7 +17,8 @@ st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon=
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 
-if 'signal_history' not in st.session_state: st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
+if 'signal_history' not in st.session_state: 
+    st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
 
 # --- 2. FUNZIONI TECNICHE COMPLETE ---
 def get_session_status():
