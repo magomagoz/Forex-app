@@ -235,11 +235,23 @@ if not s_data.empty:
                 }])
                 st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_sig], ignore_index=True)
 
-# Registro Storico
+# --- SEZIONE SIDEBAR: STORICO & RESET ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📜 Storico Segnali")
+
 if not st.session_state['signal_history'].empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📜 Storico Segnali")
-    st.sidebar.dataframe(st.session_state['signal_history'].tail(5))
+    # Mostra la tabella
+    st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
+    
+    # Pulsante di Reset
+    if st.sidebar.button("🗑️ Svuota Storico"):
+        # Sovrascrive lo stato con un DataFrame vuoto
+        st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
+        st.sidebar.success("Storico cancellato!")
+        time_lib.sleep(1) # Pausa breve per mostrare il messaggio
+        st.rerun() # Ricarica l'app per aggiornare la visualizzazione
+else:
+    st.sidebar.info("Nessun segnale registrato.")
 
 time_lib.sleep(1)
 st.rerun()
