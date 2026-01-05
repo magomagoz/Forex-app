@@ -159,7 +159,7 @@ if df_rt is not None and not df_rt.empty:
 
 # Sezione Forza Valute
 st.markdown("---")
-st.subheader("⚡ Currency Strength Meter (Forex & Crypto")
+st.subheader("⚡ Currency Strength Meter (Forex & Crypto)")
 s_data = get_currency_strength()
 
 if not s_data.empty:
