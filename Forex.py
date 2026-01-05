@@ -61,20 +61,22 @@ def get_currency_strength():
             close_data = data
 
         returns = close_data.pct_change().iloc[-1] * 100
-        
-        # Calcolo forza (Forex basato su panieri, Crypto basato su performance secca)
+
         strength = {
-            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
-            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0)) / 3,
-            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0)) / 3,
-            "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
-            "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
+            "USD 🇺🇸": (-returns.get("EURUSD",0) - returns.get("GBPUSD",0) + returns.get("USDJPY",0) - returns.get("AUDUSD",0) + returns.get("USDCAD",0) + returns.get("USDCHF",0) - returns.get("NZDUSD",0)) / 7,
+            "EUR 🇪🇺": (returns.get("EURUSD",0) + returns.get("EURJPY",0) + returns.get("EURGBP",0)) / 3,
+            "GBP 🇬🇧": (returns.get("GBPUSD",0) + returns.get("GBPJPY",0) - returns.get("EURGBP",0)) / 3,
+            "JPY 🇯🇵": (-returns.get("USDJPY",0) - returns.get("EURJPY",0) - returns.get("GBPJPY",0)) / 3,
+            "CHF 🇨🇭": (-returns.get("USDCHF",0) - returns.get("EURCHF",0) - returns.get("GBPCHF",0)) / 3,
+            "AUD 🇦🇺": returns.get("AUDUSD", 0),
+            "CAD 🇨🇦": -returns.get("USDCAD", 0),
             "BTC ₿": returns.get("BTC-USD", 0),
             "ETH 💎": returns.get("ETH-USD", 0)
         }
+        
         return pd.Series(strength).sort_values(ascending=False)
     except Exception as e:
-        print(f"Errore Strength: {e}")
+        print(f"Errore Strength Meter: {e}")
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
@@ -157,7 +159,7 @@ if df_rt is not None and not df_rt.empty:
 
 # Sezione Forza Valute
 st.markdown("---")
-st.subheader("⚡ Currency Strength Meter")
+st.subheader("⚡ Currency Strength Meter (Forex & Crypto")
 s_data = get_currency_strength()
 
 if not s_data.empty:
@@ -166,7 +168,7 @@ if not s_data.empty:
         if val > 0.15: bg_color, txt_color = "#006400", "#00FFCC"
         elif val < -0.15: bg_color, txt_color = "#8B0000", "#FF4B4B"
         else: bg_color, txt_color = "#333333", "#FFFFFF"
-        cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:10px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+        cols[i].markdown(f"<div style='text-align:center; background:{bg_color}; padding:5px; border-radius:10px; border:1px solid {txt_color};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_color}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 else:
     st.warning("⚠️ Dati forza valuta non disponibili al momento. Riprova tra poco.")
     
