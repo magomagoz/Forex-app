@@ -362,8 +362,9 @@ if pair == current_ticker: # Solo se l'asset scansionato è quello selezionato
     # (Il codice del punto 7 del messaggio precedente va qui per mostrare i dettagli grafici)
     pass 
 
-# Nota: Assicurati che la sezione 7 e 8 nel tuo file mostrino i grafici 
-# dell'asset "pair" selezionato mentre il loop sopra lavora su tutti.
+# Esecuzione motori (Chiamali una sola volta qui alla fine)
+update_signal_outcomes()
+run_sentinel()
 
 # --- 9. STORICO SIDEBAR ---
 # Visualizzazione Cronologia con Colori
@@ -379,7 +380,7 @@ if not st.session_state['signal_history'].empty:
 
     st.dataframe(st.session_state['signal_history'].style.applymap(color_status, subset=['Stato']), use_container_width=True)
 else:
-    st.info("In attesa di segnali...")
+    st.info("Nessun segnale rilevato. Scansione in corso...")
 
 # Pulsante Reset nella Sidebar
     st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
