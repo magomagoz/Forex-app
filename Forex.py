@@ -271,12 +271,12 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
-    c1.metric("RSI Daily", f"{last_rsi:.1f}", detect_divergence(df_d))
+    c1.metric("RSI Daily", f"{rsi_scan:.1f}", detect_divergence(df_d))
     c2.metric("Inerzia AI (75m)", f"{drift:.5f}")
     c3.metric("Sentinel Score", f"{score}/100")
 
     if not is_low_liquidity():
-        action = "COMPRA" if (score >= 65 and last_rsi < 60) else "VENDI" if (score <= 35 and last_rsi > 40) else None
+        action = "COMPRA" if (score >= 65 and rsi_scan < 60) else "VENDI" if (score <= 35 and rsi_scan > 40) else None
         
         last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
         if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
