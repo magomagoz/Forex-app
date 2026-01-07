@@ -258,7 +258,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     df_d['rsi'] = ta.rsi(df_d['close'], length=14)
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     
-    rsi, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
+    rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     
     y_vals = df_rt['close'].tail(15).values
     x_vals = np.arange(len(y_vals)).reshape(-1, 1)
@@ -271,7 +271,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
-    c1.metric("RSI Daily", f"{rsi_scan:.1f}", detect_divergence(df_d))
+    c1.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
     c2.metric("Inerzia AI (75m)", f"{drift:.5f}")
     c3.metric("Sentinel Score", f"{score}/100")
 
