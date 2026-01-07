@@ -276,7 +276,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     c3.metric("Sentinel Score", f"{score}/100")
 
     if not is_low_liquidity():
-        action = "COMPRA" if (score >= 65 and rsi_scan < 60) else "VENDI" if (score <= 35 and rsi_scan > 40) else None
+        action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
         
         last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
         if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
