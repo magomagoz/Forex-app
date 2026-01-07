@@ -24,9 +24,9 @@ if 'last_alert' not in st.session_state:
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
     sessions = {
-        "**Tokyo** 🇯🇵": (time(0,0), time(9,0)), 
-        "**Londra** 🇬🇧": (time(8,0), time(17,0)), 
-        "**New York** 🇺🇸": (time(13,0), time(22,0))
+        "Tokyo 🇯🇵": (time(0,0), time(9,0)), 
+        "Londra 🇬🇧": (time(8,0), time(17,0)), 
+        "New York 🇺🇸": (time(13,0), time(22,0))
     }
     return {name: start <= now_utc <= end for name, (start, end) in sessions.items()}
 
@@ -81,7 +81,7 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
-# --- 3. LOGICA MONITORAGGIO ---
+# --- 3. MOTORI DI BACKGROUND ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
@@ -125,19 +125,16 @@ def run_sentinel():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
                     tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
-                    
-                    # Calcolo LOTTI
-                    risk_amount = balance * (risk_pc / 100)
-                    dist_pips = abs(c_v - sl) * p_mult
-                    lot_size = risk_amount / (dist_pips * 10) if dist_pips > 0 else 0
-                    
-                    new_sig = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{lot_size:.2f}", 'Stato': 'In Corso'}
+                    risk_val = balance * (risk_pc / 100)
+                    dist_p = abs(c_v - sl) * p_mult
+                    sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
+                    new_sig = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
         except: continue
 
-# --- 4. SIDEBAR CON TIMER ---
+# --- 4. SIDEBAR CON TIMER E SESSIONI ---
 st.sidebar.header("🛠 Trading Desk (5m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
@@ -149,18 +146,24 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Balance (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
+st.sidebar.subheader("🌍 Sessioni")
+for s_name, is_open in get_session_status().items():
+    color = "🟢" if is_open else "🔴"
+    status_text = "OPEN" if is_open else "CLOSED"
+    st.sidebar.markdown(f"{color} **{s_name}**: {status_text}")
+
 if st.sidebar.button("🗑️ Reset Cronologia"):
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
 
-# --- 5. POPUP ALERT (OVERLAY) ---
+# --- 5. POPUP ALERT ---
 if st.session_state['last_alert']:
     alert = st.session_state['last_alert']
     st.markdown(f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
             <h1 style="font-size: 4em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
             <h2 style="font-size: 3em;">{alert['Asset']} - {alert['Direzione']}</h2>
-            <p style="font-size: 2.5em; color: #ffcc00;">LOTTI CONSIGLIATI: {alert['Size']}</p>
+            <p style="font-size: 2.5em; color: #ffcc00;">LOTTI: {alert['Size']}</p>
             <p style="font-size: 1.8em;">Prezzo: {alert['Prezzo']} | SL: {alert['SL']} | TP: {alert['TP']}</p>
         </div>
     """, unsafe_allow_html=True)
@@ -169,7 +172,7 @@ if st.session_state['last_alert']:
         st.rerun()
     st.stop()
 
-# --- 6. HEADER E GRAFICO CON BBM ---
+# --- 6. HEADER E GRAFICO ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
@@ -204,7 +207,7 @@ if not s_data.empty:
         txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
         cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:8px; border:1px solid {txt_c};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-# --- 8. ANALISI AI E SEGNALI ---
+# --- 8. ANALISI AI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
     df_d.columns = [c.lower() for c in df_d.columns]
@@ -241,3 +244,7 @@ if not st.session_state['signal_history'].empty:
         color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
+
+st.markdown("---")
+st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (M5).")
+st.caption(f"Ultimo aggiornamento globale: {datetime.now().strftime('%H:%M:%S')}")
