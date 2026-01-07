@@ -275,16 +275,33 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     c2.metric("Inerzia AI (75m)", f"{drift:.5f}")
     c3.metric("Sentinel Score", f"{score}/100")
 
-    if not is_low_liquidity():
-        action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
+# --- CORREZIONE ANALISI AI ---
+if not is_low_liquidity():
+    # Usiamo rsi_val (che è l'RSI dell'asset che stai guardando ora)
+    action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
+    
+    if action:
+        # Recuperiamo l'ultimo segnale per evitare popup infiniti
+        last_s = st.session_state['signal_history'].iloc[0] if not st.session_state['signal_history'].empty else None
         
-        last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
-        if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
+        if last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action:
             sl = curr_price - (1.5 * last_atr) if action == "COMPRA" else curr_price + (1.5 * last_atr)
             tp = curr_price + (3 * last_atr) if action == "COMPRA" else curr_price - (3 * last_atr)
-            lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
-            color = "#00ffcc" if action == "COMPRA" else "#ff4b4b"
+            # Creiamo il segnale per il popup e la cronologia
+            new_alert = {
+                'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"),
+                'Asset': selected_label,
+                'Direzione': action,
+                'Prezzo': price_fmt.format(curr_price),
+                'SL': price_fmt.format(sl),
+                'TP': price_fmt.format(tp),
+                'Stato': 'In Corso'
+            }
+            # Aggiunge in cima alla cronologia
+            st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_alert]), st.session_state['signal_history']], ignore_index=True)
+            st.session_state['last_alert'] = new_alert
+            st.rerun()
 
 # Aggiornamento dati
 #update_signal_outcomes()
