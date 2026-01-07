@@ -153,9 +153,10 @@ if st.session_state['last_alert']:
             <p style="font-size: 1.5em; color: gray;">{alert['DataOra']}</p>
             <br>
             <p style="font-size: 1.2em;">(Tocca il pulsante sotto per chiudere)</p>
-        </div>, unsafe_allow_html=True)
-        
-    if st.button("CHIUDI AVVISO E TORNA AL MONITOR"):
+        </div>
+    """, unsafe_allow_html=True)
+
+    if st.button("✅ CHIUDI AVVISO E TORNA AL MONITOR", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
     st.stop() # Blocca il resto dell'app finché il popup è attivo
@@ -238,9 +239,9 @@ if df_rt is not None and df_d is not None and not df_d.empty:
 update_signal_outcomes()
 run_sentinel()
 
-# --- NUOVO 7. INTERFACCIA PRINCIPALE ---
+# --- 7. INTERFACCIA PRINCIPALE ---
 st.markdown("---")
-st.title("🛰️ Sentinel AI: Multi-Asset Scanner")
+st.title("🛰️ Sentinel AI: Global Market Monitor")
 
 # Lista di tutti gli asset da monitorare
 all_assets = list(asset_map.keys())
@@ -338,3 +339,40 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 
 time_lib.sleep(1)
 st.rerun()
+
+
+# Sidebar
+st.sidebar.header("🛠️ Trading Desk")
+selected_asset = st.sidebar.selectbox("Asset Visualizzato", list(asset_map.keys()))
+if st.sidebar.button("🗑️ Svuota Cronologia"):
+    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
+    st.rerun()
+
+# Esecuzione Motori
+verify_signals()
+run_sentinel()
+
+# Layout Principale
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.subheader(f"📊 Grafico Real-Time: {selected_asset}")
+    # (Qui puoi rimettere il tuo codice del grafico Plotly se vuoi visualizzarlo)
+    st.info("La sentinella sta scansionando tutti gli asset in background...")
+
+with col2:
+    st.subheader("📜 Cronologia Segnali")
+    if not st.session_state['signal_history'].empty:
+        df_vis = st.session_state['signal_history']
+        def style_stato(val):
+            color = '#ffcc00' # In corso
+            if 'TARGET' in val: color = '#00ffcc'
+            if 'STOP' in val: color = '#ff4b4b'
+            return f'color: {color}; font-weight: bold'
+        
+        st.dataframe(df_vis.style.applymap(style_stato, subset=['Stato']), use_container_width=True, height=600)
+    else:
+        st.write("Nessun segnale rilevato.")
+
+# Footer di stato
+st.caption(f"Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')} - Monitoraggio attivo su 9 Asset.")
