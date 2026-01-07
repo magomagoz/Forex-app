@@ -16,8 +16,10 @@ st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon=
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
-
+    st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
+if 'last_alert' not in st.session_state:
+    st.session_state['last_alert'] = None
+    
 # --- 2. FUNZIONI TECNICHE ---
 def get_session_status():
     now_utc = datetime.now(pytz.utc).time()
@@ -80,6 +82,26 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 DIV. BULLISH"
     return "Neutrale"
 
+# --- 3. LOGICA DI MONITORAGGIO & UPDATE STATO ---
+def update_signal_outcomes():
+    """Controlla se i segnali passati hanno toccato TP o SL"""
+    if st.session_state['signal_history'].empty: return
+    
+    df = st.session_state['signal_history']
+    for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
+        data = yf.download(asset_map[row['Asset']], period="1d", interval="5m", progress=False)
+        if not data.empty:
+            high = data['High'].max()
+            low = data['Low'].min()
+            current_p = data['Close'].iloc[-1]
+            
+            if row['Direzione'] == 'LONG':
+                if high >= row['TP']: df.at[idx, 'Stato'] = '✅ TARGET'
+                elif low <= row['SL']: df.at[idx, 'Stato'] = '❌ STOP LOSS'
+            else: # SHORT
+                if low <= row['TP']: df.at[idx, 'Stato'] = '✅ TARGET'
+                elif high >= row['SL']: df.at[idx, 'Stato'] = '❌ STOP LOSS'
+
 # --- 3. SIDEBAR (CON MAPPING NOMI PULITI) ---
 st.sidebar.header("🛠 Trading Desk (M5)")
 
@@ -116,6 +138,27 @@ if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
 st.sidebar.subheader("🌍 **Sessioni**")
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
+
+# --- 4. POPUP A TUTTO SCHERMO (Overlay) ---
+if st.session_state['last_alert']:
+    alert = st.session_state['last_alert']
+    st.markdown(f"""
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                    background-color: rgba(0,0,0,0.9); z-index: 9999; 
+                    display: flex; flex-direction: column; justify-content: center; align-items: center; 
+                    color: white; text-align: center; border: 5px solid #00ffcc;">
+            <h1 style="font-size: 5em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
+            <h2 style="font-size: 3em;">{alert['Asset']} - {alert['Direzione']}</h2>
+            <p style="font-size: 2em;">Prezzo: {alert['Prezzo']:.5f}</p>
+            <p style="font-size: 1.5em; color: gray;">{alert['DataOra']}</p>
+            <br>
+            <p style="font-size: 1.2em;">(Tocca il pulsante sotto per chiudere)</p>
+        </div>, unsafe_allow_html=True)
+        
+    if st.button("CHIUDI AVVISO E TORNA AL MONITOR"):
+        st.session_state['last_alert'] = None
+        st.rerun()
+    st.stop() # Blocca il resto dell'app finché il popup è attivo
 
 # --- 4. HEADER ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • M5</p></div>', unsafe_allow_html=True)
@@ -190,10 +233,14 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
             color = "#00ffcc" if action == "LONG" else "#ff4b4b"
-            
-# --- 7. MOTORE DI SCANSIONE MULTI-ASSET (SENTINELLA) ---
+
+# Aggiornamento dati
+update_signal_outcomes()
+run_sentinel()
+
+# --- NUOVO 7. INTERFACCIA PRINCIPALE ---
 st.markdown("---")
-st.subheader("🕵️ Analisi Sentinella in corso...")
+st.title("🛰️ Sentinel AI: Multi-Asset Scanner")
 
 # Lista di tutti gli asset da monitorare
 all_assets = list(asset_map.keys())
@@ -267,13 +314,27 @@ if pair == current_ticker: # Solo se l'asset scansionato è quello selezionato
 # dell'asset "pair" selezionato mentre il loop sopra lavora su tutti.
 
 # --- 9. STORICO SIDEBAR ---
+# Visualizzazione Cronologia con Colori
+st.sidebar.markdown("---")
+st.subheader("📜 Cronologia e Verifica Segnali")
 if not st.session_state['signal_history'].empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📜 Storico Segnali")
+    def color_status(val):
+        color = 'white'
+        if '✅' in val: color = '#00ffcc'
+        elif '❌' in val: color = '#ff4b4b'
+        elif 'In Corso' in val: color = '#ffcc00'
+        return f'color: {color}'
+
+    st.dataframe(st.session_state['signal_history'].style.applymap(color_status, subset=['Stato']), use_container_width=True)
+else:
+    st.info("In attesa di segnali...")
+
+# Pulsante Reset nella Sidebar
     st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
-    if st.sidebar.button("🗑️ Svuota Storico"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
-        st.rerun()
+
+if st.sidebar.button("🗑️ Reset Cronologia"):
+    st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
+    st.rerun()
 
 time_lib.sleep(1)
 st.rerun()
