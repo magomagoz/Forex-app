@@ -45,6 +45,7 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
+        # Ticker reali per il calcolo
         forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         crypto = ["BTC-USD", "ETH-USD"]
         data = yf.download(forex + crypto, period="2d", interval="1d", progress=False, timeout=15)
@@ -58,7 +59,6 @@ def get_currency_strength():
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
             "BTC ₿": returns.get("BTC-USD", 0),
             "ETH 💎": returns.get("ETH-USD", 0)
         }
@@ -76,13 +76,22 @@ def detect_divergence(df):
     curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
     prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
-    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 **IL PREZZO SCENDERA'**"
-    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 **IL PREZZO SALIRA'**"
+    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DIV. BEARISH"
+    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 DIV. BULLISH"
     return "Neutrale"
 
-# --- 3. SIDEBAR ---
+# --- 3. SIDEBAR (CON MAPPING NOMI PULITI) ---
+st.sidebar.header("🛠 Trading Desk (M5)")
 
-asset_options = {
+# Timer Countdown
+if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
+countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
+col_l, col_t = st.sidebar.columns([2, 1])
+col_l.markdown("⏳ **Prossimo Scan**")
+col_t.markdown(f"**{countdown}s**")
+
+# Mapping Asset: Etichetta Pulita -> Ticker Yahoo
+asset_map = {
     "EURUSD": "EURUSD=X",
     "GBPUSD": "GBPUSD=X",
     "USDJPY": "USDJPY=X",
@@ -94,32 +103,22 @@ asset_options = {
     "ETH-USD": "ETH-USD"
 }
 
-# L'utente vede "EURUSD", ma il codice usa "EURUSD=X"
-selected_label = st.sidebar.selectbox("**Asset**", list(asset_options.keys()))
-pair = asset_options[selected_label] 
+selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
+pair = asset_map[selected_label] # Qui usiamo il ticker con =X per i calcoli
 
-st.sidebar.header("🛠 Trading Desk (5m)")
-if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
-countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-
-col_label, col_time = st.sidebar.columns([2, 1])
-col_label.markdown("⏳ **Prossimo Scan**")
-col_time.markdown(f"**{countdown}s**")
-
-pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
-balance = st.sidebar.number_input("**CONTO (€)**", value=1000)
-risk_pc = st.sidebar.slider("**RISCHIO %**", 0.5, 5.0, 1.0)
+balance = st.sidebar.number_input("**Balance (€)**", value=1000)
+risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
 if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
     st.cache_data.clear()
     st.rerun()
 
-st.sidebar.subheader("🌍 **Sessioni di Mercato**")
+st.sidebar.subheader("🌍 **Sessioni**")
 for s, op in get_session_status().items():
     st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
 
 # --- 4. HEADER ---
-st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI • Crypto & Forex Analysis</p></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • M5</p></div>', unsafe_allow_html=True)
 
 # --- 5. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
@@ -127,32 +126,28 @@ df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
 if df_rt is not None and not df_rt.empty:
-    # Calcolo Bollinger completo
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
-    
-    # Identificazione sicura colonne BB
     col_upper = [c for c in df_rt.columns if "BBU" in c.upper()][0]
     col_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     col_lower = [c for c in df_rt.columns if "BBL" in c.upper()][0]
 
-    st.subheader(f"📈 Chart 5m: {pair}")
+    st.subheader(f"📈 Chart: {selected_label}") # Visualizza nome pulito
     plot_df = df_rt.tail(60)
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=plot_df.index, open=plot_df['open'], high=plot_df['high'], low=plot_df['low'], close=plot_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_upper], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_mid], line=dict(color='gray', dash='dash'), name='Mid BB'))
     fig.add_trace(go.Scatter(x=plot_df.index, y=plot_df[col_lower], line=dict(color='rgba(173, 216, 230, 0.4)'), fill='tonexty', name='Lower BB'))
-    
     fig.update_layout(height=450, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=0,b=0))
     st.plotly_chart(fig, use_container_width=True)
     
     curr_price = float(df_rt['close'].iloc[-1])
-    st.metric("Prezzo Live", price_fmt.format(curr_price))
+    st.metric(f"Prezzo {selected_label}", price_fmt.format(curr_price))
 
 # --- 6. STRENGTH METER ---
 st.markdown("---")
-st.subheader("⚡ Market Strength Meter (Crypto & Forex)")
+st.subheader("⚡ Market Strength Meter")
 s_data = get_currency_strength()
 if not s_data.empty:
     cols = st.columns(len(s_data))
@@ -170,13 +165,11 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     
     last_rsi, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     
-    # Inerzia AI
     y_vals = df_rt['close'].tail(15).values
     x_vals = np.arange(len(y_vals)).reshape(-1, 1)
     model = LinearRegression().fit(x_vals, y_vals)
     drift = model.predict([[15]])[0] - curr_price
     
-    # Score Sentinel
     score = 50
     if curr_price < df_rt[col_lower].iloc[-1]: score += 20
     if curr_price > df_rt[col_upper].iloc[-1]: score -= 20
@@ -188,26 +181,21 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     c3.metric("Sentinel Score", f"{score}/100")
 
     if not is_low_liquidity():
-        action = "COMPRA" if (score >= 65 and last_rsi < 60) else "VENDI" if (score <= 35 and last_rsi > 40) else None
+        action = "LONG" if (score >= 65 and last_rsi < 60) else "SHORT" if (score <= 35 and last_rsi > 40) else None
         
-        already_signaled = False
-        if not st.session_state['signal_history'].empty:
-            last_s = st.session_state['signal_history'].iloc[-1]
-            if last_s['Asset'] == pair and last_s['Direzione'] == action:
-                already_signaled = True
-
-        if action and not already_signaled:
-            sl = curr_price - (1.5 * last_atr) if action == "COMPRA" else curr_price + (1.5 * last_atr)
-            tp = curr_price + (3 * last_atr) if action == "COMPRA" else curr_price - (3 * last_atr)
+        last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
+        if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
+            sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
+            tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
             lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
-            color = "#00ffcc" if action == "COMPRA" else "#ff4b4b"
+            color = "#00ffcc" if action == "LONG" else "#ff4b4b"
             st.markdown(f"""<div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
-                <h2 style="color: {color}; margin:0;">🚀 SEGNALE: {action}</h2>
+                <h2 style="color: {color}; margin:0;">🚀 SEGNALE {selected_label}: {action}</h2>
                 <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
                 <p style="color:#ffcc00; font-weight:bold;">LOTTI: {lotti:.2f}</p></div>""", unsafe_allow_html=True)
             
-            new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': pair, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
+            new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
             st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
 
 # --- 8. STORICO SIDEBAR ---
