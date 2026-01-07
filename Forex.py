@@ -156,11 +156,7 @@ if not s_data.empty:
         txt = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
         cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:5px; border-radius:8px; border:1px solid {txt};'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-
-
-
-
-# --- 7. ANALISI AI & SEGNALI ---
+# --- 7. ANALISI AI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
     df_d.columns = [c.lower() for c in df_d.columns]
@@ -195,23 +191,6 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             
             color = "#00ffcc" if action == "LONG" else "#ff4b4b"
             
-            st.markdown(f"""<div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
-                <h2 style="color: {color}; margin:0;">🚀 SEGNALE {selected_label}: {action}</h2>
-                <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
-                <p style="color:#ffcc00; font-weight:bold;">LOTTI: {lotti:.2f}</p></div>, unsafe_allow_html=True)
-            
-            new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
-            st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
-
-
-
-
-
-
-
-
-
-
 # --- 7. MOTORE DI SCANSIONE MULTI-ASSET (SENTINELLA) ---
 st.markdown("---")
 st.subheader("🕵️ Analisi Sentinella in corso...")
@@ -247,7 +226,7 @@ for ticker_label in all_assets:
         
         # LOGICA SEGNALE
         if not is_low_liquidity():
-            scan_action = "LONG" if (scan_score >= 65 and rsi_scan < 60) else "SHORT" if (scan_score <= 35 and rsi_scan > 40) else None
+            scan_action = "COMPRA" if (scan_score >= 65 and rsi_scan < 60) else "VENDI" if (scan_score <= 35 and rsi_scan > 40) else None
             
             if scan_action:
                 # Controlla se il segnale è nuovo (non presente nell'ultimo record dello storico per quell'asset)
