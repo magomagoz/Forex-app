@@ -104,45 +104,56 @@ def update_signal_outcomes():
 
 def run_sentinel():
     for label, ticker in asset_map.items():
-        # Download dati M5 e Daily
-        df_rt = yf.download(ticker, period="2d", interval="5m", progress=False)
-        df_d = yf.download(ticker, period="1y", interval="1d", progress=False)
-        
-        if not df_rt.empty and not df_d.empty:
-            # Calcolo indicatori
-            rsi = ta.rsi(df_d['Close'], length=14).iloc[-1]
-            atr = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14).iloc[-1]
-            bb = ta.bbands(df_rt['Close'], length=20, std=2)
+        try:
+            # Download dati
+            df_rt_scan = yf.download(ticker, period="2d", interval="5m", progress=False)
+            df_d_scan = yf.download(ticker, period="1y", interval="1d", progress=False)
             
-            curr_p = df_rt['Close'].iloc[-1]
-            lower_bb = bb.iloc[-1, 0]
-            upper_bb = bb.iloc[-1, 2]
+            if df_rt_scan.empty or df_d_scan.empty: continue
+
+            # Pulizia colonne per yfinance
+            if isinstance(df_rt_scan.columns, pd.MultiIndex): df_rt_scan.columns = df_rt_scan.columns.get_level_values(0)
+            if isinstance(df_d_scan.columns, pd.MultiIndex): df_d_scan.columns = df_d_scan.columns.get_level_values(0)
+            df_rt_scan.columns = [c.lower() for c in df_rt_scan.columns]
+            df_d_scan.columns = [c.lower() for c in df_d_scan.columns]
+
+            # Calcoli con le TUE variabili
+            bb_scan = ta.bbands(df_rt_scan['close'], length=20, std=2)
+            close_val = float(df_rt_scan['close'].iloc[-1])
+            lower_bb = float(bb_scan.iloc[-1, 0])
+            upper_bb = float(bb_scan.iloc[-1, 2])
             
-            # Logica Segnale
-            action = None
-            if curr_p < lower_bb and rsi < 40: action = "LONG"
-            elif curr_p > upper_bb and rsi > 60: action = "SHORT"
+            # RSI e ATR Daily
+            rsi_scan = ta.rsi(df_d_scan['close'], length=14).iloc[-1]
+            atr_scan = ta.atr(df_d_scan['high'], df_d_scan['low'], df_d_scan['close'], length=14).iloc[-1]
             
-            if action:
-                # Verifica duplicati
+            # Logica Segnale (I tuoi parametri)
+            scan_action = None
+            if close_val < lower_bb and rsi_scan < 40: scan_action = "COMPRA"
+            elif close_val > upper_bb and rsi_scan > 60: scan_action = "VENDI"
+            
+            if scan_action:
                 history = st.session_state['signal_history']
-                if history.empty or not ((history['Asset'] == label) & (history['Direzione'] == action)).tail(1).any():
-                    sl = curr_p - (1.5 * atr) if action == "LONG" else curr_p + (1.5 * atr)
-                    tp = curr_p + (3 * atr) if action == "LONG" else curr_p - (3 * last_atr)
+                # Evita duplicati
+                if history.empty or not ((history['Asset'] == label) & (history['Direzione'] == scan_action)).tail(1).any():
+                    p_unit, p_fmt, _ = get_asset_params(ticker)
+                    sl = close_val - (1.5 * atr_scan) if scan_action == "COMPRA" else close_val + (1.5 * atr_scan)
+                    tp = close_val + (3 * atr_scan) if scan_action == "COMPRA" else close_val - (3 * atr_scan)
                     
                     new_sig = {
-                        'Orario': datetime.now().strftime("%H:%M:%S"),
+                        'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"),
                         'Asset': label,
-                        'Direzione': action,
-                        'Prezzo': curr_p,
-                        'SL': sl, 'TP': tp,
-                        'Stato': 'In Corso',
-                        'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                        'Direzione': scan_action,
+                        'Prezzo': p_fmt.format(close_val),
+                        'SL': p_fmt.format(sl),
+                        'TP': p_fmt.format(tp),
+                        'Stato': 'In Corso'
                     }
-                    st.session_state['signal_history'] = pd.concat([history, pd.DataFrame([new_sig])], ignore_index=True)
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), history], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
-
+        except:
+            continue
 
 # --- 3. SIDEBAR (CON MAPPING NOMI PULITI) ---
 st.sidebar.header("🛠 Trading Desk (5m)")
@@ -185,28 +196,26 @@ for s, op in get_session_status().items():
 if st.session_state['last_alert']:
     alert = st.session_state['last_alert']
     st.markdown(f"""
-        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                    background-color: rgba(0,0,0,0.9); z-index: 9999; 
+        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
+                    background-color: rgba(0,0,0,0.95); z-index: 999999; 
                     display: flex; flex-direction: column; justify-content: center; align-items: center; 
-                    color: white; text-align: center; border: 5px solid #00ffcc;">
-            <h1 style="font-size: 5em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
+                    color: white; text-align: center; padding: 20px;">
+            <h1 style="font-size: 4em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
             <h2 style="font-size: 3em;">{alert['Asset']} - {alert['Direzione']}</h2>
-            <p style="font-size: 2em;">Prezzo: {alert['Prezzo']:.5f}</p>
-            <p style="font-size: 1.5em; color: gray;">{alert['DataOra']}</p>
-            <br>
-            <p style="font-size: 1.2em;">(Tocca il pulsante sotto per chiudere)</p>
+            <p style="font-size: 2em;">Prezzo: {alert['Prezzo']}</p>
+            <p style="font-size: 1.2em; color: gray;">{alert.get('DataOra', alert.get('Orario', ''))}</p>
         </div>
     """, unsafe_allow_html=True)
 
-    if st.button("✅ CHIUDI AVVISO E TORNA AL MONITOR", use_container_width=True):
+    if st.button("✅ CHIUDI AVVISO"):
         st.session_state['last_alert'] = None
         st.rerun()
-    st.stop() # Blocca il resto dell'app finché il popup è attivo
+    st.stop()
 
-# --- 4. HEADER ---
+# --- 5. HEADER ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • M5</p></div>', unsafe_allow_html=True)
 
-# --- 5. DATA ENGINE ---
+# --- 6. DATA ENGINE ---
 pip_unit, price_fmt, pip_mult, asset_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
@@ -381,40 +390,3 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 
 time_lib.sleep(1)
 st.rerun()
-
-
-# Sidebar
-st.sidebar.header("🛠️ Trading Desk")
-selected_asset = st.sidebar.selectbox("Asset Visualizzato", list(asset_map.keys()))
-if st.sidebar.button("🗑️ Svuota Cronologia"):
-    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
-    st.rerun()
-
-# Esecuzione Motori
-verify_signals()
-run_sentinel()
-
-# Layout Principale
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.subheader(f"📊 Grafico Real-Time: {selected_asset}")
-    # (Qui puoi rimettere il tuo codice del grafico Plotly se vuoi visualizzarlo)
-    st.info("La sentinella sta scansionando tutti gli asset in background...")
-
-with col2:
-    st.subheader("📜 Cronologia Segnali")
-    if not st.session_state['signal_history'].empty:
-        df_vis = st.session_state['signal_history']
-        def style_stato(val):
-            color = '#ffcc00' # In corso
-            if 'TARGET' in val: color = '#00ffcc'
-            if 'STOP' in val: color = '#ff4b4b'
-            return f'color: {color}; font-weight: bold'
-        
-        st.dataframe(df_vis.style.applymap(style_stato, subset=['Stato']), use_container_width=True, height=600)
-    else:
-        st.write("Nessun segnale rilevato.")
-
-# Footer di stato
-st.caption(f"Ultimo aggiornamento: {datetime.now().strftime('%H:%M:%S')} - Monitoraggio attivo su 9 Asset.")
