@@ -13,11 +13,10 @@ import plotly.graph_objects as go
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
+    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
 
@@ -123,10 +122,16 @@ def run_sentinel():
             if s_action:
                 hist = st.session_state['signal_history']
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
-                    _, p_fmt, _ = get_asset_params(ticker)
+                    p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
                     tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
-                    new_sig = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Stato': 'In Corso'}
+                    
+                    # Calcolo LOTTI
+                    risk_amount = balance * (risk_pc / 100)
+                    dist_pips = abs(c_v - sl) * p_mult
+                    lot_size = risk_amount / (dist_pips * 10) if dist_pips > 0 else 0
+                    
+                    new_sig = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{lot_size:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
@@ -134,54 +139,37 @@ def run_sentinel():
 
 # --- 4. SIDEBAR CON TIMER ---
 st.sidebar.header("🛠 Trading Desk (5m)")
-
-# TIMER A 60 SECONDI
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-c_left, c_right = st.sidebar.columns([2, 1])
-c_left.markdown("⏳ **Prossimo Scan**")
-c_right.markdown(f"**{countdown}s**")
+st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
 
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
-
 balance = st.sidebar.number_input("**Balance (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
-if st.sidebar.button("🔄 AGGIORNA ORA"):
-    st.cache_data.clear()
-    st.rerun()
-
-st.sidebar.subheader("🌍 Sessioni")
-for s, op in get_session_status().items():
-    st.sidebar.markdown(f"**{s}**: {'🟢 OPEN' if op else '🔴 CLOSED'}")
-
 if st.sidebar.button("🗑️ Reset Cronologia"):
-    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato'])
+    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
 
-# --- 5. POPUP A TUTTO SCHERMO ---
+# --- 5. POPUP ALERT (OVERLAY) ---
 if st.session_state['last_alert']:
     alert = st.session_state['last_alert']
     st.markdown(f"""
-        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; 
-                    background-color: rgba(0,0,0,0.95); z-index: 999999; 
-                    display: flex; flex-direction: column; justify-content: center; align-items: center; 
-                    color: white; text-align: center; padding: 20px;">
-            <h1 style="font-size: 4em; color: #00ffcc; margin-bottom: 10px;">🚀 NUOVO SEGNALE</h1>
-            <h2 style="font-size: 3em; margin: 0;">{alert['Asset']}</h2>
-            <h3 style="font-size: 2.5em; color: #ffcc00;">{alert['Direzione']} @ {alert['Prezzo']}</h3>
-            <p style="font-size: 1.5em; color: gray; margin-top: 20px;">SL: {alert['SL']} | TP: {alert['TP']}</p>
-            <p style="font-size: 1.2em; color: #555;">Tocca il pulsante sotto per tornare alla dashboard</p>
+        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
+            <h1 style="font-size: 4em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
+            <h2 style="font-size: 3em;">{alert['Asset']} - {alert['Direzione']}</h2>
+            <p style="font-size: 2.5em; color: #ffcc00;">LOTTI CONSIGLIATI: {alert['Size']}</p>
+            <p style="font-size: 1.8em;">Prezzo: {alert['Prezzo']} | SL: {alert['SL']} | TP: {alert['TP']}</p>
         </div>
     """, unsafe_allow_html=True)
-    if st.button("✅ CHIUDI E TORNA ALLA DASHBOARD", use_container_width=True):
+    if st.button("✅ CHIUDI E TORNA"):
         st.session_state['last_alert'] = None
         st.rerun()
     st.stop()
 
-# --- 6. HEADER E GRAFICO ---
+# --- 6. HEADER E GRAFICO CON BBM ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
@@ -191,21 +179,21 @@ df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 if df_rt is not None and not df_rt.empty:
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
-    c_up, c_low = [c for c in df_rt.columns if "BBU" in c.upper()][0], [c for c in df_rt.columns if "BBL" in c.upper()][0]
+    c_up, c_mid, c_low = [c for c in df_rt.columns if "BBU" in c.upper()][0], [c for c in df_rt.columns if "BBM" in c.upper()][0], [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
     st.subheader(f"📈 Chart: {selected_label}")
     p_df = df_rt.tail(60)
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Price'))
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)'), name='Upper BB'))
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_mid], line=dict(color='rgba(255, 255, 255, 0.3)', dash='dash'), name='BBM (Middle)'))
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)'), fill='tonexty', name='Lower BB'))
     fig.update_layout(height=450, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
     st.plotly_chart(fig, use_container_width=True)
-    
     curr_p = float(df_rt['close'].iloc[-1])
     st.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
 
-# --- 7. CURRENCY STRENGTH (BOX COLORATI) ---
+# --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
 st.subheader("⚡ Market Strength Meter")
 s_data = get_currency_strength()
@@ -214,7 +202,7 @@ if not s_data.empty:
     for i, (curr, val) in enumerate(s_data.items()):
         bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
         txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
-        cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:8px; border:1px solid {txt_c};'><b style='color:white; font-size:0.9em;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold; font-size:1.1em;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+        cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:8px; border:1px solid {txt_c};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI E SEGNALI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
@@ -222,20 +210,13 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     df_d.columns = [c.lower() for c in df_d.columns]
     df_d['rsi'] = ta.rsi(df_d['close'], length=14); df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
-    
-    y = df_rt['close'].tail(15).values; x = np.arange(len(y)).reshape(-1, 1)
-    model = LinearRegression().fit(x, y); drift = model.predict([[15]])[0] - curr_p
-    
-    score = 50
-    if curr_p < df_rt[c_low].iloc[-1]: score += 20
-    elif curr_p > df_rt[c_up].iloc[-1]: score -= 20
+    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
     st.markdown("---")
     c1, c2, c3 = st.columns(3)
     c1.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-    c2.metric("Inerzia AI (75m)", f"{drift:.5f}")
-    c3.metric("Sentinel Score", f"{score}/100")
-
+    c2.metric("Sentinel Score", f"{score}/100")
+    
     if not is_low_liquidity():
         action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
         if action:
@@ -243,7 +224,9 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             if hist.empty or not ((hist['Asset'] == selected_label) & (hist['Direzione'] == action)).head(1).any():
                 sl = curr_p - (1.5 * last_atr) if action == "COMPRA" else curr_p + (1.5 * last_atr)
                 tp = curr_p + (3 * last_atr) if action == "COMPRA" else curr_p - (3 * last_atr)
-                new_a = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Stato': 'In Corso'}
+                dist_p = abs(curr_p - sl) * p_mult
+                size = (balance * (risk_pc / 100)) / (dist_p * 10) if dist_p > 0 else 0
+                new_a = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
                 st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
                 st.session_state['last_alert'] = new_a
                 st.rerun()
@@ -251,17 +234,10 @@ if df_rt is not None and df_d is not None and not df_d.empty:
 # --- 9. MOTORI E CRONOLOGIA ---
 update_signal_outcomes()
 run_sentinel()
-
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
     def style_s(val):
-        color = '#ffcc00'
-        if '✅' in val: color = '#00ffcc'
-        elif '❌' in val: color = '#ff4b4b'
+        color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
-else:
-    st.info("In attesa di segnali...")
-
-st.caption(f"Ultimo Check: {datetime.now().strftime('%H:%M:%S')}")
