@@ -76,12 +76,12 @@ def detect_divergence(df):
     curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
     prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
-    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DIV. BEARISH"
-    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 DIV. BULLISH"
+    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 **IL PREZZO SCENDERA'**"
+    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 **IL PREZZO SALIRA'**"
     return "Neutrale"
 
 # --- 3. SIDEBAR ---
-st.sidebar.header("🛠 Trading Desk (M5)")
+st.sidebar.header("🛠 Trading Desk (5m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
 
@@ -90,8 +90,8 @@ col_label.markdown("⏳ **Prossimo Scan**")
 col_time.markdown(f"**{countdown}s**")
 
 pair = st.sidebar.selectbox("**Asset**", ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "BTC-USD", "ETH-USD"])
-balance = st.sidebar.number_input("**Balance (€)**", value=1000)
-risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
+balance = st.sidebar.number_input("**CONTO (€)**", value=1000)
+risk_pc = st.sidebar.slider("**RISCHIO %**", 0.5, 5.0, 1.0)
 
 if st.sidebar.button("🔄 **AGGIORNAMENTO**"):
     st.cache_data.clear()
@@ -171,7 +171,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     c3.metric("Sentinel Score", f"{score}/100")
 
     if not is_low_liquidity():
-        action = "LONG" if (score >= 65 and last_rsi < 60) else "SHORT" if (score <= 35 and last_rsi > 40) else None
+        action = "COMPRA" if (score >= 65 and last_rsi < 60) else "VENDI" if (score <= 35 and last_rsi > 40) else None
         
         already_signaled = False
         if not st.session_state['signal_history'].empty:
@@ -180,11 +180,11 @@ if df_rt is not None and df_d is not None and not df_d.empty:
                 already_signaled = True
 
         if action and not already_signaled:
-            sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
-            tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
+            sl = curr_price - (1.5 * last_atr) if action == "COMPRA" else curr_price + (1.5 * last_atr)
+            tp = curr_price + (3 * last_atr) if action == "COMPRA" else curr_price - (3 * last_atr)
             lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
-            color = "#00ffcc" if action == "LONG" else "#ff4b4b"
+            color = "#00ffcc" if action == "COMPRA" else "#ff4b4b"
             st.markdown(f"""<div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
                 <h2 style="color: {color}; margin:0;">🚀 SEGNALE: {action}</h2>
                 <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
