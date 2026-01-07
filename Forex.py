@@ -194,6 +194,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
             color = "#00ffcc" if action == "LONG" else "#ff4b4b"
+            
             st.markdown(f"""<div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
                 <h2 style="color: {color}; margin:0;">🚀 SEGNALE {selected_label}: {action}</h2>
                 <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
@@ -201,18 +202,6 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             
             new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
             st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
-
-# --- 8. STORICO SIDEBAR ---
-if not st.session_state['signal_history'].empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📜 Storico Segnali")
-    st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
-    if st.sidebar.button("🗑️ Svuota Storico"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
-        st.rerun()
-
-time_lib.sleep(1)
-st.rerun()
 
 
 
@@ -297,3 +286,17 @@ if pair == current_ticker: # Solo se l'asset scansionato è quello selezionato
 
 # Nota: Assicurati che la sezione 7 e 8 nel tuo file mostrino i grafici 
 # dell'asset "pair" selezionato mentre il loop sopra lavora su tutti.
+
+# --- 9. STORICO SIDEBAR ---
+if not st.session_state['signal_history'].empty:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📜 Storico Segnali")
+    st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
+    if st.sidebar.button("🗑️ Svuota Storico"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
+        st.rerun()
+
+time_lib.sleep(1)
+st.rerun()
+
+
