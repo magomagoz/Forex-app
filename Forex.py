@@ -78,8 +78,8 @@ def detect_divergence(df):
     curr_p, curr_r = float(price.iloc[-1]), float(rsi.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi.iloc[-20:-1].max()
     prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi.iloc[-20:-1].min()
-    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DIV. BEARISH"
-    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 DIV. BULLISH"
+    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DECRESCITA"
+    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
 # --- 3. LOGICA DI MONITORAGGIO & UPDATE STATO ---
@@ -103,7 +103,7 @@ def update_signal_outcomes():
                 elif high >= row['SL']: df.at[idx, 'Stato'] = '❌ STOP LOSS'
 
 # --- 3. SIDEBAR (CON MAPPING NOMI PULITI) ---
-st.sidebar.header("🛠 Trading Desk (M5)")
+st.sidebar.header("🛠 Trading Desk (5m)")
 
 # Timer Countdown
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
@@ -224,15 +224,15 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     c3.metric("Sentinel Score", f"{score}/100")
 
     if not is_low_liquidity():
-        action = "LONG" if (score >= 65 and last_rsi < 60) else "SHORT" if (score <= 35 and last_rsi > 40) else None
+        action = "COMPRA" if (score >= 65 and last_rsi < 60) else "VENDI" if (score <= 35 and last_rsi > 40) else None
         
         last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
         if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
-            sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
-            tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
+            sl = curr_price - (1.5 * last_atr) if action == "COMPRA" else curr_price + (1.5 * last_atr)
+            tp = curr_price + (3 * last_atr) if action == "COMPRA" else curr_price - (3 * last_atr)
             lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
             
-            color = "#00ffcc" if action == "LONG" else "#ff4b4b"
+            color = "#00ffcc" if action == "COMPRA" else "#ff4b4b"
 
 # Aggiornamento dati
 update_signal_outcomes()
@@ -287,8 +287,8 @@ for ticker_label in all_assets:
                 if is_new:
                     # Calcolo SL/TP e Lotti
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(current_ticker)
-                    sl_scan = close_val - (1.5 * atr_scan) if scan_action == "LONG" else close_val + (1.5 * atr_scan)
-                    tp_scan = close_val + (3 * atr_scan) if scan_action == "LONG" else close_val - (3 * atr_scan)
+                    sl_scan = close_val - (1.5 * atr_scan) if scan_action == "COMPRA" else close_val + (1.5 * atr_scan)
+                    tp_scan = close_val + (3 * atr_scan) if scan_action == "COMPRA" else close_val - (3 * atr_scan)
                     
                     # Aggiunta allo storico
                     new_sig = pd.DataFrame([{
@@ -338,5 +338,3 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 
 time_lib.sleep(1)
 st.rerun()
-
-
