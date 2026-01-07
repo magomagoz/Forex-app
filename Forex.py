@@ -237,7 +237,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
 
 # Aggiornamento dati
 update_signal_outcomes()
-run_sentinel()
+#run_sentinel()
 
 # --- 7. INTERFACCIA PRINCIPALE ---
 st.markdown("---")
