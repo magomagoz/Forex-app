@@ -81,6 +81,23 @@ def detect_divergence(df):
     return "Neutrale"
 
 # --- 3. SIDEBAR ---
+
+asset_options = {
+    "EURUSD": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "USDJPY": "USDJPY=X",
+    "AUDUSD": "AUDUSD=X",
+    "USDCAD": "USDCAD=X",
+    "USDCHF": "USDCHF=X",
+    "NZDUSD": "NZDUSD=X",
+    "BTC-USD": "BTC-USD",
+    "ETH-USD": "ETH-USD"
+}
+
+# L'utente vede "EURUSD", ma il codice usa "EURUSD=X"
+selected_label = st.sidebar.selectbox("**Asset**", list(asset_options.keys()))
+pair = asset_options[selected_label] 
+
 st.sidebar.header("🛠 Trading Desk (5m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
