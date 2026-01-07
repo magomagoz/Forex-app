@@ -156,56 +156,77 @@ if not s_data.empty:
         txt = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
         cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:5px; border-radius:8px; border:1px solid {txt};'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-# --- 7. ANALISI AI & SEGNALI ---
-if df_rt is not None and df_d is not None and not df_d.empty:
-    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
-    df_d.columns = [c.lower() for c in df_d.columns]
-    df_d['rsi'] = ta.rsi(df_d['close'], length=14)
-    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
-    
-    last_rsi, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
-    
-    y_vals = df_rt['close'].tail(15).values
-    x_vals = np.arange(len(y_vals)).reshape(-1, 1)
-    model = LinearRegression().fit(x_vals, y_vals)
-    drift = model.predict([[15]])[0] - curr_price
-    
-    score = 50
-    if curr_price < df_rt[col_lower].iloc[-1]: score += 20
-    if curr_price > df_rt[col_upper].iloc[-1]: score -= 20
-    
-    st.markdown("---")
-    c1, c2, c3 = st.columns(3)
-    c1.metric("RSI Daily", f"{last_rsi:.1f}", detect_divergence(df_d))
-    c2.metric("Inerzia AI (75m)", f"{drift:.5f}")
-    c3.metric("Sentinel Score", f"{score}/100")
+# --- 7. MOTORE DI SCANSIONE MULTI-ASSET (SENTINELLA) ---
+st.markdown("---")
+st.subheader("🕵️ Analisi Sentinella in corso...")
 
-    if not is_low_liquidity():
-        action = "LONG" if (score >= 65 and last_rsi < 60) else "SHORT" if (score <= 35 and last_rsi > 40) else None
+# Lista di tutti gli asset da monitorare
+all_assets = list(asset_map.keys())
+
+for ticker_label in all_assets:
+    current_ticker = asset_map[ticker_label]
+    
+    # Scarichiamo i dati per la scansione silente
+    # Usiamo cache breve per non appesantire il sistema
+    df_scan = get_realtime_data(current_ticker)
+    df_d_scan = yf.download(current_ticker, period="1y", interval="1d", progress=False)
+    
+    if df_scan is not None and not df_scan.empty and not df_d_scan.empty:
+        # Calcoli Tecnici Rapidi
+        bb_scan = ta.bbands(df_scan['close'], length=20, std=2)
+        close_val = float(df_scan['close'].iloc[-1])
+        upper_bb = float(bb_scan.iloc[-1, 2]) # Colonna BBU
+        lower_bb = float(bb_scan.iloc[-1, 0]) # Colonna BBL
         
-        last_s = st.session_state['signal_history'].iloc[-1] if not st.session_state['signal_history'].empty else None
-        if action and (last_s is None or last_s['Asset'] != selected_label or last_s['Direzione'] != action):
-            sl = curr_price - (1.5 * last_atr) if action == "LONG" else curr_price + (1.5 * last_atr)
-            tp = curr_price + (3 * last_atr) if action == "LONG" else curr_price - (3 * last_atr)
-            lotti = (balance * (risk_pc/100)) / (abs(curr_price - sl) / pip_unit * pip_mult) if abs(curr_price - sl) > 0 else 0
+        # RSI e ATR Daily
+        if isinstance(df_d_scan.columns, pd.MultiIndex): df_d_scan.columns = df_d_scan.columns.get_level_values(0)
+        df_d_scan.columns = [c.lower() for c in df_d_scan.columns]
+        rsi_scan = ta.rsi(df_d_scan['close'], length=14).iloc[-1]
+        atr_scan = ta.atr(df_d_scan['high'], df_d_scan['low'], df_d_scan['close'], length=14).iloc[-1]
+        
+        # Calcolo Score rapido per la sentinella
+        scan_score = 50
+        if close_val < lower_bb: scan_score += 20
+        if close_val > upper_bb: scan_score -= 20
+        
+        # LOGICA SEGNALE
+        if not is_low_liquidity():
+            scan_action = "LONG" if (scan_score >= 65 and rsi_scan < 60) else "SHORT" if (scan_score <= 35 and rsi_scan > 40) else None
             
-            color = "#00ffcc" if action == "LONG" else "#ff4b4b"
-            st.markdown(f"""<div style="border: 2px solid {color}; padding: 20px; border-radius: 15px; background: #0e1117;">
-                <h2 style="color: {color}; margin:0;">🚀 SEGNALE {selected_label}: {action}</h2>
-                <p>Entry: {price_fmt.format(curr_price)} | SL: {price_fmt.format(sl)} | TP: {price_fmt.format(tp)}</p>
-                <p style="color:#ffcc00; font-weight:bold;">LOTTI: {lotti:.2f}</p></div>""", unsafe_allow_html=True)
-            
-            new_row = pd.DataFrame([{'Orario': datetime.now().strftime("%H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': curr_price, 'SL': sl, 'TP': tp}])
-            st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_row], ignore_index=True)
+            if scan_action:
+                # Controlla se il segnale è nuovo (non presente nell'ultimo record dello storico per quell'asset)
+                history = st.session_state['signal_history']
+                is_new = True
+                if not history.empty:
+                    last_asset_sig = history[history['Asset'] == ticker_label].tail(1)
+                    if not last_asset_sig.empty and last_asset_sig['Direzione'].values[0] == scan_action:
+                        is_new = False
+                
+                if is_new:
+                    # Calcolo SL/TP e Lotti
+                    p_unit, p_fmt, p_mult, a_type = get_asset_params(current_ticker)
+                    sl_scan = close_val - (1.5 * atr_scan) if scan_action == "LONG" else close_val + (1.5 * atr_scan)
+                    tp_scan = close_val + (3 * atr_scan) if scan_action == "LONG" else close_val - (3 * atr_scan)
+                    
+                    # Aggiunta allo storico
+                    new_sig = pd.DataFrame([{
+                        'Orario': datetime.now().strftime("%H:%M:%S"),
+                        'Asset': ticker_label,
+                        'Direzione': scan_action,
+                        'Prezzo': close_val,
+                        'SL': sl_scan,
+                        'TP': tp_scan
+                    }])
+                    st.session_state['signal_history'] = pd.concat([st.session_state['signal_history'], new_sig], ignore_index=True)
+                    
+                    # Notifica immediata a schermo
+                    st.toast(f"🚀 NUOVO SEGNALE: {ticker_label} {scan_action}", icon="🔥")
 
-# --- 8. STORICO SIDEBAR ---
-if not st.session_state['signal_history'].empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📜 Storico Segnali")
-    st.sidebar.dataframe(st.session_state['signal_history'].tail(10), use_container_width=True)
-    if st.sidebar.button("🗑️ Svuota Storico"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['Orario', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP'])
-        st.rerun()
+# --- 8. VISUALIZZAZIONE ASSET SELEZIONATO ---
+# Qui mostriamo i dettagli dell'asset che l'utente ha scelto nel menu
+if pair == current_ticker: # Solo se l'asset scansionato è quello selezionato
+    # (Il codice del punto 7 del messaggio precedente va qui per mostrare i dettagli grafici)
+    pass 
 
-time_lib.sleep(1)
-st.rerun()
+# Nota: Assicurati che la sezione 7 e 8 nel tuo file mostrino i grafici 
+# dell'asset "pair" selezionato mentre il loop sopra lavora su tutti.
