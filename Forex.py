@@ -102,6 +102,48 @@ def update_signal_outcomes():
                 if low <= row['TP']: df.at[idx, 'Stato'] = '✅ TARGET'
                 elif high >= row['SL']: df.at[idx, 'Stato'] = '❌ STOP LOSS'
 
+def run_sentinel():
+    for label, ticker in asset_map.items():
+        # Download dati M5 e Daily
+        df_rt = yf.download(ticker, period="2d", interval="5m", progress=False)
+        df_d = yf.download(ticker, period="1y", interval="1d", progress=False)
+        
+        if not df_rt.empty and not df_d.empty:
+            # Calcolo indicatori
+            rsi = ta.rsi(df_d['Close'], length=14).iloc[-1]
+            atr = ta.atr(df_d['High'], df_d['Low'], df_d['Close'], length=14).iloc[-1]
+            bb = ta.bbands(df_rt['Close'], length=20, std=2)
+            
+            curr_p = df_rt['Close'].iloc[-1]
+            lower_bb = bb.iloc[-1, 0]
+            upper_bb = bb.iloc[-1, 2]
+            
+            # Logica Segnale
+            action = None
+            if curr_p < lower_bb and rsi < 40: action = "LONG"
+            elif curr_p > upper_bb and rsi > 60: action = "SHORT"
+            
+            if action:
+                # Verifica duplicati
+                history = st.session_state['signal_history']
+                if history.empty or not ((history['Asset'] == label) & (history['Direzione'] == action)).tail(1).any():
+                    sl = curr_p - (1.5 * atr) if action == "LONG" else curr_p + (1.5 * atr)
+                    tp = curr_p + (3 * atr) if action == "LONG" else curr_p - (3 * last_atr)
+                    
+                    new_sig = {
+                        'Orario': datetime.now().strftime("%H:%M:%S"),
+                        'Asset': label,
+                        'Direzione': action,
+                        'Prezzo': curr_p,
+                        'SL': sl, 'TP': tp,
+                        'Stato': 'In Corso',
+                        'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+                    }
+                    st.session_state['signal_history'] = pd.concat([history, pd.DataFrame([new_sig])], ignore_index=True)
+                    st.session_state['last_alert'] = new_sig
+                    st.rerun()
+
+
 # --- 3. SIDEBAR (CON MAPPING NOMI PULITI) ---
 st.sidebar.header("🛠 Trading Desk (5m)")
 
@@ -236,8 +278,8 @@ if df_rt is not None and df_d is not None and not df_d.empty:
             color = "#00ffcc" if action == "COMPRA" else "#ff4b4b"
 
 # Aggiornamento dati
-update_signal_outcomes()
-#run_sentinel()
+#update_signal_outcomes()
+run_sentinel()
 
 # --- 7. INTERFACCIA PRINCIPALE ---
 st.markdown("---")
