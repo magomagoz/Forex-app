@@ -249,7 +249,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     df_d['rsi'] = ta.rsi(df_d['close'], length=14)
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     
-    last_rsi, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
+    rsi, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     
     y_vals = df_rt['close'].tail(15).values
     x_vals = np.arange(len(y_vals)).reshape(-1, 1)
