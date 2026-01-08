@@ -305,8 +305,8 @@ if df_rt is not None and not df_rt.empty:
         fig.add_vline(
             x=line_time, 
             line_width=1, 
-            line_dash="dash", 
-            line_color="rgba(0, 0, 0, 1)", # Nero
+            #line_dash="dash", 
+            line_color="rgba(0, 0, 0, 0.2)", # Nero
             row="all", # Applica a entrambi i sottografici (Prezzo e RSI)
             col=1
         )
