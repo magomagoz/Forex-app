@@ -306,7 +306,7 @@ if df_rt is not None and not df_rt.empty:
             x=line_time, 
             line_width=1, 
             line_dash="dash", 
-            line_color="rgba(0, 0, 0, 0)", # Nero
+            line_color="rgba(0, 0, 0, 1)", # Nero
             row="all", # Applica a entrambi i sottografici (Prezzo e RSI)
             col=1
         )
