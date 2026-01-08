@@ -258,16 +258,17 @@ if df_rt is not None and not df_rt.empty:
     c_met1.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
     c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro")
 
-# --- 7. CURRENCY STRENGTH ---
-st.markdown("---")
-st.subheader("⚡ Currency Strength Meter")
-s_data = get_currency_strength()
-if not s_data.empty:
-    s_display = s_data.iloc[:9] # Fix per evitare l'errore TypeError
-    cols = st.columns(len(s_display))
-    for i, (curr, val) in enumerate(s_display.items()):
-        col_c = "#00ffcc" if val > 0 else "#ff4b4b"
-        cols[i].markdown(f"<div style='text-align:center; background:#1e1e1e; padding:10px; border-radius:10px; border:1px solid #444;'><b style='color:white;'>{curr}</b><br><span style='color:{col_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+    # --- 7. CURRENCY STRENGTH ---
+    st.markdown("---")
+    st.subheader("⚡ Currency Strength Meter")
+    s_data = get_currency_strength()
+    if not s_data.empty:
+        s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
+        cols = st.columns(len(s_display))
+        for i, (curr, val) in enumerate(s_data.items()):
+            bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
+            txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
+            cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:8px; border:1px solid {txt_c};'><b style='color:white;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
