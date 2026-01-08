@@ -185,7 +185,7 @@ if st.session_state['last_alert']:
     if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
-    st.stop()
+st.stop()
 
 # --- 6. HEADER E GRAFICO ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
