@@ -188,7 +188,7 @@ if st.session_state['last_alert']:
     st.stop()
 
 # --- 6. HEADER E GRAFICO ---
-st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1></div>', unsafe_allow_html=True)
+st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
@@ -199,7 +199,7 @@ if df_rt is not None and not df_rt.empty:
     df_rt = pd.concat([df_rt, bb], axis=1)
     c_up, c_mid, c_low = [c for c in df_rt.columns if "BBU" in c.upper()][0], [c for c in df_rt.columns if "BBM" in c.upper()][0], [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart: {selected_label}")
+    st.subheader(f"📈 Chart 1m: {selected_label}")
     p_df = df_rt.tail(60)
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Price'))
@@ -208,6 +208,7 @@ if df_rt is not None and not df_rt.empty:
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)'), fill='tonexty', name='Lower BB'))
     fig.update_layout(height=450, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5))
     st.plotly_chart(fig, use_container_width=True)
+    
     curr_p = float(df_rt['close'].iloc[-1])
     st.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
 
@@ -231,7 +232,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
     st.markdown("---")
-    c1, c2, c3 = st.columns(3)
+    c1, c2 = st.columns(2)
     c1.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
     c2.metric("Sentinel Score", f"{score}/100")
     
@@ -244,7 +245,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
                 tp = curr_p + (3 * last_atr) if action == "COMPRA" else curr_p - (3 * last_atr)
                 dist_p = abs(curr_p - sl) * p_mult
                 size = (balance * (risk_pc / 100)) / (dist_p * 10) if dist_p > 0 else 0
-                new_a = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
+                new_a = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
                 st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
                 st.session_state['last_alert'] = new_a
                 st.rerun()
@@ -252,6 +253,7 @@ if df_rt is not None and df_d is not None and not df_d.empty:
 # --- 9. MOTORI E CRONOLOGIA ---
 update_signal_outcomes()
 run_sentinel()
+
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
@@ -261,5 +263,5 @@ if not st.session_state['signal_history'].empty:
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
 
 st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (M5).")
-st.caption(f"Ultimo aggiornamento globale: {datetime.now().strftime('%H:%M:%S')}")
+st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y - %H:%M:%S')}")
