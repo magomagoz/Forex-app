@@ -203,7 +203,7 @@ def run_sentinel():
 st.sidebar.header("🛠 Trading Desk (1m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.markdown(f"⏳ **Prossimo Scan Sentinella: {countdown}s**")
+st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
 
 # LOG DI MONITORAGGIO
 st.sidebar.subheader("📡 Sentinel Status")
