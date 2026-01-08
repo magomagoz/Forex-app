@@ -245,7 +245,7 @@ if st.session_state['last_alert']:
 
     # CSS per il pulsante di chiusura sopra il popup
     st.markdown(f"""
-        <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
+        <div style="position: fixed; top: 0; left: 0; width: 50vw; height: 50vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
             <h1 style="font-size: 4em; color: #00ffcc; margin-bottom:10px;">🚀 NUOVO SEGNALE</h1>
             <h2 style="font-size: 1.5em; color: gray;">{alert['DataOra']} (Roma)</h2>
             <h2 style="font-size: 3.5em; margin: 20px 0;">{alert['Asset']} - {alert['Direzione']}</h2>
