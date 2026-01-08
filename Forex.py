@@ -365,32 +365,32 @@ st.markdown("---")
 st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
     
-    # Visualizziamo le metriche
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-    col_b.metric("Sentinel Score", f"{score}/100")
-    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
-    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+# Visualizziamo le metriche
+col_a, col_b, col_c = st.columns(3)
+col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+col_b.metric("Sentinel Score", f"{score}/100")
+adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
 
-    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+st.markdown("### 📊 Guida alla Volatilità (ADX)")
 
-    # 2. Definiamo i dati della tabella
-    adx_guide = pd.DataFrame([
-        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
-        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
-        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
+# 2. Definiamo i dati della tabella
+adx_guide = pd.DataFrame([
+    {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
+    {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
+    {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
     ])
 
     # 3. QUI INSERISCI LA FUNZIONE highlight_adx
-    def highlight_adx(row):
-        # Usiamo curr_adx_ai calcolato poco sopra
-        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']:
-            return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
-        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']:
-            return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
-        elif curr_adx_ai > 30 and "30+" in row['Valore']:
-            return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
-        return [''] * len(row)
+def highlight_adx(row):
+    # Usiamo curr_adx_ai calcolato poco sopra
+    if curr_adx_ai <= 20 and "0 - 20" in row['Valore']:
+        return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+    elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']:
+        return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+    elif curr_adx_ai > 30 and "30+" in row['Valore']:
+        return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+    return [''] * len(row)
 
 # --- Tabella Parametri ADX (Grafica) ---
 st.markdown("### 📊 Guida alla Volatilità (ADX)")
