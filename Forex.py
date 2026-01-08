@@ -151,11 +151,12 @@ def run_sentinel():
           
             # Nomi colonne BB
             c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
-            c_m = [c for c in bb_m.columns if "BBM" in c.upper()][0]
+            c_m = [c for c in bb_s.columns if "BBM" in c.upper()][0]
             c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
 
             c_v = float(df_rt_s['close'].iloc[-1])
             l_bb = float(bb_s[c_l].iloc[-1]) # Usa il nome colonna trovato
+            m_bb = float(bb_s[c_m].iloc[-1])
             u_bb = float(bb_s[c_u].iloc[-1])
             
             # Logica Segnale: aggiunto filtro ADX < 30 (evita trend esplosivi)
