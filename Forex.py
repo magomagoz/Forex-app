@@ -13,6 +13,10 @@ import plotly.graph_objects as go
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
+#Definizione Fuso Orario Roma
+rome_tz = pytz.timezone('Europe\Rome')
+
+#Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state: 
@@ -21,23 +25,27 @@ if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
 
 # --- 2. FUNZIONI TECNICHE ---
+def get_now_rome():
+    return datetime.now(rome_tz)
+
 def get_session_status():
-    now_utc = datetime.now(pytz.utc).time()
+    now_rome = get_now_rome().time()
+    
     sessions = {
         "Tokyo 🇯🇵": (time(0,0), time(9,0)), 
-        "Londra 🇬🇧": (time(8,0), time(17,0)), 
-        "New York 🇺🇸": (time(13,0), time(22,0))
+        "Londra 🇬🇧": (time(9,0), time(18,0)), 
+        "New York 🇺🇸": (time(14,0), time(23,0))
     }
-    return {name: start <= now_utc <= end for name, (start, end) in sessions.items()}
+    return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
 
 def is_low_liquidity():
-    now_utc = datetime.now(pytz.utc).time()
-    return time(23, 0) <= now_utc or now_utc <= time(1, 0)
+    now_rome = get_now_rome().time()
+    return time(23, 0) <= now_rome or now_rome <= time(1, 0)
 
-@st.cache_data(ttl=50)
+@st.cache_data(ttl=30)
 def get_realtime_data(ticker):
     try:
-        df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
+        df = yf.download(ticker, period="1d", interval="1m", progress=False, timeout=10)
         if df is None or df.empty: return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -72,7 +80,7 @@ def get_asset_params(pair):
     return 0.0001, "{:.5f}", 10, "FOREX"
 
 def detect_divergence(df):
-    if len(df) < 20: return "Analisi..."
+    if len(df) < 20: return "Analisi in corso"
     price, rsi_col = df['close'], df['rsi']
     curr_p, curr_r = float(price.iloc[-1]), float(rsi_col.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi_col.iloc[-20:-1].max()
@@ -87,7 +95,7 @@ def update_signal_outcomes():
     df = st.session_state['signal_history']
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            data = yf.download(asset_map[row['Asset']], period="1d", interval="5m", progress=False)
+            data = yf.download(asset_map[row['Asset']], period="1d", interval="1m", progress=False)
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
                 high, low = data['High'].max(), data['Low'].min()
@@ -103,6 +111,7 @@ def update_signal_outcomes():
 def run_sentinel():
     for label, ticker in asset_map.items():
         try:
+            # Monitoraggio rapido su base 1 minuto
             df_rt_s = yf.download(ticker, period="2d", interval="5m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
@@ -121,6 +130,7 @@ def run_sentinel():
             
             if s_action:
                 hist = st.session_state['signal_history']
+                # Evita duplicati nello stesso minuto
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
@@ -128,17 +138,18 @@ def run_sentinel():
                     risk_val = balance * (risk_pc / 100)
                     dist_p = abs(c_v - sl) * p_mult
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
-                    new_sig = {'DataOra': datetime.now().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
+                    
+                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
         except: continue
 
 # --- 4. SIDEBAR CON TIMER E SESSIONI ---
-st.sidebar.header("🛠 Trading Desk (5m)")
+st.sidebar.header("🛠 Trading Desk (1m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
+st.sidebar.markdown(f"⏳ **Scan Sentinella: {countdown}s**")
 
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
@@ -146,7 +157,7 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Balance (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
-st.sidebar.subheader("🌍 Sessioni")
+st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
     status_text = "OPEN" if is_open else "CLOSED"
@@ -162,12 +173,16 @@ if st.session_state['last_alert']:
     st.markdown(f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
             <h1 style="font-size: 4em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
-            <h2 style="font-size: 3em;">{alert['Asset']} - {alert['Direzione']}</h2>
-            <p style="font-size: 2.5em; color: #ffcc00;">LOTTI: {alert['Size']}</p>
-            <p style="font-size: 1.8em;">Prezzo: {alert['Prezzo']} | SL: {alert['SL']} | TP: {alert['TP']}</p>
+            <h2 style="font-size: 1.5em; color: gray;">{alert['DataOra']} (Ora Roma)</h2>
+            <h2 style="font-size: 3.5em; margin: 20px 0;">{alert['Asset']} - {alert['Direzione']}</h2>
+            <div style="background: #222; padding: 20px; border-radius:15px; border: 2px solid #FFCC00;">
+                <p style="font-size: 2.5em; color: #ffcc00;">LOTTI: {alert['Size']}</p>
+                <p style="font-size: 1.5em; margin: 10px 0;">Prezzo: {alert['Prezzo']}</p>
+                <p style="font-size: 1.2em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+            </div>    
         </div>
     """, unsafe_allow_html=True)
-    if st.button("✅ CHIUDI E TORNA"):
+    if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
     st.stop()
