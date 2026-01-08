@@ -168,7 +168,7 @@ def run_sentinel():
                 # Evita duplicati nello stesso minuto
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                    atr_s = ta.atr(df_d_s['high'], df_d_s[low'], df_d_s['close'], length=14).iloc[-1]
+                    atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
                     tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
                     risk_val = balance * (risk_pc / 100)
