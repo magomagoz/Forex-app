@@ -47,18 +47,6 @@ def get_session_status():
     }
     return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
 
-    # Evidenziamo la riga corrente
-    def highlight_adx(row):
-        if curr_adx <= 20 and "0 - 20" in row['Valore']:
-            return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
-        elif 20 < curr_adx <= 30 and "20 - 30" in row['Valore']:
-            return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
-        elif curr_adx > 30 and "30+" in row['Valore']:
-            return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
-        return [''] * len(row)
-
-    st.table(adx_guide.style.apply(highlight_adx, axis=1))
-
 def is_low_liquidity():
     now_rome = get_now_rome().time()
     return time(23, 0) <= now_rome or now_rome <= time(1, 0)
@@ -271,7 +259,7 @@ p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="5d", progress=False)
 
-if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
+if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
     # Calcolo indicatori per il grafico
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
