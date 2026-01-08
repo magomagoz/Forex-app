@@ -377,9 +377,9 @@ st.markdown("---")
 st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
     
-        col_a, col_b, col_c = st.columns(3)
-        col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-        col_b.metric("Sentinel Score", f"{score}/100")
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
     
     # Box ADX con colore dinamico
     adx_color = "🔴" if curr_adx > 30 else "🟡" if curr_adx > 20 else "🟢"
