@@ -53,7 +53,7 @@ def is_low_liquidity():
 @st.cache_data(ttl=30)
 def get_realtime_data(ticker):
     try:
-        df = yf.download(ticker, period="1d", interval="1m", progress=False, timeout=10)
+        df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
         if df is None or df.empty: return None
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
@@ -208,7 +208,7 @@ if df_rt is not None and not df_rt.empty:
     df_rt = pd.concat([df_rt, bb], axis=1)
     c_up, c_mid, c_low = [c for c in df_rt.columns if "BBU" in c.upper()][0], [c for c in df_rt.columns if "BBM" in c.upper()][0], [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 1m: {selected_label}")
+    st.subheader(f"📈 Chart 5m: {selected_label}")
     p_df = df_rt.tail(60)
     fig = go.Figure()
     fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Price'))
