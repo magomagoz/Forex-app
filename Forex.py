@@ -385,12 +385,12 @@ col_b.metric("Sentinel Score", f"{score}/100")
 adx_color = "🔴" if curr_adx > 30 else "🟡" if curr_adx > 20 else "🟢"
 col_c.metric("Forza Trend (ADX)", f"{curr_adx:.1f}", adx_color)
 
-    # --- Tabella Parametri ADX (Grafica) ---
-    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+# --- Tabella Parametri ADX (Grafica) ---
+st.markdown("### 📊 Guida alla Volatilità (ADX)")
     
-    # Creiamo una tabella per spiegare come interpretare l'ADX attuale
-    adx_guide = pd.DataFrame([
-        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità Segnale": "MASSIMA (Rimbalzi puliti)"},
-        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità Segnale": "MEDIA (Attenzione ai breakout)"},
-        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità Segnale": "BASSA (Rischio rottura Bande)"}
+# Creiamo una tabella per spiegare come interpretare l'ADX attuale
+adx_guide = pd.DataFrame([
+    {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità Segnale": "MASSIMA (Rimbalzi puliti)"},
+    {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità Segnale": "MEDIA (Attenzione ai breakout)"},
+    {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità Segnale": "BASSA (Rischio rottura Bande)"}
     ])
