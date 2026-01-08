@@ -238,29 +238,55 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 update_signal_outcomes()
 run_sentinel()
 
-# --- 5. POPUP ALERT CON SUONO ---
+# --- 5. POPUP ALERT RIDOTTO (MODAL) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
 
-    # CSS per il pulsante di chiusura sopra il popup
+    # CSS per popup a mezzo schermo centrato
     st.markdown(f"""
-        <div style="position: fixed; top: 0; left: 0; width: 50vw; height: 50vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
-            <h1 style="font-size: 4em; color: #00ffcc; margin-bottom:10px;">🚀 NUOVO SEGNALE</h1>
-            <h2 style="font-size: 1.5em; color: gray;">{alert['DataOra']} (Roma)</h2>
-            <h2 style="font-size: 3.5em; margin: 20px 0;">{alert['Asset']} - {alert['Direzione']}</h2>
-            <div style="background: #222; padding: 30px; border-radius:20px; border: 3px solid #FFCC00; min-width: 300px;">
-                <p style="font-size: 3em; color: #ffcc00; font-weight: bold; margin:0;">LOTTI: {alert['Size']}</p>
-                <p style="font-size: 1.8em; margin: 15px 0;">Prezzo: {alert['Prezzo']}</p>
-                <p style="font-size: 1.3em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+        <div style="
+            position: fixed; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            width: 60vw; 
+            max-width: 800px;
+            background-color: rgba(15, 12, 41, 0.98); 
+            z-index: 999999; 
+            display: flex; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            color: white; 
+            text-align: center; 
+            padding: 40px;
+            border: 4px solid #00ffcc;
+            border-radius: 30px;
+            box-shadow: 0 0 50px rgba(0, 255, 204, 0.5);
+            backdrop-filter: blur(10px);
+        ">
+            <h1 style="font-size: 3em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
+            <h2 style="font-size: 1.2em; color: #888;">{alert['DataOra']}</h2>
+            <hr style="width: 80%; border: 1px solid #333; margin: 20px 0;">
+            <h2 style="font-size: 3em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
+            
+            <div style="background: #222; padding: 25px; border-radius:20px; border: 1px solid #ffcc00; width: 80%; margin: 20px 0;">
+                <p style="font-size: 2.5em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
+                <p style="font-size: 1.5em; margin: 10px 0;">Entry: {alert['Prezzo']}</p>
+                <p style="font-size: 1.1em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
             </div>
-            <p style="margin-top: 40px; color: #555;">Clicca il tasto sotto per tornare al grafico</p>
-        </div>""", unsafe_allow_html=True)
+            <p style="color: #666; font-style: italic; margin-bottom: 20px;">L'app rimarrà in attesa finché non confermi la lettura.</p>
+        </div>
+    """, unsafe_allow_html=True)
     
-    # Il bottone deve stare FUORI dal CSS ma visibile sopra lo z-index
-    if st.button("✅ CHIUDI ALERT E TORNA AL DESK", use_container_width=True, type="primary"):
-        st.session_state['last_alert'] = None
-        st.rerun()
+    # Pulsante di chiusura (Streamlit lo renderizza sopra grazie allo z-index se messo subito dopo)
+    # Lo mettiamo in una colonna centrale per estetica
+    _, col_btn, _ = st.columns([1, 2, 1])
+    with col_btn:
+        if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
+            st.session_state['last_alert'] = None
+            st.rerun()
 
 # --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
