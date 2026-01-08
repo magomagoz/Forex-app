@@ -263,7 +263,7 @@ st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
 if not s_data.empty:
-    s_display = s_data.iloc[:6] # Fix per evitare l'errore TypeError
+    s_display = s_data.iloc[:9] # Fix per evitare l'errore TypeError
     cols = st.columns(len(s_display))
     for i, (curr, val) in enumerate(s_display.items()):
         col_c = "#00ffcc" if val > 0 else "#ff4b4b"
