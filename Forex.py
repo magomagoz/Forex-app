@@ -205,15 +205,14 @@ if "start_time" not in st.session_state: st.session_state.start_time = time_lib.
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
 st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
 
-# LOG DI MONITORAGGIO
+# --- 4. SIDEBAR LOGS (PULIZIA) ---
 st.sidebar.subheader("📡 Sentinel Status")
 status = st.session_state.get('last_scan_status', 'In attesa...')
-st.sidebar.code(status) # Mostra l'asset che sta scansionando
 
-# Usiamo un box colorato per il log
+# Usiamo SOLO il box colorato, rimuovi st.sidebar.code(status)
 if "SEGNALE" in status:
     st.sidebar.success(status)
-elif "Trend Forte" in status:
+elif "Trend Forte" in status or "⚠️" in status:
     st.sidebar.warning(status)
 else:
     st.sidebar.info(status)
@@ -238,39 +237,18 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 update_signal_outcomes()
 run_sentinel()
 
-# --- 5. POPUP ALERT RIDOTTO (MODAL) ---
+# --- 5. POPUP ALERT (FIXED) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
 
-    # CSS per popup a mezzo schermo centrato
+    # NOTA: Tutto il blocco div deve essere dentro st.markdown con unsafe_allow_html=True
     st.markdown(f"""
-        <div style="
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            width: 60vw; 
-            max-width: 800px;
-            background-color: rgba(15, 12, 41, 0.98); 
-            z-index: 999999; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            color: white; 
-            text-align: center; 
-            padding: 40px;
-            border: 4px solid #00ffcc;
-            border-radius: 30px;
-            box-shadow: 0 0 50px rgba(0, 255, 204, 0.5);
-            backdrop-filter: blur(10px);
-        ">
+        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60vw; max-width: 800px; background-color: rgba(15, 12, 41, 0.98); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 40px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px);">
             <h1 style="font-size: 3em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
             <h2 style="font-size: 1.2em; color: #888;">{alert['DataOra']}</h2>
             <hr style="width: 80%; border: 1px solid #333; margin: 20px 0;">
             <h2 style="font-size: 3em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
-            
             <div style="background: #222; padding: 25px; border-radius:20px; border: 1px solid #ffcc00; width: 80%; margin: 20px 0;">
                 <p style="font-size: 2.5em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
                 <p style="font-size: 1.5em; margin: 10px 0;">Entry: {alert['Prezzo']}</p>
@@ -280,13 +258,9 @@ if st.session_state['last_alert']:
         </div>
     """, unsafe_allow_html=True)
     
-    # Pulsante di chiusura (Streamlit lo renderizza sopra grazie allo z-index se messo subito dopo)
-    # Lo mettiamo in una colonna centrale per estetica
-    _, col_btn, _ = st.columns([1, 2, 1])
-    with col_btn:
-        if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
-            st.session_state['last_alert'] = None
-            st.rerun()
+    if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
+        st.session_state['last_alert'] = None
+        st.rerun()
 
 # --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
