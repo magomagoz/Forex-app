@@ -394,7 +394,7 @@ def highlight_adx(row):
 
 # --- Tabella Parametri ADX (Grafica) ---
 st.markdown("### 📊 Guida alla Volatilità (ADX)")
-    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+st.table(adx_guide.style.apply(highlight_adx, axis=1))
                     
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
