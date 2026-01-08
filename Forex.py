@@ -47,6 +47,18 @@ def get_session_status():
     }
     return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
 
+    # Evidenziamo la riga corrente
+    def highlight_adx(row):
+        if curr_adx <= 20 and "0 - 20" in row['Valore']:
+            return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+        elif 20 < curr_adx <= 30 and "20 - 30" in row['Valore']:
+            return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+        elif curr_adx > 30 and "30+" in row['Valore']:
+            return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+        return [''] * len(row)
+
+    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+
 def is_low_liquidity():
     now_rome = get_now_rome().time()
     return time(23, 0) <= now_rome or now_rome <= time(1, 0)
@@ -136,9 +148,7 @@ def run_sentinel():
             atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1]
-
-            
-            
+          
             # Nomi colonne BB
             c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_m = [c for c in bb_m.columns if "BBM" in c.upper()][0]
@@ -169,14 +179,44 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
-        except: continue
 
+            # Prepariamo il messaggio di log predefinito
+            scan_detail = "OK"
+            if curr_adx > 30:
+                scan_detail = f"Trend Forte (ADX:{curr_adx:.0f})"
+            elif rsi_s > 45 and rsi_s < 55:
+                scan_detail = f"RSI Neutro ({rsi_s:.0f})"
+
+            if s_action:
+                # Se c'è un'azione, il log mostrerà l'azione
+                st.session_state['last_scan_status'] = f"🚀 {label}: SEGNALE {s_action}!"
+            else:
+                # Altrimenti mostra il motivo del "no signal"
+                st.session_state['last_scan_status'] = f"📡 {label}: {scan_detail}"
+
+        except Exception as e:
+            st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
+            continue
+                
 # --- 4. SIDEBAR CON TIMER E SESSIONI ---
 st.sidebar.header("🛠 Trading Desk (1m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.markdown(f"⏳ **Scan Sentinella: {countdown}s**")
+st.sidebar.markdown(f"⏳ **Prossimo Scan Sentinella: {countdown}s**")
 
+# LOG DI MONITORAGGIO
+st.sidebar.subheader("📡 Sentinel Status")
+status = st.session_state.get('last_scan_status', 'In attesa...')
+st.sidebar.code(status) # Mostra l'asset che sta scansionando
+
+# Usiamo un box colorato per il log
+if "SEGNALE" in status:
+    st.sidebar.success(status)
+elif "Trend Forte" in status:
+    st.sidebar.warning(status)
+else:
+    st.sidebar.info(status)
+         
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
@@ -201,22 +241,25 @@ run_sentinel()
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
+
+    # CSS per il pulsante di chiusura sopra il popup
     st.markdown(f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
-            <h1 style="font-size: 4em; color: #00ffcc;">🚀 NUOVO SEGNALE</h1>
-            <h2 style="font-size: 1.5em; color: gray;">{alert['DataOra']} (Ora Roma)</h2>
+            <h1 style="font-size: 4em; color: #00ffcc; margin-bottom:10px;">🚀 NUOVO SEGNALE</h1>
+            <h2 style="font-size: 1.5em; color: gray;">{alert['DataOra']} (Roma)</h2>
             <h2 style="font-size: 3.5em; margin: 20px 0;">{alert['Asset']} - {alert['Direzione']}</h2>
-            <div style="background: #222; padding: 20px; border-radius:15px; border: 2px solid #FFCC00;">
-                <p style="font-size: 2.5em; color: #ffcc00;">LOTTI: {alert['Size']}</p>
-                <p style="font-size: 1.5em; margin: 10px 0;">Prezzo: {alert['Prezzo']}</p>
-                <p style="font-size: 1.2em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
-            </div>    
-        </div>
-    """, unsafe_allow_html=True)
-    if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
+            <div style="background: #222; padding: 30px; border-radius:20px; border: 3px solid #FFCC00; min-width: 300px;">
+                <p style="font-size: 3em; color: #ffcc00; font-weight: bold; margin:0;">LOTTI: {alert['Size']}</p>
+                <p style="font-size: 1.8em; margin: 15px 0;">Prezzo: {alert['Prezzo']}</p>
+                <p style="font-size: 1.3em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+            </div>
+            <p style="margin-top: 40px; color: #555;">Clicca il tasto sotto per tornare al grafico</p>
+        </div>, unsafe_allow_html=True)
+    
+    # Il bottone deve stare FUORI dal CSS ma visibile sopra lo z-index
+    if st.button("✅ CHIUDI ALERT E TORNA AL DESK", use_container_width=True, type="primary"):
         st.session_state['last_alert'] = None
         st.rerun()
-    st.stop()
 
 # --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
@@ -292,7 +335,7 @@ if df_rt is not None and not df_rt.empty:
             cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI ---
-if df_rt is not None and df_d is not None and not df_d.empty:
+if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
     df_d.columns = [c.lower() for c in df_d.columns]
     df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
@@ -319,6 +362,9 @@ if df_rt is not None and df_d is not None and not df_d.empty:
                 st.session_state['last_alert'] = new_a
                 st.rerun()
 
+    adx_df = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
+    curr_adx = adx_df['ADX_14'].iloc[-1]
+                    
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
@@ -328,5 +374,23 @@ if not st.session_state['signal_history'].empty:
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
 
 st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
+st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+    
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
+    
+    # Box ADX con colore dinamico
+    adx_color = "🔴" if curr_adx > 30 else "🟡" if curr_adx > 20 else "🟢"
+    col_c.metric("Forza Trend (ADX)", f"{curr_adx:.1f}", adx_color)
+
+    # --- Tabella Parametri ADX (Grafica) ---
+    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    
+    # Creiamo una tabella per spiegare come interpretare l'ADX attuale
+    adx_guide = pd.DataFrame([
+        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità Segnale": "MASSIMA (Rimbalzi puliti)"},
+        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità Segnale": "MEDIA (Attenzione ai breakout)"},
+        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità Segnale": "BASSA (Rischio rottura Bande)"}
+    ])
