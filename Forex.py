@@ -343,11 +343,6 @@ if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
     rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    c1.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-    c2.metric("Sentinel Score", f"{score}/100")
-    
     if not is_low_liquidity():
         action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
         if action:
