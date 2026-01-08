@@ -254,7 +254,7 @@ if st.session_state['last_alert']:
                 <p style="font-size: 1.3em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
             </div>
             <p style="margin-top: 40px; color: #555;">Clicca il tasto sotto per tornare al grafico</p>
-        </div>, unsafe_allow_html=True)
+        </div>""", unsafe_allow_html=True)
     
     # Il bottone deve stare FUORI dal CSS ma visibile sopra lo z-index
     if st.button("✅ CHIUDI ALERT E TORNA AL DESK", use_container_width=True, type="primary"):
