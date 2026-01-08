@@ -389,13 +389,15 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     except Exception as e:
         st.error(f"Errore nell'analisi AI: {e}")
 
-# --- 9. CRONOLOGIA SEGNALI (Sempre visibile in fondo) ---
-st.markdown("---")
-st.subheader("📜 Cronologia Segnali")
+# --- 9. CRONOLOGIA SEGNALI (CORRETTA) ---
 if not st.session_state['signal_history'].empty:
-    def style_s(val):
+    def style_status(val):
+        if not isinstance(val, str): return ''
         color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
-    st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
+    
+    # Usiamo .map invece di .applymap per compatibilità con Pandas 2.x+
+    styled_df = st.session_state['signal_history'].style.map(style_status, subset=['Stato'])
+    st.dataframe(styled_df, use_container_width=True)
 
 st.info(f"🛰️ **Sentinel AI**: Monitoraggio attivo su {len(asset_map)} asset.")
