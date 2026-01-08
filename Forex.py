@@ -204,7 +204,7 @@ p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 # Nota: qui assume che tu abbia fatto la modifica "5m" suggerita prima.
 # Se non l'hai fatta, df_rt sarà a 1m, se l'hai fatta sarà a 5m. Funziona in entrambi i casi.
 df_rt = get_realtime_data(pair) 
-df_d = yf.download(pair, period="1y", interval="1d", progress=False)
+df_d = yf.download(pair, period="1y", interval="5d", progress=False)
 
 if df_rt is not None and not df_rt.empty:
     # Calcolo indicatori per il grafico
@@ -217,7 +217,7 @@ if df_rt is not None and not df_rt.empty:
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart: {selected_label} (Con RSI)")
+    st.subheader(f"📈 Chart 5m: {selected_label} (Con RSI)")
     
     # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
@@ -231,8 +231,9 @@ if df_rt is not None and not df_rt.empty:
     fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], 
                                  low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
     # Bande Bollinger
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(0, 255, 204, 0.3)', width=1), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(0, 255, 204, 0.3)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_mid], line=dict(color='rgba(255, 255, 255, 0.3)', width=1), name='Middle BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
 
     # --- RIGA 2: RSI ---
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
