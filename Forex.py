@@ -269,7 +269,7 @@ if df_rt is not None and not df_rt.empty:
             bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
             txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
             # Usiamo cols[i] in modo sicuro
-            cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:10px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.7em;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+            cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:12px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.7em;'>{curr}</b><br><span style='color:{txt_c}; font-weight:bold;'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
