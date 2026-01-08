@@ -127,7 +127,8 @@ def run_sentinel():
             if df_rt_s.empty or df_d_s.empty: continue
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
-            df_rt_s.columns = [c.lower() for c in df_rt_s.columns]; df_d_s.columns = [c.lower() for c in df_d_s.columns]
+            df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
+            df_d_s.columns = [c.lower() for c in df_d_s.columns]
             
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
             c_v, l_bb, u_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
@@ -176,6 +177,10 @@ for s_name, is_open in get_session_status().items():
 if st.sidebar.button("🗑️ Reset Cronologia"):
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
+
+# --- SPOSTA QUI (subito dopo la sidebar) ---
+update_signal_outcomes()
+run_sentinel()
 
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
@@ -298,10 +303,6 @@ if df_rt is not None and df_d is not None and not df_d.empty:
                 st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
                 st.session_state['last_alert'] = new_a
                 st.rerun()
-
-# --- 9. MOTORI E CRONOLOGIA ---
-update_signal_outcomes()
-run_sentinel()
 
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
