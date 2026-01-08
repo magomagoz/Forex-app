@@ -297,9 +297,9 @@ if df_rt is not None and not df_rt.empty:
     start_time = p_df.index.min()
     end_time = p_df.index.max()
     
-    # Generiamo i marker ogni 30 minuti
-    # '30T' sta per 30 minuti in Pandas
-    v_lines = pd.date_range(start=start_time, end=end_time, freq='30T')
+    # Generiamo i marker ogni 5 minuti
+    # '5T' sta per 5 minuti in Pandas
+    v_lines = pd.date_range(start=start_time, end=end_time, freq='5T')
     
     for line_time in v_lines:
         fig.add_vline(
