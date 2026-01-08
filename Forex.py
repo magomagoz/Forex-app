@@ -18,8 +18,7 @@ st.markdown("""
         .block-container {padding-top: 1rem;}
         [data-testid="stSidebarNav"] {display: none;}
         [data-testid="stSidebar"] > div:first-child {padding-top: 0rem;}
-    </style>
-""", unsafe_allow_html=True)
+    </style>""", unsafe_allow_html=True)
 
 #Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
