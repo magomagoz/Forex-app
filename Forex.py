@@ -153,10 +153,10 @@ def run_sentinel():
             c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_m = [c for c in bb_m.columns if "BBM" in c.upper()][0]
             c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
-            
+
             c_v = float(df_rt_s['close'].iloc[-1])
-            l_bb = float(bb_s.iloc[-1, 0])
-            u_bb = float(bb_s.iloc[-1, 2])
+            l_bb = float(bb_s[c_l].iloc[-1]) # Usa il nome colonna trovato
+            u_bb = float(bb_s[c_u].iloc[-1])
             
             # Logica Segnale: aggiunto filtro ADX < 30 (evita trend esplosivi)
             s_action = None
@@ -270,7 +270,7 @@ p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="5d", progress=False)
 
-if df_rt is not None and not df_rt.empty:
+if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
     # Calcolo indicatori per il grafico
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
