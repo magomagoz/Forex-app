@@ -270,10 +270,26 @@ if df_rt is not None and not df_rt.empty:
     
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
-    # Candele e BB
-    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_u], line=dict(color='rgba(173, 216, 230, 0.2)'), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_l], line=dict(color='rgba(173, 216, 230, 0.2)'), fill='tonexty', name='Lower BB'), row=1, col=1)
+    # --- RIGA 1: PREZZO E BANDE ---
+    # Candele
+    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], 
+                                 low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
+    
+    # 1. Linea Superiore (Upper BB)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_u], 
+                             line=dict(color='rgba(173, 216, 230, 0.3)', width=1), 
+                             name='Upper BB'), row=1, col=1)
+    
+    # 2. LINEA MEDIA (Aggiunta qui)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_m], 
+                             line=dict(color='rgba(255, 255, 255, 0.5)', width=1.5, dash='dash'), 
+                             name='Middle BB (SMA 20)'), row=1, col=1)
+    
+    # 3. Linea Inferiore (Lower BB) e riempimento
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_l], 
+                             line=dict(color='rgba(173, 216, 230, 0.3)', width=1), 
+                             fill='tonexty', fillcolor='rgba(173, 216, 230, 0.05)',
+                             name='Lower BB'), row=1, col=1)
 
     # RSI
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
@@ -323,60 +339,55 @@ if df_rt is not None and not df_rt.empty:
             # Usiamo cols[i] in modo sicuro
             cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-# --- 8. ANALISI AI ---
+# --- 8. ANALISI AI (CORRETTA) ---
 if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
-    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
-    df_d.columns = [c.lower() for c in df_d.columns]
-    df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
-    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
-    
-    rsi_val = float(df_d['rsi'].iloc[-1])
-    last_atr = float(df_d['atr'].iloc[-1])
-    curr_p = float(df_rt['close'].iloc[-1])
-    
-    # Calcolo Score (usando le bande calcolate nel grafico)
-    score = 50 + (20 if curr_p < df_rt[c_l].iloc[-1] else -20 if curr_p > df_rt[c_u].iloc[-1] else 0)
-    
-    if not is_low_liquidity():
-        action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
-        if action:
-            hist = st.session_state['signal_history']
-            if hist.empty or not ((hist['Asset'] == selected_label) & (hist['Direzione'] == action)).head(1).any():
-                sl = curr_p - (1.5 * last_atr) if action == "COMPRA" else curr_p + (1.5 * last_atr)
-                tp = curr_p + (3 * last_atr) if action == "COMPRA" else curr_p - (3 * last_atr)
-                dist_p = abs(curr_p - sl) * p_mult
-                size = (balance * (risk_pc / 100)) / (dist_p * 10) if dist_p > 0 else 0
-                new_a = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
-                st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
-                st.session_state['last_alert'] = new_a
-                st.rerun()
+    # Ricalcoliamo o recuperiamo i nomi delle colonne per sicurezza
+    # in caso lo script saltasse la parte grafica
+    try:
+        c_u_ai = [c for c in df_rt.columns if "BBU" in c.upper()][0]
+        c_l_ai = [c for c in df_rt.columns if "BBL" in c.upper()][0]
+        
+        if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
+        df_d.columns = [c.lower() for c in df_d.columns]
+        df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
+        df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
+        
+        rsi_val = float(df_d['rsi'].iloc[-1])
+        last_atr = float(df_d['atr'].iloc[-1])
+        curr_p = float(df_rt['close'].iloc[-1])
+        
+        # Calcolo Score
+        score = 50
+        if curr_p < df_rt[c_l_ai].iloc[-1]: score += 20
+        elif curr_p > df_rt[c_u_ai].iloc[-1]: score -= 20
+        
+        if not is_low_liquidity():
+            action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
+            if action:
+                hist = st.session_state['signal_history']
+                if hist.empty or not ((hist['Asset'] == selected_label) & (hist['Direzione'] == action)).head(1).any():
+                    sl = curr_p - (1.5 * last_atr) if action == "COMPRA" else curr_p + (1.5 * last_atr)
+                    tp = curr_p + (3 * last_atr) if action == "COMPRA" else curr_p - (3 * last_atr)
+                    dist_p = abs(curr_p - sl) * p_mult
+                    size = (balance * (risk_pc / 100)) / (dist_p * 10) if dist_p > 0 else 0
+                    new_a = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
+                    st.session_state['last_alert'] = new_a
+                    st.rerun()
 
-    # --- VISUALIZZAZIONE METRICHE AI & ADX ---
-    adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
-    curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
+        # Visualizzazione Metriche
+        adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
+        curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
 
-    st.markdown("---")
-    st.subheader("🕵️ Sentinel Market Analysis")
-    col_a, col_b, col_c = st.columns(3)
-    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-    col_b.metric("Sentinel Score", f"{score}/100")
-    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
-    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
-
-    st.markdown("### 📊 Guida alla Volatilità (ADX)")
-    adx_guide = pd.DataFrame([
-        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
-        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
-        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
-    ])
-
-    def highlight_adx(row):
-        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']: return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
-        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']: return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
-        elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
-        return [''] * len(row)
-
-    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+        st.markdown("---")
+        st.subheader("🕵️ Sentinel Market Analysis")
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+        col_b.metric("Sentinel Score", f"{score}/100")
+        adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+        col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+    except Exception as e:
+        st.error(f"Errore nell'analisi AI: {e}")
 
 # --- 9. CRONOLOGIA SEGNALI (Sempre visibile in fondo) ---
 st.markdown("---")
