@@ -9,13 +9,12 @@ import pytz
 import time as time_lib
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
-import base64
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
 #Definizione Fuso Orario Roma
-rome_tz = pytz.timezone('Europe\Rome')
+rome_tz = pytz.timezone('Europe/Rome')
 
 #Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -104,7 +103,7 @@ def update_signal_outcomes():
     df = st.session_state['signal_history']
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            data = yf.download(asset_map[row['Asset']], period="1d", interval="1m", progress=False)
+            data = yf.download(asset_map[row['Asset']], period="5d", interval="1m", progress=False)
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
                 high, low = data['High'].max(), data['Low'].min()
@@ -121,7 +120,7 @@ def run_sentinel():
     for label, ticker in asset_map.items():
         try:
             # Monitoraggio rapido su base 1 minuto
-            df_rt_s = yf.download(ticker, period="1d", interval="1m", progress=False)
+            df_rt_s = yf.download(ticker, period="5d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
@@ -202,7 +201,7 @@ st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #2
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair)
-df_d = yf.download(pair, period="1y", interval="1d", progress=False)
+df_d = yf.download(pair, period="1y", interval="5d", progress=False)
 
 if df_rt is not None and not df_rt.empty:
     bb = ta.bbands(df_rt['close'], length=20, std=2)
