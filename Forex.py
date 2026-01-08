@@ -306,7 +306,7 @@ if df_rt is not None and not df_rt.empty:
             x=line_time, 
             line_width=1, 
             line_dash="dash", 
-            line_color="rgba(255, 255, 255, 0.2)", # Bianco semitrasparente
+            line_color="rgba(0, 0, 0, 0.2)", # Nero semitrasparente
             row="all", # Applica a entrambi i sottografici (Prezzo e RSI)
             col=1
         )
