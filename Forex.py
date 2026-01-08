@@ -9,6 +9,7 @@ import pytz
 import time as time_lib
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
+import base64
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
@@ -27,6 +28,14 @@ if 'last_alert' not in st.session_state:
 # --- 2. FUNZIONI TECNICHE ---
 def get_now_rome():
     return datetime.now(rome_tz)
+
+def play_notification_sound():
+    audio_html = """
+        <audio autoplay>
+            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        </audio>
+    """
+    st.markdown(audio_html, unsafe_allow_html=True)
 
 def get_session_status():
     now_rome = get_now_rome().time()
@@ -112,7 +121,7 @@ def run_sentinel():
     for label, ticker in asset_map.items():
         try:
             # Monitoraggio rapido su base 1 minuto
-            df_rt_s = yf.download(ticker, period="2d", interval="5m", progress=False)
+            df_rt_s = yf.download(ticker, period="1d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
@@ -154,7 +163,7 @@ st.sidebar.markdown(f"⏳ **Scan Sentinella: {countdown}s**")
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
-balance = st.sidebar.number_input("**Balance (€)**", value=1000)
+balance = st.sidebar.number_input("**Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
 st.sidebar.subheader("🌍 Sessioni di Mercato")
@@ -167,8 +176,9 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
 
-# --- 5. POPUP ALERT ---
+# --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
+    play_notification_sound()
     alert = st.session_state['last_alert']
     st.markdown(f"""
         <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0,0,0,0.95); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 20px;">
@@ -185,7 +195,7 @@ if st.session_state['last_alert']:
     if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
-st.stop()
+    st.stop()
 
 # --- 6. HEADER E GRAFICO ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
@@ -227,7 +237,8 @@ if not s_data.empty:
 if df_rt is not None and df_d is not None and not df_d.empty:
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
     df_d.columns = [c.lower() for c in df_d.columns]
-    df_d['rsi'] = ta.rsi(df_d['close'], length=14); df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
+    df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
+    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
@@ -264,4 +275,4 @@ if not st.session_state['signal_history'].empty:
 
 st.markdown("---")
 st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y - %H:%M:%S')}")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%H:%M:%S')}")
