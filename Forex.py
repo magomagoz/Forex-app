@@ -270,7 +270,7 @@ p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="5d", progress=False)
 
-if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
+if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
     # Calcolo indicatori per il grafico
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
@@ -335,12 +335,17 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
             cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI ---
-if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
+if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
     df_d.columns = [c.lower() for c in df_d.columns]
     df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
-    rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
+    
+    rsi_val = float(df_d['rsi'].iloc[-1])
+    last_atr = float(df_d['atr'].iloc[-1])
+    curr_p = float(df_rt['close'].iloc[-1])
+    
+    # Calcolo Score (usando le bande calcolate nel grafico)
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
     if not is_low_liquidity():
@@ -357,45 +362,34 @@ if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
                 st.session_state['last_alert'] = new_a
                 st.rerun()
 
-    # 1. Calcoliamo l'ADX per l'analisi
+    # --- VISUALIZZAZIONE METRICHE AI & ADX ---
     adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
     curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
 
-st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
-    
-# Visualizziamo le metriche
-col_a, col_b, col_c = st.columns(3)
-col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-col_b.metric("Sentinel Score", f"{score}/100")
-adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
-col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+    st.markdown("---")
+    st.subheader("🕵️ Sentinel Market Analysis")
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
+    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
 
-st.markdown("### 📊 Guida alla Volatilità (ADX)")
-
-# 2. Definiamo i dati della tabella
-adx_guide = pd.DataFrame([
-    {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
-    {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
-    {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
+    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    adx_guide = pd.DataFrame([
+        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
+        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
+        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
     ])
 
-    # 3. QUI INSERISCI LA FUNZIONE highlight_adx
-def highlight_adx(row):
-    # Usiamo curr_adx_ai calcolato poco sopra
-    if curr_adx_ai <= 20 and "0 - 20" in row['Valore']:
-        return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
-    elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']:
-        return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
-    elif curr_adx_ai > 30 and "30+" in row['Valore']:
-        return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
-    return [''] * len(row)
+    def highlight_adx(row):
+        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']: return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']: return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+        elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+        return [''] * len(row)
 
-# --- Tabella Parametri ADX (Grafica) ---
-st.markdown("### 📊 Guida alla Volatilità (ADX)")
-st.table(adx_guide.style.apply(highlight_adx, axis=1))
-                    
+    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+
+# --- 9. CRONOLOGIA SEGNALI (Sempre visibile in fondo) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
@@ -403,3 +397,5 @@ if not st.session_state['signal_history'].empty:
         color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
+
+st.info(f"🛰️ **Sentinel AI**: Monitoraggio attivo su {len(asset_map)} asset.")
