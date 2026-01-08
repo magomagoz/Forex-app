@@ -231,29 +231,29 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
 update_signal_outcomes()
 run_sentinel()
 
-# --- 5. POPUP ALERT (FIXED) ---
+# --- 5. POPUP ALERT (RE-FIXED) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
 
-    # Tutto il contenuto HTML deve stare in un UNICO st.markdown
-    popup_html = f"""
-        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85vw; max-width: 800px; background-color: rgba(15, 12, 41, 0.98); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px);">
-            <h1 style="font-size: 2.5em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
-            <h2 style="font-size: 1em; color: #888;">{alert['DataOra']}</h2>
-            <hr style="width: 80%; border: 1px solid #333; margin: 15px 0;">
+    # Popup HTML con z-index leggermente ridotto per non coprire i tasti Streamlit
+    st.markdown(f"""
+        <div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); width: 85vw; max-width: 700px; background-color: rgba(15, 12, 41, 0.98); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px); font-family: sans-serif;">
+            <h1 style="font-size: 2.2em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
+            <p style="font-size: 0.9em; color: #888;">{alert['DataOra']}</p>
+            <hr style="width: 80%; border: 0.5px solid #333; margin: 15px 0;">
             <h2 style="font-size: 2.5em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
-            <div style="background: #222; padding: 20px; border-radius:20px; border: 1px solid #ffcc00; width: 90%; margin: 15px 0;">
+            <div style="background: rgba(34, 34, 34, 0.8); padding: 20px; border-radius:20px; border: 1px solid #ffcc00; width: 90%; margin: 15px 0;">
                 <p style="font-size: 2em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
-                <p style="font-size: 1.3em; margin: 5px 0;">Entry: {alert['Prezzo']}</p>
-                <p style="font-size: 1em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+                <p style="font-size: 1.2em; margin: 5px 0;">Entry: {alert['Prezzo']}</p>
+                <p style="font-size: 0.9em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
             </div>
-            <p style="color: #666; font-style: italic; margin-bottom: 10px;">Conferma per riprendere il monitoraggio.</p>
+            <p style="color: #666; font-style: italic; font-size: 0.8em;">Clicca il tasto qui sotto per chiudere</p>
         </div>
-    """
-    st.markdown(popup_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
     
-    if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
+    # Il bottone deve essere fuori dal markdown ma visibile
+    if st.button("✅ CHIUDI E TORNA AL MONITORAGGIO", use_container_width=True, type="primary"):
         st.session_state['last_alert'] = None
         st.rerun()
 
