@@ -292,20 +292,28 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
 
-    # --- AGGIUNTA LINEE 30 MIN (FIXED) ---
-    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='30min')
+    # --- AGGIUNTA LINEE VERTICALI OGNI 30 MINUTI ---
+    # Prendiamo l'intervallo temporale del dataframe visualizzato (p_df)
+    start_time = p_df.index.min()
+    end_time = p_df.index.max()
+    
+    # Generiamo i marker ogni 30 minuti
+    # '30T' sta per 30 minuti in Pandas
+    v_lines = pd.date_range(start=start_time, end=end_time, freq='30T')
+    
     for line_time in v_lines:
-        if line_time in p_df.index:
-            fig.add_vline(x=line_time, line_width=1, line_dash="dot", line_color="rgba(255,255,255,0.15)")
-            fig.add_annotation(
-                x=line_time, 
-                y=-0.12, # Posiziona sotto l'asse X del secondo grafico
-                xref="x", 
-                yref="paper", 
-                text=line_time.strftime('%H:%M'), 
-                showarrow=False, 
-                font=dict(size=10, color="gray")
-            )
+        fig.add_vline(
+            x=line_time, 
+            line_width=1, 
+            line_dash="dash", 
+            line_color="rgba(255, 255, 255, 0.2)", # Bianco semitrasparente
+            row="all", # Applica a entrambi i sottografici (Prezzo e RSI)
+            col=1
+        )
+
+    # Layout finale (questo lo hai già, assicurati che fig.update_layout segua il ciclo for)
+    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
+                      margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
 
     # --- AGGIUNTA FRECCE SEGNALI ---
     if not st.session_state['signal_history'].empty:
