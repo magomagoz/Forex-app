@@ -310,6 +310,85 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     c_met1.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
     c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro")
 
+    # --- AGGIUNTA LINEE VERTICALI E ETICHETTE ORARIO ---
+    start_time = p_df.index.min()
+    end_time = p_df.index.max()
+    
+    # Generiamo i marker ogni 30 minuti
+    v_lines = pd.date_range(start=start_time, end=end_time, freq='30T')
+    
+    for line_time in v_lines:
+        # 1. Disegna la linea verticale su entrambi i grafici
+        fig.add_vline(
+            x=line_time, 
+            line_width=1, 
+            line_dash="dot", 
+            line_color="rgba(255, 255, 255, 0.15)",
+            row="all", 
+            col=1
+        )
+        
+        # 2. Aggiungi l'etichetta dell'ora in basso (sotto l'RSI)
+        fig.add_annotation(
+            x=line_time,
+            y=0, # Posizione verticale relativa al sottografico
+            xref="x2", # Si riferisce all'asse X del secondo grafico (RSI)
+            yref="row2", # Si ancora alla riga 2
+            text=line_time.strftime('%H:%M'),
+            showarrow=False,
+            font=dict(size=10, color="rgba(255, 255, 255, 0.6)"),
+            bgcolor="rgba(0, 0, 0, 0.5)",
+            yshift=-20 # Sposta il testo leggermente sotto l'asse
+        )
+
+    # Layout finale (aggiungiamo un po' di margine in basso per le etichette)
+    fig.update_layout(
+        height=600, 
+        template="plotly_dark", 
+        xaxis_rangeslider_visible=False, 
+        margin=dict(l=0, r=0, t=30, b=40), # b=40 dà spazio alle scritte orarie
+        legend=dict(orientation="h", y=1.02)
+    )
+
+    # --- AGGIUNTA FRECCE SEGNALI SUL GRAFICO ---
+    if not st.session_state['signal_history'].empty:
+        # Filtriamo solo i segnali dell'asset attualmente visualizzato
+        asset_signals = st.session_state['signal_history'][
+            st.session_state['signal_history']['Asset'] == selected_label
+        ]
+        
+        for _, sig in asset_signals.iterrows():
+            try:
+                # Convertiamo la data del segnale in formato datetime per Plotly
+                # Nota: assicurati che il formato %d/%m/%Y %H:%M:%S coincida con quello del segnale
+                sig_time = pd.to_datetime(sig['DataOra'], dayfirst=True)
+                
+                # Se il segnale è nell'intervallo di tempo visualizzato nel grafico (p_df)
+                if sig_time in p_df.index:
+                    y_pos = p_df.loc[sig_time, 'low'] if sig['Direzione'] == 'COMPRA' else p_df.loc[sig_time, 'high']
+                    color = "#00ffcc" if sig['Direzione'] == 'COMPRA' else "#ff4b4b"
+                    symbol = "triangle-up" if sig['Direzione'] == 'COMPRA' else "triangle-down"
+                    ay_val = 40 if sig['Direzione'] == 'COMPRA' else -40
+
+                    fig.add_annotation(
+                        x=sig_time,
+                        y=y_pos,
+                        text=f"<b>{sig['Direzione']}</b>",
+                        showarrow=True,
+                        arrowhead=2,
+                        arrowcolor=color,
+                        arrowsize=1.5,
+                        arrowwidth=2,
+                        ax=0,
+                        ay=ay_val,
+                        font=dict(color=color, size=12),
+                        bgcolor="rgba(0,0,0,0.7)",
+                        bordercolor=color,
+                        row=1, col=1
+                    )
+            except:
+                continue # Salta se la data non è formattata o fuori range
+        
     # --- 7. CURRENCY STRENGTH ---
     st.markdown("---")
     st.subheader("⚡ Currency Strength Meter")
