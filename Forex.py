@@ -357,8 +357,44 @@ if df_rt is not None and df_rt.empty and df_d is not None and not df_d.empty:
                 st.session_state['last_alert'] = new_a
                 st.rerun()
 
-    adx_df = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
-    curr_adx = adx_df['ADX_14'].iloc[-1]
+    # 1. Calcoliamo l'ADX per l'analisi
+    adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
+    curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
+
+st.markdown("---")
+st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+    
+    # Visualizziamo le metriche
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
+    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+
+    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+
+    # 2. Definiamo i dati della tabella
+    adx_guide = pd.DataFrame([
+        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
+        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
+        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
+    ])
+
+    # 3. QUI INSERISCI LA FUNZIONE highlight_adx
+    def highlight_adx(row):
+        # Usiamo curr_adx_ai calcolato poco sopra
+        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']:
+            return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']:
+            return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+        elif curr_adx_ai > 30 and "30+" in row['Valore']:
+            return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+        return [''] * len(row)
+
+# --- Tabella Parametri ADX (Grafica) ---
+st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    st.table(adx_guide.style.apply(highlight_adx, axis=1))
                     
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
@@ -367,25 +403,3 @@ if not st.session_state['signal_history'].empty:
         color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
-
-st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Market Analysis**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
-    
-col_a, col_b, col_c = st.columns(3)
-col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-col_b.metric("Sentinel Score", f"{score}/100")
-    
-# Box ADX con colore dinamico
-adx_color = "🔴" if curr_adx > 30 else "🟡" if curr_adx > 20 else "🟢"
-col_c.metric("Forza Trend (ADX)", f"{curr_adx:.1f}", adx_color)
-
-# --- Tabella Parametri ADX (Grafica) ---
-st.markdown("### 📊 Guida alla Volatilità (ADX)")
-    
-# Creiamo una tabella per spiegare come interpretare l'ADX attuale
-adx_guide = pd.DataFrame([
-    {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità Segnale": "MASSIMA (Rimbalzi puliti)"},
-    {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità Segnale": "MEDIA (Attenzione ai breakout)"},
-    {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità Segnale": "BASSA (Rischio rottura Bande)"}
-    ])
