@@ -249,145 +249,66 @@ if st.session_state['last_alert']:
     if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
         st.session_state['last_alert'] = None
         st.rerun()
-
-# --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
+# --- 6. HEADER E GRAFICO AVANZATO (FIXED) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
-# Nota: qui assume che tu abbia fatto la modifica "5m" suggerita prima.
-# Se non l'hai fatta, df_rt sarà a 1m, se l'hai fatta sarà a 5m. Funziona in entrambi i casi.
 df_rt = get_realtime_data(pair) 
-df_d = yf.download(pair, period="1y", interval="5d", progress=False)
+df_d = yf.download(pair, period="1y", interval="1d", progress=False) # Daily per analisi
 
-if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
-    # Calcolo indicatori per il grafico
+if df_rt is not None and not df_rt.empty:
+    # Calcolo indicatori
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
-    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14) # Calcolo RSI per il grafico
+    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14)
     
-    # Nomi colonne bande
-    c_u = [c for c in df_rt.columns if "BBU" in c.upper()][0]
-    c_m = [c for c in df_rt.columns if "BBM" in c.upper()][0]
-    c_l = [c for c in df_rt.columns if "BBL" in c.upper()][0]
+    c_u = [c for c in bb.columns if "BBU" in c.upper()][0]
+    c_m = [c for c in bb.columns if "BBM" in c.upper()][0]
+    c_l = [c for c in bb.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m: {selected_label} (Con RSI)")
-    
-    # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
     
-    # Creazione sottografici (2 righe: Prezzo sopra, RSI sotto)
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
-    # --- RIGA 1: PREZZO E BANDE ---
-    # Candele
-    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], 
-                                 low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
-    # Bande Bollinger
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_u], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_m], line=dict(color='rgba(255, 255, 255, 0.3)', width=1), name='Middle BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_l], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
+    # Candele e BB
+    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_u], line=dict(color='rgba(173, 216, 230, 0.2)'), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_l], line=dict(color='rgba(173, 216, 230, 0.2)'), fill='tonexty', name='Lower BB'), row=1, col=1)
 
-    # --- RIGA 2: RSI ---
+    # RSI
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
-    
-    # Linee RSI (70 e 30)
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
-    fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
 
-    # Layout finale
-    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
-                      margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    curr_p = float(df_rt['close'].iloc[-1])
-    # Mostriamo anche il valore attuale dell'RSI accanto al prezzo
-    curr_rsi = float(df_rt['rsi'].iloc[-1])
-    
-    c_met1, c_met2 = st.columns(2)
-    c_met1.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
-    c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro")
-
-    # --- AGGIUNTA LINEE VERTICALI E ETICHETTE ORARIO ---
-    start_time = p_df.index.min()
-    end_time = p_df.index.max()
-    
-    # Generiamo i marker ogni 30 minuti
-    v_lines = pd.date_range(start=start_time, end=end_time, freq='30T')
-    
+    # --- AGGIUNTA LINEE 30 MIN ---
+    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='30T')
     for line_time in v_lines:
-        # 1. Disegna la linea verticale su entrambi i grafici
-        fig.add_vline(
-            x=line_time, 
-            line_width=1, 
-            line_dash="dot", 
-            line_color="rgba(255, 255, 255, 0.15)",
-            row="all", 
-            col=1
-        )
-        
-        # 2. Aggiungi l'etichetta dell'ora in basso (sotto l'RSI)
-        fig.add_annotation(
-            x=line_time,
-            y=0, # Posizione verticale relativa al sottografico
-            xref="x2", # Si riferisce all'asse X del secondo grafico (RSI)
-            yref="row2", # Si ancora alla riga 2
-            text=line_time.strftime('%H:%M'),
-            showarrow=False,
-            font=dict(size=10, color="rgba(255, 255, 255, 0.6)"),
-            bgcolor="rgba(0, 0, 0, 0.5)",
-            yshift=-20 # Sposta il testo leggermente sotto l'asse
-        )
+        fig.add_vline(x=line_time, line_width=1, line_dash="dot", line_color="rgba(255,255,255,0.15)", row="all", col=1)
+        fig.add_annotation(x=line_time, y=0, xref="x2", yref="row2", text=line_time.strftime('%H:%M'), showarrow=False, font=dict(size=10, color="gray"), yshift=-20)
 
-    # Layout finale (aggiungiamo un po' di margine in basso per le etichette)
-    fig.update_layout(
-        height=600, 
-        template="plotly_dark", 
-        xaxis_rangeslider_visible=False, 
-        margin=dict(l=0, r=0, t=30, b=40), # b=40 dà spazio alle scritte orarie
-        legend=dict(orientation="h", y=1.02)
-    )
-
-    # --- AGGIUNTA FRECCE SEGNALI SUL GRAFICO ---
+    # --- AGGIUNTA FRECCE SEGNALI ---
     if not st.session_state['signal_history'].empty:
-        # Filtriamo solo i segnali dell'asset attualmente visualizzato
-        asset_signals = st.session_state['signal_history'][
-            st.session_state['signal_history']['Asset'] == selected_label
-        ]
-        
+        asset_signals = st.session_state['signal_history'][st.session_state['signal_history']['Asset'] == selected_label]
         for _, sig in asset_signals.iterrows():
             try:
-                # Convertiamo la data del segnale in formato datetime per Plotly
-                # Nota: assicurati che il formato %d/%m/%Y %H:%M:%S coincida con quello del segnale
-                sig_time = pd.to_datetime(sig['DataOra'], dayfirst=True)
+                sig_time = pd.to_datetime(sig['DataOra'], dayfirst=True).floor('1min')
+                # Cerchiamo il match più vicino nel grafico
+                nearest_idx = p_df.index.get_indexer([sig_time], method='nearest')[0]
+                actual_time = p_df.index[nearest_idx]
                 
-                # Se il segnale è nell'intervallo di tempo visualizzato nel grafico (p_df)
-                if sig_time in p_df.index:
-                    y_pos = p_df.loc[sig_time, 'low'] if sig['Direzione'] == 'COMPRA' else p_df.loc[sig_time, 'high']
-                    color = "#00ffcc" if sig['Direzione'] == 'COMPRA' else "#ff4b4b"
-                    symbol = "triangle-up" if sig['Direzione'] == 'COMPRA' else "triangle-down"
-                    ay_val = 40 if sig['Direzione'] == 'COMPRA' else -40
+                y_pos = p_df.loc[actual_time, 'low'] if sig['Direzione'] == 'COMPRA' else p_df.loc[actual_time, 'high']
+                color = "#00ffcc" if sig['Direzione'] == 'COMPRA' else "#ff4b4b"
+                fig.add_annotation(
+                    x=actual_time, y=y_pos, text=sig['Direzione'], showarrow=True, arrowhead=2,
+                    arrowcolor=color, ax=0, ay=40 if sig['Direzione'] == 'COMPRA' else -40,
+                    font=dict(color=color), bgcolor="rgba(0,0,0,0.8)", row=1, col=1
+                )
+            except: continue
 
-                    fig.add_annotation(
-                        x=sig_time,
-                        y=y_pos,
-                        text=f"<b>{sig['Direzione']}</b>",
-                        showarrow=True,
-                        arrowhead=2,
-                        arrowcolor=color,
-                        arrowsize=1.5,
-                        arrowwidth=2,
-                        ax=0,
-                        ay=ay_val,
-                        font=dict(color=color, size=12),
-                        bgcolor="rgba(0,0,0,0.7)",
-                        bordercolor=color,
-                        row=1, col=1
-                    )
-            except:
-                continue # Salta se la data non è formattata o fuori range
+    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=40))
+    
+    # SOLO ORA RENDERIZZIAMO IL GRAFICO
+    st.plotly_chart(fig, use_container_width=True)
         
     # --- 7. CURRENCY STRENGTH ---
     st.markdown("---")
