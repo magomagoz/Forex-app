@@ -13,6 +13,13 @@ from plotly.subplots import make_subplots
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
+st.markdown("""
+    <style>
+        .block-container {padding-top: 1rem;}
+        [data-testid="stSidebarNav"] {display: none;}
+        [data-testid="stSidebar"] > div:first-child {padding-top: 0rem;}
+    </style>
+""", unsafe_allow_html=True)
 
 #Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
@@ -230,25 +237,27 @@ if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
 
-    # NOTA: Tutto il blocco div deve essere dentro st.markdown con unsafe_allow_html=True
-    st.markdown(f"""
-        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 60vw; max-width: 800px; background-color: rgba(15, 12, 41, 0.98); z-index: 999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 40px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px);">
-            <h1 style="font-size: 3em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
-            <h2 style="font-size: 1.2em; color: #888;">{alert['DataOra']}</h2>
-            <hr style="width: 80%; border: 1px solid #333; margin: 20px 0;">
-            <h2 style="font-size: 3em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
-            <div style="background: #222; padding: 25px; border-radius:20px; border: 1px solid #ffcc00; width: 80%; margin: 20px 0;">
-                <p style="font-size: 2.5em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
-                <p style="font-size: 1.5em; margin: 10px 0;">Entry: {alert['Prezzo']}</p>
-                <p style="font-size: 1.1em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+    # Tutto il contenuto HTML deve stare in un UNICO st.markdown
+    popup_html = f"""
+        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85vw; max-width: 800px; background-color: rgba(15, 12, 41, 0.98); z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px);">
+            <h1 style="font-size: 2.5em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
+            <h2 style="font-size: 1em; color: #888;">{alert['DataOra']}</h2>
+            <hr style="width: 80%; border: 1px solid #333; margin: 15px 0;">
+            <h2 style="font-size: 2.5em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
+            <div style="background: #222; padding: 20px; border-radius:20px; border: 1px solid #ffcc00; width: 90%; margin: 15px 0;">
+                <p style="font-size: 2em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
+                <p style="font-size: 1.3em; margin: 5px 0;">Entry: {alert['Prezzo']}</p>
+                <p style="font-size: 1em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
             </div>
-            <p style="color: #666; font-style: italic; margin-bottom: 20px;">L'app rimarrà in attesa finché non confermi la lettura.</p>
+            <p style="color: #666; font-style: italic; margin-bottom: 10px;">Conferma per riprendere il monitoraggio.</p>
         </div>
-    """, unsafe_allow_html=True)
+    """
+    st.markdown(popup_html, unsafe_allow_html=True)
     
     if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
         st.session_state['last_alert'] = None
         st.rerun()
+
 # --- 6. HEADER E GRAFICO AVANZATO (FIXED) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
@@ -296,11 +305,20 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
 
-    # --- AGGIUNTA LINEE 30 MIN ---
-    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='30T')
+    # --- AGGIUNTA LINEE 30 MIN (FIXED) ---
+    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='30min')
     for line_time in v_lines:
-        fig.add_vline(x=line_time, line_width=1, line_dash="dot", line_color="rgba(255,255,255,0.15)", row="all", col=1)
-        fig.add_annotation(x=line_time, y=0, xref="x2", yref="row2", text=line_time.strftime('%H:%M'), showarrow=False, font=dict(size=10, color="gray"), yshift=-20)
+        if line_time in p_df.index:
+            fig.add_vline(x=line_time, line_width=1, line_dash="dot", line_color="rgba(255,255,255,0.15)")
+            fig.add_annotation(
+                x=line_time, 
+                y=-0.12, # Posiziona sotto l'asse X del secondo grafico
+                xref="x", 
+                yref="paper", 
+                text=line_time.strftime('%H:%M'), 
+                showarrow=False, 
+                font=dict(size=10, color="gray")
+            )
 
     # --- AGGIUNTA FRECCE SEGNALI ---
     if not st.session_state['signal_history'].empty:
