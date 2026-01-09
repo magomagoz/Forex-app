@@ -13,6 +13,15 @@ from plotly.subplots import make_subplots
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
+st.markdown("""
+    <style>
+        .block-container {padding-top: 1rem !important;}
+        /* Correzione Sidebar: rimosso spazio e corretto !important */
+        [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 #Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
@@ -24,6 +33,8 @@ if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 2. FUNZIONI TECNICHE ---
 def get_now_rome():
@@ -150,7 +161,7 @@ def run_sentinel():
                     dist_p = abs(c_v - sl) * p_mult
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                     
-                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
+                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
@@ -178,7 +189,6 @@ if st.sidebar.button("🗑️ Reset Cronologia"):
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
 
-# --- SPOSTA QUI (subito dopo la sidebar) ---
 update_signal_outcomes()
 run_sentinel()
 
@@ -198,6 +208,7 @@ if st.session_state['last_alert']:
             </div>    
         </div>
     """, unsafe_allow_html=True)
+    
     if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
@@ -223,7 +234,7 @@ if df_rt is not None and not df_rt.empty:
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m: {selected_label} (Con RSI)")
+    st.subheader(f"📈 Chart 5m: {selected_label} - RSI)")
     
     # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
@@ -261,7 +272,7 @@ if df_rt is not None and not df_rt.empty:
     
     c_met1, c_met2 = st.columns(2)
     c_met1.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
-    c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro")
+    c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="IPERCOMPRATO" if curr_rsi > 70 else "IPERVENDUTO" if curr_rsi < 30 else "NEUTRO")
 
     # --- 7. CURRENCY STRENGTH ---
     st.markdown("---")
