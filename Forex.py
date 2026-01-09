@@ -285,7 +285,7 @@ if df_rt is not None and not df_rt.empty:
     
     p_df = df_rt.tail(60)
     
-fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
 
     # --- RIGA 1: PREZZO E BANDE ---
     # Candele
