@@ -10,6 +10,18 @@ import time as time_lib
 from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import requests
+
+def send_telegram_msg(msg):
+    """Invia un avviso istantaneo su Telegram"""
+    token = "IL_TUO_BOT_TOKEN" # Sostituisci con il tuo token
+    chat_id = "IL_TUO_CHAT_ID" # Sostituisci con il tuo ID
+    try:
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
+        requests.get(url, params=params, timeout=5)
+    except Exception as e:
+        print(f"Errore Telegram: {e}")
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
@@ -191,7 +203,12 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
+                    
+                    # Sotto st.session_state['last_alert'] = new_sig
+                    msg = f"🚀 *SEGNALE {s_action}* 🚀\n\nAsset: {label}\nPrezzo: {new_sig['Prezzo']}\nTP: {new_sig['TP']} | SL: {new_sig['SL']}"
+                    send_telegram_msg(msg)
 
+            
             # Prepariamo il messaggio di log predefinito
             scan_detail = "OK"
             if c_adx > 30:
