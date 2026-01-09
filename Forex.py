@@ -309,18 +309,6 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
     fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
 
-    # RIGHE VERTICALI OGNI 5 MINUTI
-    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='5min')
-    
-    for line_time in v_lines:
-        fig.add_vline(
-            x=line_time, 
-            line_width=1, 
-            line_dash="dot",
-            line_color="rgba(255, 255, 255, 0.1)", # Grigio chiaro visibile su scuro
-            row="all", 
-            col=1
-        )
         # CORREZIONE: yref="paper" e y=-0.1 per evitare errori di row2/y2
         fig.add_annotation(
             x=line_time, y=-0.05, xref="x", yref="paper",
