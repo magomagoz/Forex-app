@@ -13,15 +13,14 @@ from plotly.subplots import make_subplots
 import requests
 
 def send_telegram_msg(msg):
-    """Invia un avviso istantaneo su Telegram"""
-    token = "IL_TUO_BOT_TOKEN" # Sostituisci con il tuo token
-    chat_id = "IL_TUO_CHAT_ID" # Sostituisci con il tuo ID
+    token = "IL_TUO_BOT_TOKEN"  # Ottenuto da @BotFather
+    chat_id = "IL_TUO_CHAT_ID"  # Ottenuto da @userinfobot
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
         requests.get(url, params=params, timeout=5)
-    except Exception as e:
-        print(f"Errore Telegram: {e}")
+    except:
+        pass # Evita blocchi se non c'è connessione
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
@@ -140,6 +139,19 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
+def get_win_rate():
+    df = st.session_state['signal_history']
+    if df.empty: return None
+    
+    # Filtriamo solo i segnali chiusi (Target o Stop Loss)
+    closed_trades = df[df['Stato'].str.contains('✅|❌', na=False)]
+    if closed_trades.empty: return "In attesa di dati..."
+    
+    wins = len(closed_trades[closed_trades['Stato'].str.contains('✅')])
+    total = len(closed_trades)
+    rate = (wins / total) * 100
+    return f"{rate:.1f}% Successo ({wins}/{total})"
+
 # --- 3. MOTORI DI BACKGROUND ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
@@ -208,12 +220,12 @@ def run_sentinel():
                     new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
-                    st.rerun()
                     
-                    # Sotto st.session_state['last_alert'] = new_sig
-                    msg = f"🚀 *SEGNALE {s_action}* 🚀\n\nAsset: {label}\nPrezzo: {new_sig['Prezzo']}\nTP: {new_sig['TP']} | SL: {new_sig['SL']}"
-                    send_telegram_msg(msg)
-
+                    # --- INVIO TELEGRAM ---
+                    t_msg = f"🚀 *SEGNALE {s_action}*\n📈 *{label}*\n💰 Prezzo: {new_sig['Prezzo']}\n🎯 TP: {new_sig['TP']}\n🛑 SL: {new_sig['SL']}"
+                    send_telegram_msg(t_msg)
+                    
+                    st.rerun()
             
             # Prepariamo il messaggio di log predefinito
             scan_detail = "OK"
