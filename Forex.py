@@ -311,9 +311,22 @@ if df_rt is not None and not df_rt.empty:
 
     # RIGHE VERTICALI OGNI 5 MINUTI
     v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='5min')
-    for lt in v_lines:
-        fig.add_vline(x=lt.timestamp()*1000, line_width=0.5, line_dash="dot", line_color="rgba(255,255,255,0.1)")
-        fig.add_annotation(x=lt, y=-0.15, xref="x", yref="paper", text=lt.strftime('%H:%M'), showarrow=False, font=dict(size=9, color="gray"))
+    
+    for line_time in v_lines:
+        fig.add_vline(
+            x=line_time, 
+            line_width=1, 
+            line_dash="dot",
+            line_color="rgba(255, 255, 255, 0.1)", # Grigio chiaro visibile su scuro
+            row="all", 
+            col=1
+        )
+        # CORREZIONE: yref="paper" e y=-0.1 per evitare errori di row2/y2
+        fig.add_annotation(
+            x=line_time, y=-0.05, xref="x", yref="paper",
+            text=line_time.strftime('%H:%M'), showarrow=False,
+            font=dict(size=10, color="gray"), row=1, col=1
+        )
         
     # Layout finale
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
