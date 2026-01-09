@@ -267,7 +267,6 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
                                  low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
     # Bande Bollinger
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_mid], line=dict(color='rgba(255, 255, 255, 0.3)', width=1), name='Middle BB'), row=1, col=1)
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
 
     # --- RIGA 2: RSI ---
