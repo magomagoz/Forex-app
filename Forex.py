@@ -283,7 +283,7 @@ if df_rt is not None and not df_rt.empty:
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m: {selected_label} - RSI)")
+    st.subheader(f"📈 Chart 5m con RSI: {selected_label}")
     
     # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
@@ -309,6 +309,24 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
     fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
 
+    # --- AGGIUNTA LINEE VERTICALI OGNI 30 MINUTI ---
+    # Prendiamo l'intervallo temporale del dataframe visualizzato (p_df)
+    start_time = p_df.index.min()
+    end_time = p_df.index.max()
+    
+    # --- AGGIUNTA LINEE VERTICALI OGNI 5 MINUTI ---
+    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='5min')
+    
+    for line_time in v_lines:
+        fig.add_vline(
+            x=line_time, 
+            line_width=1, 
+            line_dash="dot",
+            line_color="rgba(255, 255, 255, 0.1)", # Grigio chiaro visibile su scuro
+            row="all", 
+            col=1
+        )
+        
     # Layout finale
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
                       margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
