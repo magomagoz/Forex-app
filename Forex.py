@@ -32,6 +32,8 @@ if 'signal_history' not in st.session_state:
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 2. FUNZIONI TECNICHE ---
 def get_now_rome():
@@ -39,10 +41,7 @@ def get_now_rome():
 
 def play_notification_sound():
     audio_html = """
-        <audio autoplay>
-            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
-    """
+        <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>"""
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def get_session_status():
@@ -64,11 +63,17 @@ def get_realtime_data(ticker):
     try:
         df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
         if df is None or df.empty: return None
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
         df.columns = [c.lower() for c in df.columns]
         return df.dropna()
     except: return None
+
+def get_asset_params(pair):
+    if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
+    if "JPY" in pair: return 0.01, "{:.2f}", 1000, "FOREX" 
+    return 0.0001, "{:.5f}", 10, "FOREX"
+
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 
 def get_currency_strength():
     try:
@@ -91,11 +96,6 @@ def get_currency_strength():
         }
         return pd.Series(strength).sort_values(ascending=False)
     except: return pd.Series(dtype=float)
-
-def get_asset_params(pair):
-    if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
-    if "JPY" in pair: return 0.01, "{:.2f}", 1000, "FOREX" 
-    return 0.0001, "{:.5f}", 10, "FOREX"
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi in corso"
@@ -150,15 +150,15 @@ def run_sentinel():
             c_m = [c for c in bb_s.columns if "BBM" in c.upper()][0]
             c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
 
-            c_v = float(df_rt_s['close'].iloc[-1])
+            curr_v = float(df_rt_s['close'].iloc[-1])
             l_bb = float(bb_s[c_l].iloc[-1]) # Usa il nome colonna trovato
             m_bb = float(bb_s[c_m].iloc[-1])
             u_bb = float(bb_s[c_u].iloc[-1])
             
             # Logica Segnale: aggiunto filtro ADX < 30 (evita trend esplosivi)
             s_action = None
-            if c_v < l_bb and rsi_s < 45 and curr_adx < 30: s_action = "COMPRA"
-            elif c_v > u_bb and rsi_s > 55 and curr_adx < 30: s_action = "VENDI"
+            if curr_v < l_bb and rsi_s < 35 and curr_adx < 30: s_action = "COMPRA"
+            elif curr_v > u_bb and rsi_s > 65 and curr_adx < 30: s_action = "VENDI"
             
             if s_action:
                 hist = st.session_state['signal_history']
@@ -166,8 +166,8 @@ def run_sentinel():
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
                     atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
-                    sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
-                    tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
+                    sl = curr_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
+                    tp = curr_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
                     risk_val = balance * (risk_pc / 100)
                     dist_p = abs(c_v - sl) * p_mult
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
@@ -176,7 +176,7 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
-
+            
             # Prepariamo il messaggio di log predefinito
             scan_detail = "OK"
             if curr_adx > 30:
@@ -212,7 +212,6 @@ elif "Trend Forte" in status or "⚠️" in status:
 else:
     st.sidebar.info(status)
          
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
@@ -254,7 +253,7 @@ if st.session_state['last_alert']:
     """, unsafe_allow_html=True)
     
     # Il bottone deve essere fuori dal markdown ma visibile
-    if st.button("✅ CHIUDI E TORNA AL MONITORAGGIO", use_container_width=True, type="primary"):
+    if st.button("✅ CHIUDI E TORNA AL MONITORAGGIO", use_container_width=True):
         st.session_state['last_alert'] = None
         st.rerun()
 
