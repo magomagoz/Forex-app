@@ -13,13 +13,30 @@ from plotly.subplots import make_subplots
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
+
 st.markdown("""
     <style>
+        /* Riduce lo spazio superiore del contenuto principale */
         .block-container {padding-top: 1rem !important;}
-        /* Correzione Sidebar: rimosso spazio e corretto !important */
+        
+        /* Rimuove lo spazio vuoto in alto nella sidebar */
         [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
-        header {visibility: hidden;}
+        
+        /* CORREZIONE: Invece di nascondere tutto l'header, 
+           nascondiamo solo le decorazioni e i menu extra, 
+           lasciando visibile il pulsante della sidebar.
+        */
+        #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+        header {background-color: rgba(0,0,0,0) !important;} /* Rende l'header trasparente */
+        
+        /* Assicura che il pulsante di riapertura sia visibile e in primo piano */
+        [data-testid="stSidebarCollapsedControl"] {
+            color: #00ffcc !important;
+            background-color: rgba(15, 12, 41, 0.8) !important;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
     </style>
 """, unsafe_allow_html=True)
 
