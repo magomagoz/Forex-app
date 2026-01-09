@@ -200,9 +200,14 @@ for s_name, is_open in get_session_status().items():
     status_text = "OPEN" if is_open else "CLOSED"
     st.sidebar.markdown(f"{color} **{s_name}**: {status_text}")
 
-if st.sidebar.button("🗑️ Reset Cronologia"):
-    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-    st.rerun()
+# --- MODIFICA SIDEBAR: RESET CON CONFERMA ---
+st.sidebar.subheader("⚙️ Gestione Dati")
+with st.sidebar.popover("🗑️ Reset Cronologia"):
+    st.warning("Sei sicuro? Questa azione è irreversibile.")
+    if st.button("SÌ, CANCELLA TUTTO"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+        st.session_state['last_alert'] = None
+        st.rerun()
 
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
@@ -248,36 +253,54 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     df_d['rsi'] = ta.rsi(df_d['close'], length=14)
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     
-    # Nomi colonne bande
-      # Nomi colonne bande
+# --- MODIFICA SIDEBAR: RESET CON SICUREZZA ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚙️ Gestione Dati")
+# Usiamo un popover per evitare click accidentali
+with st.sidebar.popover("🗑️ Reset Cronologia"):
+    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
+    if st.button("SÌ, CANCELLA ORA"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+        st.session_state['last_alert'] = None
+        st.rerun()
+
+    # --- MODIFICA GRAFICO: BANDE CON RIEMPIMENTO SELETTIVO ---
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
+    c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    # Variabili per le metriche
-    curr_p = float(df_rt['close'].iloc[-1])
-    curr_rsi = float(df_rt['rsi'].iloc[-1])
-    rsi_val = float(df_d['rsi'].iloc[-1]) # RSI Daily
-    last_atr = float(df_d['atr'].iloc[-1])
-
-    # CALCOLO SCORE AI
-    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
-
-    st.subheader(f"📈 Chart 5m: {selected_label}")
-    
-    # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
-    
-    # Creazione sottografici (2 righe: Prezzo sopra, RSI sotto)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                         vertical_spacing=0.05, row_heights=[0.75, 0.25])
-
-    # --- RIGA 1: PREZZO E BANDE ---
-    # Candele
-    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], 
-                                 low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
-    # Bande Bollinger
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
+    
+    # 1. Candele (Prezzo)
+    fig.add_trace(go.Candlestick(
+        x=p_df.index, open=p_df['open'], high=p_df['high'], 
+        low=p_df['low'], close=p_df['close'], name='Prezzo'
+    ), row=1, col=1)
+    
+    # 2. Banda Superiore (Solo riga sottile)
+    fig.add_trace(go.Scatter(
+        x=p_df.index, y=p_df[c_up], 
+        line=dict(color='rgba(173, 216, 230, 0.4)', width=1), 
+        name='Upper BB'
+    ), row=1, col=1)
+    
+    # 3. Banda Mediana (Base per il riempimento inferiore)
+    fig.add_trace(go.Scatter(
+        x=p_df.index, y=p_df[c_mid], 
+        line=dict(color='rgba(255, 255, 255, 0.2)', width=1), 
+        name='BBM (Mediana)'
+    ), row=1, col=1)
+    
+    # 4. Banda Inferiore (Riempimento Celeste verso la Mediana)
+    fig.add_trace(go.Scatter(
+        x=p_df.index, y=p_df[c_low], 
+        line=dict(color='rgba(0, 191, 255, 0.6)', width=1.5), 
+        fill='tonexty',  # Riempie lo spazio verso la traccia precedente (BBM)
+        fillcolor='rgba(0, 191, 255, 0.15)', # Celeste trasparente
+        name='Lower BB (Buy Zone)'
+    ), row=1, col=1)
 
     # --- RIGA 2: RSI ---
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
