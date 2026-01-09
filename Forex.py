@@ -309,21 +309,16 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
     fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
 
-    start_dt = p_df.index.min()
-    end_dt = p_df.index.max()
-    v_lines = pd.date_range(start=start_dt, end=end_dt, freq='30min')
-
-    for line_time in v_lines:
-        # Aggiungiamo la linea verticale su entrambi i grafici
-        fig.add_vline(x=line_time.timestamp() * 1000, # Plotly usa i millisecondi per gli assi temporali
-                      line_width=1, line_dash="dot", 
-                      line_color="rgba(255,255,255,0.2)")
+    # RIGHE VERTICALI OGNI 5 MINUTI
+    v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='5min')
+    for lt in v_lines:
+        fig.add_vline(x=lt.timestamp()*1000, line_width=0.5, line_dash="dot", line_color="rgba(255,255,255,0.1)")
+        fig.add_annotation(x=lt, y=-0.15, xref="x", yref="paper", text=lt.strftime('%H:%M'), showarrow=False, font=dict(size=9, color="gray"))
         
         # Etichetta oraria in basso
         fig.add_annotation(x=line_time, y=-0.15, xref="x", yref="paper",
                            text=line_time.strftime('%H:%M'), showarrow=False,
                            font=dict(size=10, color="gray"))
-
         
     # Layout finale
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
