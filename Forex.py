@@ -347,27 +347,6 @@ if df_rt is not None and not df_rt.empty:
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
                       margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
 
-# --- AGGIUNTA LINEE VERTICALI OGNI 5 MINUTI ---
-# Generiamo i marker temporali basandoci sull'indice del grafico attuale (p_df)
-v_lines = pd.date_range(start=p_df.index.min(), end=p_df.index.max(), freq='5min')
-
-for line_time in v_lines:
-    fig.add_vline(
-        x=line_time, 
-        line_width=1, 
-        line_dash="dot",
-        line_color="rgba(255, 255, 255, 0.15)", # Grigio molto tenue per non sporcare
-        row="all", 
-        col=1
-    )
-    # Etichetta oraria alla base di ogni linea per precisione chirurgica
-    fig.add_annotation(
-        x=line_time, y=0, xref="x", yref="paper",
-        text=line_time.strftime('%H:%M'), showarrow=False,
-        font=dict(size=9, color="rgba(200, 200, 200, 0.5)"),
-        yshift=-20, row=1, col=1
-    )
-    
     st.plotly_chart(fig, use_container_width=True)
     
     curr_p = float(df_rt['close'].iloc[-1])
