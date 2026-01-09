@@ -149,7 +149,7 @@ def run_sentinel():
             adx_df = ta.adx(df_rt_s['high'], dfrt_s['low'], df_rt_s['close'], length=14).iloc[-1]
             c_adx = adx_df['ADX_14'].iloc[-1]
 
-            c_v = float(df_rt_s['closa'].iloc[-1]
+            c_v = float(df_rt_s['close'].iloc[-1])
             l_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
             m_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
             u_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
