@@ -254,7 +254,7 @@ with st.sidebar.popover("🗑️ Reset Cronologia"):
         st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
         st.session_state['last_alert'] = None
         st.rerun()
-
+    
     # --- MODIFICA GRAFICO: BANDE CON RIEMPIMENTO SELETTIVO ---
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
