@@ -16,7 +16,8 @@ st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon=
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem !important;}
-        [data-testid="stSidebar"] > div: first-child {padding-top: 0rem :important;}
+        /* Correzione Sidebar: rimosso spazio e corretto !important */
+        [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
         header {visibility: hidden;}
         footer {visibility: hidden;}
     </style>
@@ -165,14 +166,14 @@ def run_sentinel():
                 # Evita duplicati nello stesso minuto
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                    atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
-                    sl = curr_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
-                    tp = curr_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
-                    risk_val = balance * (risk_pc / 100)
-                    dist_p = abs(c_v - sl) * p_mult
+                    sl = curr_v - (1.5 * atr_s) if s_action == "COMPRA" else curr_v + (1.5 * atr_s)
+                    tp = curr_v + (3 * atr_s) if s_action == "COMPRA" else curr_v - (3 * atr_s)
+                    balance_val = balance if 'balance' in locals() else 1000
+                    risk_val = balance_val * (risk_pc / 100) if 'risk_pc' in locals() else 10
+                    dist_p = abs(curr_v - sl) * p_mult
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                     
-                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
+                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(curr_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
