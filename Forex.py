@@ -215,87 +215,66 @@ if st.session_state['last_alert']:
         st.rerun()
     st.stop()
 
-# --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
+# --- 6. HEADER E LOGICA DATI ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
-# Nota: qui assume che tu abbia fatto la modifica "5m" suggerita prima.
-# Se non l'hai fatta, df_rt sarà a 1m, se l'hai fatta sarà a 5m. Funziona in entrambi i casi.
 df_rt = get_realtime_data(pair) 
-df_d = yf.download(pair, period="1y", interval="5d", progress=False)
+df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
-if df_rt is not None and not df_rt.empty:
-    # Calcolo indicatori per il grafico
+if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
+    # 1. PRE-CALCOLO INDICATORI (Fondamentale per evitare NameError)
+    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
+    df_d.columns = [c.lower() for c in df_d.columns]
+    
+    # Calcolo indicatori Real Time (5m)
     bb = ta.bbands(df_rt['close'], length=20, std=2)
     df_rt = pd.concat([df_rt, bb], axis=1)
-    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14) # Calcolo RSI per il grafico
+    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14)
+    
+    # Calcolo indicatori Daily (per score e divergenza)
+    df_d['rsi'] = ta.rsi(df_d['close'], length=14)
+    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
     
     # Nomi colonne bande
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
-    c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m: {selected_label}")
-    
-    # Prepariamo gli ultimi 60 periodi per la visualizzazione
-    p_df = df_rt.tail(60)
-    
-    # Creazione sottografici (2 righe: Prezzo sopra, RSI sotto)
-    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
-
-    # --- RIGA 1: PREZZO E BANDE ---
-    # Candele
-    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], 
-                                 low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
-    # Bande Bollinger
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_mid], line=dict(color='rgba(255, 255, 255, 0.3)', width=1), name='Middle BB'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
-
-    # --- RIGA 2: RSI ---
-    fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
-    
-    # Linee RSI (70 e 30)
-    fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
-    fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
-
-    # Layout finale
-    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
-                      margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
+    # Variabili per le metriche
     curr_p = float(df_rt['close'].iloc[-1])
-    # Mostriamo anche il valore attuale dell'RSI accanto al prezzo
     curr_rsi = float(df_rt['rsi'].iloc[-1])
+    rsi_val = float(df_d['rsi'].iloc[-1]) # RSI Daily
+    last_atr = float(df_d['atr'].iloc[-1])
     
-    # Creazione delle tre colonne
-c_met1, c_met2, c_met3 = st.columns(3)
+    # CALCOLO SCORE AI
+    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
 
-# Colonna 1: Prezzo Attuale
-c_met1.metric(
-    label=f"Prezzo {selected_label}", 
-    value=price_fmt.format(curr_p)
+    # 2. GRAFICO
+    st.subheader(f"📈 Chart 5m: {selected_label}")
+    p_df = df_rt.tail(60)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    fig.add_trace(go.Candlestick(x=p_df.index, open=p_df['open'], high=p_df['high'], low=p_df['low'], close=p_df['close'], name='Prezzo'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(173, 216, 230, 0.4)', width=1), fill='tonexty', name='Lower BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
+    fig.update_layout(height=500, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0))
+    st.plotly_chart(fig, use_container_width=True)
+
+    # 3. COLONNE METRICHE (Ora tutte le variabili sono definite!)
+    c_met1, c_met2, c_met3 = st.columns(3)
+    
+    c_met1.metric(label=f"Prezzo {selected_label}", value=price_fmt.format(curr_p))
+    
+    c_met2.metric(
+        label="RSI (5m)", 
+        value=f"{curr_rsi:.1f}", 
+        delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro",
+        delta_color="inverse"
     )
+    
+    c_met3.metric(label="Sentinel Score", value=f"{score}/100")
 
-# Colonna 2: RSI (5m) con indicazione Ipercomprato/Ipervenduto
-c_met2.metric(
-    label="RSI (5m)", 
-    value=f"{curr_rsi:.1f}", 
-    delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro",
-    delta_color="inverse" # Rosso se ipercomprato, verde se ipervenduto
-    )
-
-# Colonna 3: Sentinel Score (Analisi AI)
-c_met3.metric(
-    label="Sentinel Score", 
-    value=f"{score}/100"
-    )
-
-# Riga aggiuntiva per l'RSI Daily (opzionale, sotto le colonne per non affollare)
-st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
+    st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
 
     # --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
@@ -310,37 +289,61 @@ if not s_data.empty:
         # Usiamo cols[i] in modo sicuro
         cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
-# --- 8. ANALISI AI ---
+# --- 8. ANALISI AI E GENERAZIONE SEGNALI ---
+# Questa sezione usa i dati già calcolati nella Sezione 6
+
 if df_rt is not None and df_d is not None and not df_d.empty:
-    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
-    df_d.columns = [c.lower() for c in df_d.columns]
-    df_d['rsi'] = ta.rsi(df_d['close'], length=14) 
-    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
-    rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
-    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
-    
+    # Controlliamo se siamo in una fascia oraria con liquidità sufficiente
     if not is_low_liquidity():
+        # LOGICA SEGNALE: Incrocio tra Sentinel Score (Sentiment) e RSI Daily (Trend)
         action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
+        
         if action:
             hist = st.session_state['signal_history']
-            if hist.empty or not ((hist['Asset'] == selected_label) & (hist['Direzione'] == action)).head(1).any():
+            
+            # Evitiamo di duplicare lo stesso segnale se è già presente e attivo
+            if hist.empty or not ((hist['Asset'] == selected_label) & (hist['Direzione'] == action) & (hist['Stato'] == 'In Corso')).any():
+                
+                # Calcolo SL e TP basato sulla volatilità (ATR)
                 sl = curr_p - (1.5 * last_atr) if action == "COMPRA" else curr_p + (1.5 * last_atr)
                 tp = curr_p + (3 * last_atr) if action == "COMPRA" else curr_p - (3 * last_atr)
+                
+                # Calcolo della Size (Lotti) in base al rischio impostato
                 dist_p = abs(curr_p - sl) * p_mult
                 size = (balance * (risk_pc / 100)) / (dist_p * 10) if dist_p > 0 else 0
-                new_a = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': selected_label, 'Direzione': action, 'Prezzo': price_fmt.format(curr_p), 'SL': price_fmt.format(sl), 'TP': price_fmt.format(tp), 'Size': f"{size:.2f}", 'Stato': 'In Corso'}
+                
+                # Creazione del nuovo record segnale
+                new_a = {
+                    'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 
+                    'Asset': selected_label, 
+                    'Direzione': action, 
+                    'Prezzo': price_fmt.format(curr_p), 
+                    'SL': price_fmt.format(sl), 
+                    'TP': price_fmt.format(tp), 
+                    'Size': f"{size:.2f}", 
+                    'Stato': 'In Corso'
+                }
+                
+                # Aggiornamento stato e trigger Alert
                 st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_a]), hist], ignore_index=True)
                 st.session_state['last_alert'] = new_a
                 st.rerun()
 
+# --- FOOTER INFORMATIVO ---
 st.markdown("---")
 st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
+# --- CRONOLOGIA SEGNALI (Posizionata in fondo per pulizia display iPhone) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
     def style_s(val):
-        color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
-        return f'color: {color}; font-weight: bold'
-    st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
+        if '✅' in str(val): return 'color: #00ffcc; font-weight: bold'
+        if '❌' in str(val): return 'color: #ff4b4b; font-weight: bold'
+        return 'color: #ffcc00; font-weight: bold'
+        
+    st.dataframe(
+        st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), 
+        use_container_width=True
+    )
