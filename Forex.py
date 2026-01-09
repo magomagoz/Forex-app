@@ -308,13 +308,6 @@ if df_rt is not None and not df_rt.empty:
     fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
     fig.add_hrect(y0=30, y1=70, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
-
-    # CORREZIONE: yref="paper" e y=-0.1 per evitare errori di row2/y2
-    fig.add_annotation(
-        x=line_time, y=-0.05, xref="x", yref="paper",
-        text=line_time.strftime('%H:%M'), showarrow=False,
-        font=dict(size=10, color="gray"), row=1, col=1
-    )
         
     # Layout finale
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
