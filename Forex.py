@@ -235,7 +235,7 @@ if st.session_state['last_alert']:
     
     
     # Overlay scuro oper mettere in risalto il pop-up
-        st.markdown('<div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 9998;"></div>', unsafe_allow_html=True)
     
     # Box del segnale
     st.markdown(f"""
