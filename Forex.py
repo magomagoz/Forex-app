@@ -219,7 +219,7 @@ def run_sentinel():
             scan_detail = "OK"
             if c_adx > 30:
                 scan_detail = f"Trend Forte (ADX:{c_adx:.0f})"
-            elif rsi_s > 45 and rsi_s < 55:
+            elif rsi_s > 40 and rsi_s < 60:
                 scan_detail = f"RSI Neutro ({rsi_s:.0f})"
 
             if s_action:
@@ -330,7 +330,7 @@ if df_rt is not None and not df_rt.empty:
     
     # Creazione sottografici (2 righe: Prezzo sopra, RSI sotto)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
-                        vertical_spacing=0.05, row_heights=[0.7, 0.3])
+                        vertical_spacing=0.05, row_heights=[0.75, 0.25])
 
     # --- RIGA 1: PREZZO E BANDE ---
     # Candele
