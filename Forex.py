@@ -166,6 +166,8 @@ def run_sentinel():
             df_rt_s = yf.download(ticker, period="5d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
+            
+            # Pulizia colonne
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
             df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
@@ -178,10 +180,14 @@ def run_sentinel():
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14).iloc[-1]
             c_adx = adx_df['ADX_14'].iloc[-1]
 
+            # IDENTIFICAZIONE CORRETTA DELLE COLONNE BB
+            # Cerchiamo le colonne BBL (Lower), BBM (Mid), BBU (Upper)
+            c_l_col = [c for c in bb_s.columns if "BBL" in c][0]
+            c_u_col = [c for c in bb_s.columns if "BBU" in c][0]
+
             c_v = float(df_rt_s['close'].iloc[-1])
-            l_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
-            m_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
-            u_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
+            l_bb = float(bb_s[c_l_col].iloc[-1])
+            u_bb = float(bb_s[c_u_col].iloc[-1])
             
             s_action = None
             if c_v < l_bb and rsi_s < 35 and c_adx < 30: s_action = "COMPRA"
@@ -317,7 +323,7 @@ if df_rt is not None and not df_rt.empty:
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m con RSI: {selected_label}")
+    st.subheader(f"📈 Chart 5m: {selected_label}")
     
     # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
