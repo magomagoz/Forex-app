@@ -315,11 +315,6 @@ if df_rt is not None and not df_rt.empty:
         fig.add_vline(x=lt.timestamp()*1000, line_width=0.5, line_dash="dot", line_color="rgba(255,255,255,0.1)")
         fig.add_annotation(x=lt, y=-0.15, xref="x", yref="paper", text=lt.strftime('%H:%M'), showarrow=False, font=dict(size=9, color="gray"))
         
-        # Etichetta oraria in basso
-        fig.add_annotation(x=line_time, y=-0.15, xref="x", yref="paper",
-                           text=line_time.strftime('%H:%M'), showarrow=False,
-                           font=dict(size=10, color="gray"))
-        
     # Layout finale
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
                       margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
