@@ -14,16 +14,19 @@ from plotly.subplots import make_subplots
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-#Definizione Fuso Orario Roma
+# Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 
-#Refresh automatico ogni 60 secondi
+# Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 if 'signal_history' not in st.session_state: 
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 2. FUNZIONI TECNICHE ---
 def get_now_rome():
@@ -31,15 +34,12 @@ def get_now_rome():
 
 def play_notification_sound():
     audio_html = """
-        <audio autoplay>
-            <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
-        </audio>
+        <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def get_session_status():
     now_rome = get_now_rome().time()
-    
     sessions = {
         "Tokyo 🇯🇵": (time(0,0), time(9,0)), 
         "Londra 🇬🇧": (time(9,0), time(18,0)), 
@@ -56,15 +56,14 @@ def get_realtime_data(ticker):
     try:
         df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
         if df is None or df.empty: return None
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
         df.columns = [c.lower() for c in df.columns]
         return df.dropna()
     except: return None
 
 def get_currency_strength():
     try:
-        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "USDCAD=X", "GBPCHF=X","EURGBP=X"]
+        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "EURGBP=X"]
         crypto = ["BTC-USD", "ETH-USD"]
         data = yf.download(forex + crypto, period="2d", interval="1d", progress=False, timeout=15)
         if data is None or data.empty: return pd.Series(dtype=float)
@@ -75,11 +74,8 @@ def get_currency_strength():
             "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0)) / 3,
             "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0)) / 3,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
-            "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
-            "BTC ₿": returns.get("BTC-USD", 0),
-            "ETH 💎": returns.get("ETH-USD", 0)
+            "BTC ₿": returns.get("BTC-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
     except: return pd.Series(dtype=float)
@@ -90,7 +86,7 @@ def get_asset_params(pair):
     return 0.0001, "{:.5f}", 10, "FOREX"
 
 def detect_divergence(df):
-    if len(df) < 20: return "Analisi in corso"
+    if len(df) < 20: return "Analisi..."
     price, rsi_col = df['close'], df['rsi']
     curr_p, curr_r = float(price.iloc[-1]), float(rsi_col.iloc[-1])
     prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi_col.iloc[-20:-1].max()
@@ -105,7 +101,7 @@ def update_signal_outcomes():
     df = st.session_state['signal_history']
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            data = yf.download(asset_map[row['Asset']], period="5d", interval="1m", progress=False)
+            data = yf.download(asset_map[row['Asset']], period="1d", interval="1m", progress=False)
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
                 high, low = data['High'].max(), data['Low'].min()
@@ -121,8 +117,7 @@ def update_signal_outcomes():
 def run_sentinel():
     for label, ticker in asset_map.items():
         try:
-            # Monitoraggio rapido su base 1 minuto
-            df_rt_s = yf.download(ticker, period="5d", interval="1m", progress=False)
+            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
                 
@@ -132,21 +127,18 @@ def run_sentinel():
             df_d_s.columns = [c.lower() for c in df_d_s.columns]
             
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
-            c_v, l_bb, u_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
-            rsi_s = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
-            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
-            curr_adx = adx_df['ADX_14'].iloc[-1]
-           
-            # Nomi colonne BB
             c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
             
             c_v = float(df_rt_s['close'].iloc[-1])
             l_bb = float(bb_s[c_l].iloc[-1])
             u_bb = float(bb_s[c_u].iloc[-1])
+            
+            rsi_s = ta.rsi(df_d_s['close'], length=14).iloc[-1]
+            atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            curr_adx = adx_df['ADX_14'].iloc[-1]
               
-            # LOGICA SEGNALE: Aggiunto filtro ADX < 30 (evita trend esplosivi)
             s_action = None
             if c_v < l_bb and rsi_s < 45 and curr_adx < 30: s_action = "COMPRA"
             elif c_v > u_bb and rsi_s > 55 and curr_adx < 30: s_action = "VENDI"
@@ -154,9 +146,7 @@ def run_sentinel():
             if s_action:
                 hist = st.session_state['signal_history']
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
-                    # ... (resto del codice per SL/TP e Size rimane uguale)
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                    atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
                     tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
                     risk_val = balance * (risk_pc / 100)
@@ -167,29 +157,25 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
-        except: continue
-
-                    st.session_state['last_scan_status'] = f"✅ {label} analizzato"
+            st.session_state['last_scan_status'] = f"✅ {label} analizzato"
         except Exception as e:
-                    st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
-                    continue
+            st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
+            continue
 
-# ESECUZIONE MOTORI (Spostata in alto per catturare segnali subito)
+# ESECUZIONE MOTORI
 update_signal_outcomes()
 run_sentinel()
 
-# --- 4. SIDEBAR CON TIMER E SESSIONI ---
+# --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (1m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
 st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
 
-# LOG DI MONITORAGGIO
 st.sidebar.subheader("📡 Sentinel Status")
 status = st.session_state.get('last_scan_status', 'In attesa...')
-st.sidebar.code(status) # Mostra l'asset che sta scansionando
+st.sidebar.code(status)
 
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
