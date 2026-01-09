@@ -235,7 +235,7 @@ if df_rt is not None and not df_rt.empty:
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
-    st.subheader(f"📈 Chart 5m: {selected_label} (Con RSI)")
+    st.subheader(f"📈 Chart 5m: {selected_label}")
     
     # Prepariamo gli ultimi 60 periodi per la visualizzazione
     p_df = df_rt.tail(60)
@@ -271,9 +271,31 @@ if df_rt is not None and not df_rt.empty:
     # Mostriamo anche il valore attuale dell'RSI accanto al prezzo
     curr_rsi = float(df_rt['rsi'].iloc[-1])
     
-    c_met1, c_met2 = st.columns(2)
-    c_met1.metric(f"Prezzo {selected_label}", price_fmt.format(curr_p))
-    c_met2.metric(f"RSI (5m)", f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro")
+    # Creazione delle tre colonne
+c_met1, c_met2, c_met3 = st.columns(3)
+
+# Colonna 1: Prezzo Attuale
+c_met1.metric(
+    label=f"Prezzo {selected_label}", 
+    value=price_fmt.format(curr_p)
+)
+
+# Colonna 2: RSI (5m) con indicazione Ipercomprato/Ipervenduto
+c_met2.metric(
+    label="RSI (5m)", 
+    value=f"{curr_rsi:.1f}", 
+    delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro",
+    delta_color="inverse" # Rosso se ipercomprato, verde se ipervenduto
+)
+
+# Colonna 3: Sentinel Score (Analisi AI)
+c_met3.metric(
+    label="Sentinel Score", 
+    value=f"{score}/100"
+)
+
+# Riga aggiuntiva per l'RSI Daily (opzionale, sotto le colonne per non affollare)
+st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
 
     # --- 7. CURRENCY STRENGTH ---
     st.markdown("---")
@@ -297,11 +319,6 @@ if df_rt is not None and df_d is not None and not df_d.empty:
     rsi_val, last_atr = float(df_d['rsi'].iloc[-1]), float(df_d['atr'].iloc[-1])
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
     
-    st.markdown("---")
-    c1, c2 = st.columns(2)
-    c1.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
-    c2.metric("Sentinel Score", f"{score}/100")
-    
     if not is_low_liquidity():
         action = "COMPRA" if (score >= 65 and rsi_val < 60) else "VENDI" if (score <= 35 and rsi_val > 40) else None
         if action:
@@ -317,13 +334,13 @@ if df_rt is not None and df_d is not None and not df_d.empty:
                 st.rerun()
 
 st.markdown("---")
+st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+
+st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
     def style_s(val):
         color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
         return f'color: {color}; font-weight: bold'
     st.dataframe(st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), use_container_width=True)
-
-st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
