@@ -15,10 +15,12 @@ from plotly.subplots import make_subplots
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 st.markdown("""
     <style>
-        .block-container {padding-top: 1rem;}
-        [data-testid="stSidebarNav"] {display: none;}
-        [data-testid="stSidebar"] > div:first-child {padding-top: 0rem;}
-    </style>""", unsafe_allow_html=True)
+        .block-container {padding-top: 1rem !important;}
+        [data-testid="stSidebar"] > div: first-child {padding-top: 0rem :important;}
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 #Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
