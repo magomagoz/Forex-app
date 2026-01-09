@@ -278,7 +278,7 @@ c_met1, c_met2, c_met3 = st.columns(3)
 c_met1.metric(
     label=f"Prezzo {selected_label}", 
     value=price_fmt.format(curr_p)
-)
+    )
 
 # Colonna 2: RSI (5m) con indicazione Ipercomprato/Ipervenduto
 c_met2.metric(
@@ -286,13 +286,13 @@ c_met2.metric(
     value=f"{curr_rsi:.1f}", 
     delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro",
     delta_color="inverse" # Rosso se ipercomprato, verde se ipervenduto
-)
+    )
 
 # Colonna 3: Sentinel Score (Analisi AI)
 c_met3.metric(
     label="Sentinel Score", 
     value=f"{score}/100"
-)
+    )
 
 # Riga aggiuntiva per l'RSI Daily (opzionale, sotto le colonne per non affollare)
 st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
