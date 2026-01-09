@@ -170,7 +170,7 @@ def run_sentinel():
         except: continue
 
 st.session_state['last_scan_status'] = f"✅ {label} analizzato"
-except Exception as e:
+    except Exception as e:
 st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
 continue
 
