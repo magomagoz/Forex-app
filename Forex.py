@@ -200,15 +200,6 @@ for s_name, is_open in get_session_status().items():
     status_text = "OPEN" if is_open else "CLOSED"
     st.sidebar.markdown(f"{color} **{s_name}**: {status_text}")
 
-# --- MODIFICA SIDEBAR: RESET CON CONFERMA ---
-st.sidebar.subheader("⚙️ Gestione Dati")
-with st.sidebar.popover("🗑️ Reset Cronologia"):
-    st.warning("Sei sicuro? Questa azione è irreversibile.")
-    if st.button("SÌ, CANCELLA TUTTO"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-        st.session_state['last_alert'] = None
-        st.rerun()
-
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
     play_notification_sound()
