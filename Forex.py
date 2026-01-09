@@ -13,8 +13,8 @@ from plotly.subplots import make_subplots
 import requests
 
 def send_telegram_msg(msg):
-    token = "IL_TUO_BOT_TOKEN"  # Ottenuto da @BotFather
-    chat_id = "IL_TUO_CHAT_ID"  # Ottenuto da @userinfobot
+    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10"  # Ottenuto da @BotFather
+    chat_id = "7191509088"  # Ottenuto da @userinfobot
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
