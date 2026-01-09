@@ -298,17 +298,17 @@ c_met3.metric(
 st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
 
     # --- 7. CURRENCY STRENGTH ---
-    st.markdown("---")
-    st.subheader("⚡ Currency Strength Meter")
-    s_data = get_currency_strength()
-    if not s_data.empty:
-        # Creiamo esattamente il numero di colonne pari ai dati ricevuti
-        cols = st.columns(len(s_data))
-        for i, (curr, val) in enumerate(s_data.items()):
-            bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
-            txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
-            # Usiamo cols[i] in modo sicuro
-            cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
+st.markdown("---")
+st.subheader("⚡ Currency Strength Meter")
+s_data = get_currency_strength()
+if not s_data.empty:
+    # Creiamo esattamente il numero di colonne pari ai dati ricevuti
+    cols = st.columns(len(s_data))
+    for i, (curr, val) in enumerate(s_data.items()):
+        bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
+        txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
+        # Usiamo cols[i] in modo sicuro
+        cols[i].markdown(f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'><b style='color:white; font-size:0.8em;'>{curr}</b><br><span style='color:{txt_c};'>{val:.2f}%</span></div>", unsafe_allow_html=True)
 
 # --- 8. ANALISI AI ---
 if df_rt is not None and df_d is not None and not df_d.empty:
