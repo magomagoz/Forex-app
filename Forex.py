@@ -98,6 +98,16 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
+def get_win_rate():
+    if st.session_state['signal_history'].empty:
+        return "Nessun dato"
+    df = st.session_state['signal_history']
+    total = len(df[df['Stato'] != 'In Corso'])
+    if total == 0: return "In attesa di chiusure..."
+    wins = len(df[df['Stato'] == '✅ TARGET'])
+    wr = (wins / total) * 100
+    return f"Win Rate: {wr:.1f}% ({wins}/{total})"
+
 # --- 3. MOTORI DI BACKGROUND ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
