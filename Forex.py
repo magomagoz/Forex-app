@@ -29,7 +29,7 @@ st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon=
 st.markdown("""
     <style>
         /* Riduce lo spazio superiore del contenuto principale */
-        .block-container {padding-top: 1rem !important;}
+        .block-container {padding-top: 0rem !important;}
         
         /* Rimuove lo spazio vuoto in alto nella sidebar */
         [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
