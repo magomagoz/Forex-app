@@ -156,11 +156,20 @@ def run_sentinel():
                     st.rerun()
         except: continue
 
+# ESECUZIONE MOTORI (Spostata in alto per catturare segnali subito)
+update_signal_outcomes()
+run_sentinel()
+
 # --- 4. SIDEBAR CON TIMER E SESSIONI ---
 st.sidebar.header("🛠 Trading Desk (1m)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
 countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.markdown(f"⏳ **Scan Sentinella: {countdown}s**")
+st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
+
+# LOG DI MONITORAGGIO
+st.sidebar.subheader("📡 Sentinel Status")
+status = st.session_state.get('last_scan_status', 'In attesa...')
+st.sidebar.code(status) # Mostra l'asset che sta scansionando
 
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
@@ -177,10 +186,6 @@ for s_name, is_open in get_session_status().items():
 if st.sidebar.button("🗑️ Reset Cronologia"):
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     st.rerun()
-
-# --- SPOSTA QUI (subito dopo la sidebar) ---
-update_signal_outcomes()
-run_sentinel()
 
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
