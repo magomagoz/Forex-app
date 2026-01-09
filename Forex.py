@@ -125,6 +125,7 @@ def run_sentinel():
             df_rt_s = yf.download(ticker, period="5d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             if df_rt_s.empty or df_d_s.empty: continue
+                
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
             df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
@@ -134,27 +135,45 @@ def run_sentinel():
             c_v, l_bb, u_bb = float(df_rt_s['close'].iloc[-1]), float(bb_s.iloc[-1, 0]), float(bb_s.iloc[-1, 2])
             rsi_s = ta.rsi(df_d_s['close'], length=14).iloc[-1]
             atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            curr_adx = adx_df['ADX_14'].iloc[-1]
+           
+            # Nomi colonne BB
+            c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
+            c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
             
+            c_v = float(df_rt_s['close'].iloc[-1])
+            l_bb = float(bb_s[c_l].iloc[-1])
+            u_bb = float(bb_s[c_u].iloc[-1])
+              
+            # LOGICA SEGNALE: Aggiunto filtro ADX < 30 (evita trend esplosivi)
             s_action = None
-            if c_v < l_bb and rsi_s < 45: s_action = "COMPRA"
-            elif c_v > u_bb and rsi_s > 55: s_action = "VENDI"
+            if c_v < l_bb and rsi_s < 45 and curr_adx < 30: s_action = "COMPRA"
+            elif c_v > u_bb and rsi_s > 55 and curr_adx < 30: s_action = "VENDI"
             
             if s_action:
                 hist = st.session_state['signal_history']
-                # Evita duplicati nello stesso minuto
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Direzione'] == s_action)).head(1).any():
+                    # ... (resto del codice per SL/TP e Size rimane uguale)
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
+                    atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
                     sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
                     tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
                     risk_val = balance * (risk_pc / 100)
                     dist_p = abs(c_v - sl) * p_mult
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                     
-                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
+                    new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     st.rerun()
         except: continue
+
+            # Aggiorna il log nella sidebar
+            st.session_state['last_scan_status'] = f"✅ {label} analizzato"
+        except Exception as e:
+            st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
+            continue
 
 # ESECUZIONE MOTORI (Spostata in alto per catturare segnali subito)
 update_signal_outcomes()
