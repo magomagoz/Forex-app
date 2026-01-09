@@ -169,11 +169,10 @@ def run_sentinel():
                     st.rerun()
         except: continue
 
-            # Aggiorna il log nella sidebar
-        st.session_state['last_scan_status'] = f"✅ {label} analizzato"
-        except Exception as e:
-            st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
-        continue
+st.session_state['last_scan_status'] = f"✅ {label} analizzato"
+except Exception as e:
+st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
+continue
 
 # ESECUZIONE MOTORI (Spostata in alto per catturare segnali subito)
 update_signal_outcomes()
