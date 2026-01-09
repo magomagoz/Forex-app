@@ -163,7 +163,7 @@ def run_sentinel():
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
             rsi_s = ta.rsi(df_d_s['close'], length=14).iloc[-1]
             atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
-            adx_df = ta.adx(df_rt_s['high'], dfrt_s['low'], df_rt_s['close'], length=14).iloc[-1]
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14).iloc[-1]
             c_adx = adx_df['ADX_14'].iloc[-1]
 
             c_v = float(df_rt_s['close'].iloc[-1])
