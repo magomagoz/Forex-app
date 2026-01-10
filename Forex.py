@@ -26,15 +26,23 @@ def send_telegram_msg(msg):
 
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
-
 st.markdown("""
     <style>
-        /* Riduce lo spazio sopra il titolo principale */
-        .main .block-container {padding-top: 1rem !important;}
-        /* Riduce lo spazio sopra la sidebar */
+        .block-container {padding-top: 1rem !important;}
         [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
-        /* Rende l'header di Streamlit meno ingombrante */
-        header {visibility: hidden;}
+        
+        /* CORREZIONE SIDEBAR: Nascondiamo menu e footer, ma lasciamo l'header 
+           attivo per permettere al tasto della sidebar di apparire */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {background-color: rgba(0,0,0,0) !important;} 
+        
+        /* Stile per il tasto di riapertura della sidebar */
+        [data-testid="stSidebarCollapsedControl"] {
+            background-color: rgba(0, 255, 204, 0.2) !important;
+            border-radius: 8px !important;
+            color: #00ffcc !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
