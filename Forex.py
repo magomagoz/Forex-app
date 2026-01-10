@@ -484,18 +484,35 @@ st.markdown("---")
 st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
-# --- CRONOLOGIA SEGNALI (Posizionata in fondo per pulizia display iPhone) ---
+# --- 9. CRONOLOGIA SEGNALI (CORRETTA) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
+
 if not st.session_state['signal_history'].empty:
-    def style_s(val):
-        if '✅' in str(val): return 'color: #00ffcc; font-weight: bold'
-        if '❌' in str(val): return 'color: #ff4b4b; font-weight: bold'
-        return 'color: #ffcc00; font-weight: bold'
-        
+    # Creiamo una copia per la visualizzazione
+    display_df = st.session_state['signal_history'].copy()
+    
+    def style_status(val):
+        color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
+        return f'color: {color}; font-weight: bold'
+    
+    # Visualizzazione tabella
     st.dataframe(
-        st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), 
-        use_container_width=True
+        display_df.style.map(style_status, subset=['Stato']), 
+        use_container_width=True,
+        hide_index=True
     )
+    
+    # TASTO DOWNLOAD (Come richiesto)
+    csv = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        "📥 Esporta Cronologia (CSV)",
+        csv,
+        "cronologia_forex.csv",
+        "text/csv",
+        key='download-csv'
+    )
+else:
+    st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
 
 st.markdown("---")
