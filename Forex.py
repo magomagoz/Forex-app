@@ -250,7 +250,6 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
     play_notification_sound()
@@ -267,11 +266,12 @@ if st.session_state['last_alert']:
             </div>    
         </div>
     """, unsafe_allow_html=True)
-    if st.button("✅ ACCETTA E CHIUDI", use_container_width=True):
+    
+    # Il bottone deve stare FUORI dal CSS ma visibile sopra lo z-index
+    if st.button("✅ CHIUDI ALERT E TORNA AL DESK", use_container_width=True, type="primary"):
         st.session_state['last_alert'] = None
         st.rerun()
-    st.stop()
-
+    
 # --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
@@ -376,7 +376,34 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     c_met2.metric(label="RSI (5m)", value=f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro", delta_color="inverse")
     c_met3.metric(label="Sentinel Score", value=f"{score}/100")
     st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
- 
+
+    # --- VISUALIZZAZIONE METRICHE AI & ADX ---
+    adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
+    curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
+
+    st.markdown("---")
+    st.subheader("🕵️ Sentinel Market Analysis")
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
+    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+
+    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    adx_guide = pd.DataFrame([
+        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
+        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
+        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
+    ])
+
+    def highlight_adx(row):
+        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']: return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']: return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+        elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+        return [''] * len(row)
+
+    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+
 # --- 7. CURRENCY STRENGTH ---
 # Deve essere fuori da ogni IF, allineato tutto a sinistra
 st.markdown("---")
