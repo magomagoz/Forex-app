@@ -200,6 +200,24 @@ for s_name, is_open in get_session_status().items():
     status_text = "OPEN" if is_open else "CLOSED"
     st.sidebar.markdown(f"{color} **{s_name}**: {status_text}")
 
+# Visualizzazione Win Rate in Sidebar
+st.sidebar.markdown("---")
+st.sidebar.subheader("🏆 Performance Oggi")
+wr = get_win_rate()
+if wr:
+    st.sidebar.info(wr)
+
+# --- MODIFICA SIDEBAR: RESET CON SICUREZZA ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚙️ Gestione Dati")
+# Usiamo un popover per evitare click accidentali
+with st.sidebar.popover("🗑️ Reset Cronologia"):
+    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
+    if st.button("SÌ, CANCELLA ORA"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+        st.session_state['last_alert'] = None
+        st.rerun()
+
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
     play_notification_sound()
@@ -243,102 +261,72 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Calcolo indicatori Daily (per score e divergenza)
     df_d['rsi'] = ta.rsi(df_d['close'], length=14)
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
-    
-# --- MODIFICA SIDEBAR: RESET CON SICUREZZA ---
-st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Gestione Dati")
-# Usiamo un popover per evitare click accidentali
-with st.sidebar.popover("🗑️ Reset Cronologia"):
-    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
-    if st.button("SÌ, CANCELLA ORA"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-        st.session_state['last_alert'] = None
-        st.rerun()
-    
-    # --- MODIFICA GRAFICO: BANDE CON RIEMPIMENTO SELETTIVO ---
+          
+    # 1. Definizioni Colonne Bande
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
     
+    # 2. Calcolo Variabili e Score (FONDAMENTALE PER EVITARE ERRORI)
+    curr_p = float(df_rt['close'].iloc[-1])
+    curr_rsi = float(df_rt['rsi'].iloc[-1])
+    rsi_val = float(df_d['rsi'].iloc[-1]) 
+    last_atr = float(df_d['atr'].iloc[-1])
+    
+    # Calcolo Score
+    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
+
+    # 3. Creazione Grafico
     p_df = df_rt.tail(60)
     fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
                         vertical_spacing=0.05, row_heights=[0.75, 0.25])
     
-    # 1. Candele (Prezzo)
+    # Candele
     fig.add_trace(go.Candlestick(
         x=p_df.index, open=p_df['open'], high=p_df['high'], 
         low=p_df['low'], close=p_df['close'], name='Prezzo'
     ), row=1, col=1)
     
-    # 2. Banda Superiore (Solo riga sottile)
+    # Banda Superiore (Solo riga)
     fig.add_trace(go.Scatter(
         x=p_df.index, y=p_df[c_up], 
-        line=dict(color='rgba(173, 216, 230, 0.4)', width=1), 
+        line=dict(color='rgba(173, 216, 230, 0.6)', width=1), 
         name='Upper BB'
     ), row=1, col=1)
     
-    # 3. Banda Mediana (Base per il riempimento inferiore)
+    # Banda Mediana (Base per il riempimento)
     fig.add_trace(go.Scatter(
         x=p_df.index, y=p_df[c_mid], 
-        line=dict(color='rgba(255, 255, 255, 0.2)', width=1), 
+        line=dict(color='rgba(255, 255, 255, 0.3)', width=1), 
         name='BBM (Mediana)'
     ), row=1, col=1)
     
-    # 4. Banda Inferiore (Riempimento Celeste verso la Mediana)
+    # Banda Inferiore (Riempita in Celeste verso la Mediana)
     fig.add_trace(go.Scatter(
         x=p_df.index, y=p_df[c_low], 
         line=dict(color='rgba(0, 191, 255, 0.6)', width=1.5), 
-        fill='tonexty',  # Riempie lo spazio verso la traccia precedente (BBM)
-        fillcolor='rgba(0, 191, 255, 0.15)', # Celeste trasparente
+        fill='tonexty', 
+        fillcolor='rgba(0, 191, 255, 0.15)', 
         name='Lower BB (Buy Zone)'
     ), row=1, col=1)
 
-    # --- RIGA 2: RSI ---
+    # RSI (Riga 2)
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
-    # --- MIGLIORAMENTO VISIVO RSI ---
-    #fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
-    # Zone di Ipercomprato/Ipervenduto evidenziate
-    #fig.add_hrect(y0=70, y1=100, fillcolor="red", opacity=0.1, line_width=0, row=2, col=1)
-    #fig.add_hrect(y0=0, y1=30, fillcolor="green", opacity=0.1, line_width=0, row=2, col=1)
-    # fine blocco miglioramento RSI
-
-
-    # Linee RSI (70 e 30)
     fig.add_hline(y=75, line_dash="dot", line_color="red", row=2, col=1)
     fig.add_hline(y=25, line_dash="dot", line_color="#00ff00", row=2, col=1)
     fig.add_hrect(y0=25, y1=75, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
-
     
-    # Visualizzazione Win Rate in Sidebar
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("🏆 Performance Oggi")
-    wr = get_win_rate()
-    if wr:
-        st.sidebar.info(wr)
-
-    
-    # Layout finale
-    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, 
-                      margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
-
+    # Layout e Visualizzazione
+    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
     st.plotly_chart(fig, use_container_width=True)
-        
-   # 3. COLONNE METRICHE (Ora tutte le variabili sono definite!)
+
+    # 4. Metriche
     c_met1, c_met2, c_met3 = st.columns(3)
-    
     c_met1.metric(label=f"Prezzo {selected_label}", value=price_fmt.format(curr_p))
-    
-    c_met2.metric(
-        label="RSI (5m)", 
-        value=f"{curr_rsi:.1f}", 
-        delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro",
-        delta_color="inverse"
-    )
-    
+    c_met2.metric(label="RSI (5m)", value=f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro", delta_color="inverse")
     c_met3.metric(label="Sentinel Score", value=f"{score}/100")
-
     st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
-
+ 
     # --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
