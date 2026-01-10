@@ -14,8 +14,8 @@ import requests
 
 def send_telegram_msg(msg):
     """Invia un avviso istantaneo su Telegram"""
-    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10
-    " # Sostituisci con il tuo token
+    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10" 
+    # Sostituisci con il tuo token
     chat_id = "7191509088" # Sostituisci con il tuo ID
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
