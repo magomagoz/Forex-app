@@ -14,8 +14,9 @@ import requests
 
 def send_telegram_msg(msg):
     """Invia un avviso istantaneo su Telegram"""
-    token = "IL_TUO_BOT_TOKEN" # Sostituisci con il tuo token
-    chat_id = "IL_TUO_CHAT_ID" # Sostituisci con il tuo ID
+    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10
+    " # Sostituisci con il tuo token
+    chat_id = "7191509088" # Sostituisci con il tuo ID
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
@@ -222,6 +223,11 @@ def run_sentinel():
                     new_sig = {'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 'Asset': label, 'Direzione': s_action, 'Prezzo': p_fmt.format(c_v), 'SL': p_fmt.format(sl), 'TP': p_fmt.format(tp), 'Size': f"{sz:.2f}", 'Stato': 'In Corso'}
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
+
+                
+                    msg = f"🚀 *SEGNALE {s_action}*\n📈 *{label}*\n💰 Prezzo: {new_sig['Prezzo']}\n🎯 TP: {new_sig['TP']}\n🛑 SL: {new_sig['SL']}"
+                    send_telegram_msg(msg)
+
                     st.rerun()
             st.session_state['last_scan_status'] = f"✅ {label} analizzato"
         except Exception as e:
