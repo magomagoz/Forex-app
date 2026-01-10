@@ -14,6 +14,17 @@ from plotly.subplots import make_subplots
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
+st.markdown("""
+    <style>
+        /* Riduce lo spazio sopra il titolo principale */
+        .main .block-container {padding-top: 1rem !important;}
+        /* Riduce lo spazio sopra la sidebar */
+        [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
+        /* Rende l'header di Streamlit meno ingombrante */
+        header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
