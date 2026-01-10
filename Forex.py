@@ -363,7 +363,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
                 x=t, 
                 line_width=1, 
                 line_dash="dot", 
-                line_color="rgba(255, 255, 255, 0.15)" # Bianco molto trasparente
+                line_color="rgba(0, 0, 0, 0.15)" # Bianco molto trasparente
             )
         
     # Layout e Visualizzazione
