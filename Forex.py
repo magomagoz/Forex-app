@@ -243,8 +243,6 @@ if st.session_state['last_alert']:
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
-# Nota: qui assume che tu abbia fatto la modifica "5m" suggerita prima.
-# Se non l'hai fatta, df_rt sarà a 1m, se l'hai fatta sarà a 5m. Funziona in entrambi i casi.
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
@@ -310,11 +308,18 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
         name='Lower BB (Buy Zone)'
     ), row=1, col=1)
 
-    # RSI (Riga 2)
+
+    # RSI
     fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
-    fig.add_hline(y=75, line_dash="dot", line_color="red", row=2, col=1)
-    fig.add_hline(y=25, line_dash="dot", line_color="#00ff00", row=2, col=1)
-    fig.add_hrect(y0=25, y1=75, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
+    fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
+
+    
+    # RSI (Riga 2)
+    #fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
+    #fig.add_hline(y=75, line_dash="dot", line_color="red", row=2, col=1)
+    #fig.add_hline(y=25, line_dash="dot", line_color="#00ff00", row=2, col=1)
+    #fig.add_hrect(y0=25, y1=75, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
     
     # Layout e Visualizzazione
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
