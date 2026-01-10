@@ -63,16 +63,43 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "USDCAD=X", "GBPCHF=X","EURGBP=X"]
+        # Lista asset completa
+        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
         crypto = ["BTC-USD", "ETH-USD"]
-        data = yf.download(forex + crypto, period="2d", interval="1d", progress=False, timeout=15)
-        if data is None or data.empty: return pd.Series(dtype=float)
-        close_data = data['Close'] if 'Close' in data else data
+        
+        # Scarichiamo 5 giorni per essere sicuri di avere dati anche nel weekend
+        data = yf.download(forex + crypto, period="5d", interval="1d", progress=False, timeout=15)
+        
+        if data is None or data.empty: 
+            return pd.Series(dtype=float)
+
+        # Gestione colonne MultiIndex (fix per versioni recenti di yfinance)
+        if isinstance(data.columns, pd.MultiIndex):
+            # Se esiste il livello 'Close', usiamo quello
+            if 'Close' in data.columns.get_level_values(0):
+                close_data = data['Close']
+            elif 'Close' in data.columns.get_level_values(1):
+                 # Caso invertito (Ticker, Price)
+                 close_data = data.xs('Close', axis=1, level=1)
+            else:
+                 # Tentativo generico di prendere la chiusura
+                 close_data = data['Close']
+        else:
+            close_data = data['Close'] if 'Close' in data else data
+
+        # Pulizia dati: riempiamo i buchi e prendiamo l'ultima variazione valida
+        close_data = close_data.ffill().dropna()
+        
+        if len(close_data) < 2: return pd.Series(dtype=float)
+
+        # Calcolo variazione percentuale
         returns = close_data.pct_change().iloc[-1] * 100
+        
+        # Calcolo forza valute (usando .get per evitare crash se manca un ticker)
         strength = {
             "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
-            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0)) / 3,
-            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0)) / 3,
+            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0)) / 4,
+            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0)) / 4,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
@@ -81,7 +108,10 @@ def get_currency_strength():
             "ETH 💎": returns.get("ETH-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
-    except: return pd.Series(dtype=float)
+    except Exception as e:
+        # Se vuoi vedere l'errore nel terminale per debug, togli il commento sotto:
+        # print(f"Errore Currency Strength: {e}")
+        return pd.Series(dtype=float)
 
 def get_asset_params(pair):
     if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
