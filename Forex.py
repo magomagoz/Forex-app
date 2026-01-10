@@ -456,4 +456,4 @@ if not st.session_state['signal_history'].empty:
         use_container_width=True
     )
 
-st.sidebar.markdown("---")
+st.markdown("---")
