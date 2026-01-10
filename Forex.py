@@ -406,3 +406,5 @@ if not st.session_state['signal_history'].empty:
         st.session_state['signal_history'].style.applymap(style_s, subset=['Stato']), 
         use_container_width=True
     )
+
+st.sidebar.markdown("---")
