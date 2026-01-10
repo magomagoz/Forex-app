@@ -371,10 +371,10 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     st.plotly_chart(fig, use_container_width=True)
 
     # 4. Metriche
-    c_met1, c_met2, c_met3 = st.columns(3)
+    c_met1, c_met2 = st.columns(2)
     c_met1.metric(label=f"Prezzo {selected_label}", value=price_fmt.format(curr_p))
     c_met2.metric(label="RSI (5m)", value=f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro", delta_color="inverse")
-    c_met3.metric(label="Sentinel Score", value=f"{score}/100")
+    
     st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
 
     # --- VISUALIZZAZIONE METRICHE AI & ADX ---
