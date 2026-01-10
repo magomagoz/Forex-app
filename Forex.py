@@ -250,55 +250,31 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT RIDOTTO (MODAL) ---
+# --- 5. POPUP ALERT (RE-FIXED) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
 
-    # CSS per popup a mezzo schermo centrato
+    # Popup HTML con z-index leggermente ridotto per non coprire i tasti Streamlit
     st.markdown(f"""
-        <div style="
-            position: fixed; 
-            top: 50%; 
-            left: 50%; 
-            transform: translate(-50%, -50%); 
-            width: 60vw; 
-            max-width: 800px;
-            background-color: rgba(15, 12, 41, 0.98); 
-            z-index: 999999; 
-            display: flex; 
-            flex-direction: column; 
-            justify-content: center; 
-            align-items: center; 
-            color: white; 
-            text-align: center; 
-            padding: 40px;
-            border: 4px solid #00ffcc;
-            border-radius: 30px;
-            box-shadow: 0 0 50px rgba(0, 255, 204, 0.5);
-            backdrop-filter: blur(10px);
-        ">
-            <h1 style="font-size: 3em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
-            <h2 style="font-size: 1.2em; color: #888;">{alert['DataOra']}</h2>
-            <hr style="width: 80%; border: 1px solid #333; margin: 20px 0;">
-            <h2 style="font-size: 3em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
-            
-            <div style="background: #222; padding: 25px; border-radius:20px; border: 1px solid #ffcc00; width: 80%; margin: 20px 0;">
-                <p style="font-size: 2.5em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
-                <p style="font-size: 1.5em; margin: 10px 0;">Entry: {alert['Prezzo']}</p>
-                <p style="font-size: 1.1em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
+        <div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); width: 85vw; max-width: 700px; background-color: rgba(15, 12, 41, 0.98); z-index: 999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; padding: 30px; border: 4px solid #00ffcc; border-radius: 30px; box-shadow: 0 0 50px rgba(0, 255, 204, 0.5); backdrop-filter: blur(10px); font-family: sans-serif;">
+            <h1 style="font-size: 2.2em; color: #00ffcc; margin-bottom:5px;">🚀 SEGNALE RILEVATO</h1>
+            <p style="font-size: 0.9em; color: #888;">{alert['DataOra']}</p>
+            <hr style="width: 80%; border: 0.5px solid #333; margin: 15px 0;">
+            <h2 style="font-size: 2.5em; margin: 10px 0;">{alert['Asset']} <span style="color:{'#00ffcc' if alert['Direzione'] == 'COMPRA' else '#ff4b4b'}">{alert['Direzione']}</span></h2>
+            <div style="background: rgba(34, 34, 34, 0.8); padding: 20px; border-radius:20px; border: 1px solid #ffcc00; width: 90%; margin: 15px 0;">
+                <p style="font-size: 2em; color: #ffcc00; font-weight: bold; margin:0;">SIZE: {alert['Size']}</p>
+                <p style="font-size: 1.2em; margin: 5px 0;">Entry: {alert['Prezzo']}</p>
+                <p style="font-size: 0.9em; color: #aaa;">SL: {alert['SL']} | TP: {alert['TP']}</p>
             </div>
-            <p style="color: #666; font-style: italic; margin-bottom: 20px;">L'app rimarrà in attesa finché non confermi la lettura.</p>
+            <p style="color: #666; font-style: italic; font-size: 0.8em;">Clicca il tasto qui sotto per chiudere</p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Pulsante di chiusura (Streamlit lo renderizza sopra grazie allo z-index se messo subito dopo)
-    # Lo mettiamo in una colonna centrale per estetica
-    _, col_btn, _ = st.columns([1, 2, 1])
-    with col_btn:
-        if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True, type="primary"):
-            st.session_state['last_alert'] = None
-            st.rerun()
+    # Il bottone deve essere fuori dal markdown ma visibile
+    if st.button("✅ CHIUDI E TORNA AL MONITORAGGIO", use_container_width=True, type="primary"):
+        st.session_state['last_alert'] = None
+        st.rerun()
 
 # --- 6. HEADER E GRAFICO AVANZATO (Con RSI) ---
 st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
