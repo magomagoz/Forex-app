@@ -353,7 +353,19 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     #fig.add_hline(y=75, line_dash="dot", line_color="red", row=2, col=1)
     #fig.add_hline(y=25, line_dash="dot", line_color="#00ff00", row=2, col=1)
     #fig.add_hrect(y0=25, y1=75, fillcolor="gray", opacity=0.1, line_width=0, row=2, col=1)
-    
+
+    # --- AGGIUNTA GRIGLIA VERTICALE (OGNI 10 MINUTI) ---
+    # Scansioniamo l'indice delle candele visibili
+    for t in p_df.index:
+        # Se il minuto è multiplo di 10 (0, 10, 20, 30...)
+        if t.minute % 10 == 0:
+            fig.add_vline(
+                x=t, 
+                line_width=1, 
+                line_dash="dot", 
+                line_color="rgba(255, 255, 255, 0.15)" # Bianco molto trasparente
+            )
+        
     # Layout e Visualizzazione
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
     st.plotly_chart(fig, use_container_width=True)
