@@ -218,6 +218,9 @@ with st.sidebar.popover("🗑️ Reset Cronologia"):
         st.session_state['last_alert'] = None
         st.rerun()
 
+st.sidebar.markdown("---")
+
+
 # --- 5. POPUP ALERT CON SUONO ---
 if st.session_state['last_alert']:
     play_notification_sound()
