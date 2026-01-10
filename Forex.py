@@ -232,16 +232,16 @@ for s_name, is_open in get_session_status().items():
 
 # Visualizzazione Win Rate in Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🏆 Performance Oggi")
+st.sidebar.subheader("🏆 **Performance Oggi**")
 wr = get_win_rate()
 if wr:
     st.sidebar.info(wr)
 
 # --- MODIFICA SIDEBAR: RESET CON SICUREZZA ---
 st.sidebar.markdown("---")
-st.sidebar.subheader("⚙️ Gestione Dati")
+#st.sidebar.subheader("⚙️ Gestione Dati")
 # Usiamo un popover per evitare click accidentali
-with st.sidebar.popover("🗑️ Reset Cronologia"):
+with st.sidebar.popover("🗑️ **Reset Cronologia**"):
     st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
     if st.button("SÌ, CANCELLA ORA"):
         st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
