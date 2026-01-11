@@ -11,6 +11,7 @@ from streamlit_autorefresh import st_autorefresh
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
+import os
 
 def send_telegram_msg(msg):
     """Invia un avviso istantaneo su Telegram"""
