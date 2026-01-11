@@ -24,6 +24,12 @@ def send_telegram_msg(msg):
     except Exception as e:
         print(f"Errore Telegram: {e}")
 
+# --- 1.1. BANNER ---
+if os.path.exists("banner.png"):
+    st.image("banner.png", use_container_width=True)
+else:
+    st.markdown("<h1 style='text-align: center;'>Forex Momentum Pro</h1>", unsafe_allow_html=True)
+
 # --- 1. CONFIGURAZIONE & REFRESH ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 st.markdown("""
