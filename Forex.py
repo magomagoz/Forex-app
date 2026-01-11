@@ -370,7 +370,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Banda Superiore (Solo riga)
     fig.add_trace(go.Scatter(
         x=p_df.index, y=p_df[c_up], 
-        line=dict(color='rgba(o, 191, 255, 0.6)', width=1.5), 
+        line=dict(color='rgba(0, 191, 255, 0.6)', width=1.5), 
         name='Upper BB (Sell Zone)'
     ), row=1, col=1)
     
