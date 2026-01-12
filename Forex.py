@@ -42,8 +42,9 @@ st.markdown("""
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 
-# Refresh automatico ogni 60 secondi
-st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
+# Refresh automatico ogni 30 secondi
+st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
+
 
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
@@ -185,11 +186,22 @@ def update_signal_outcomes():
     st.session_state['signal_history'] = df
 
 def run_sentinel():
-    """Scansiona tutti gli asset per trovare nuovi segnali"""
-    for label, ticker in asset_map.items():
+    """Scansiona tutti gli asset con barra di progresso"""
+    assets = list(asset_map.items())
+    progress_bar = st.sidebar.progress(0) # Crea la barra nella sidebar
+    
+    for i, (label, ticker) in enumerate(assets):
+        # Aggiorna la barra di progresso
+        progress_val = (i + 1) / len(assets)
+        progress_bar.progress(progress_val)
+        
         try:
+            # Aggiorna lo stato visivo
+            st.session_state['last_scan_status'] = f"Analisi {label}..."
+            
             df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
+            
             if df_rt_s.empty or df_d_s.empty: continue
                 
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
@@ -253,15 +265,19 @@ def run_sentinel():
 
                     st.rerun() # Ricarica immediata per mostrare popup
             
-            st.session_state['last_scan_status'] = f"✅ {label} analizzato"
+            st.session_state['last_scan_status'] = f"✅ {label} OK"
         except Exception as e:
-            st.session_state['last_scan_status'] = f"⚠️ Errore su {label}"
+            st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
             continue
+    
+    # Una volta finito il giro
+    st.session_state['last_scan_status'] = "😴 Sentinel in pausa (30s)"
+    progress_bar.empty() # Rimuove la barra alla fine del ciclo
 
 # --- 4. SIDEBAR ---
-st.sidebar.header("🛠 Trading Desk (1m)")
+st.sidebar.header("🛠 Trading Desk (30s)")
 if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
-countdown = 60 - int(time_lib.time() - st.session_state.start_time) % 60
+countdown = 30 - int(time_lib.time() - st.session_state.start_time) % 60
 st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
 
 st.sidebar.subheader("📡 Sentinel Status")
@@ -273,6 +289,7 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
+st.sidebar.markdown("---")
 st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
