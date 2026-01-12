@@ -294,7 +294,8 @@ st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
     status_text = "OPEN" if is_open else "CLOSED"
-    st.sidebar.markdown(f"{color} **{s_name}**: {status_text}")
+    st.sidebar.markdown(f"{color} **{s_name}** <small>({status_text})</small>",
+unsafe_allow_html=True)
 
 # Win Rate Sidebar
 st.sidebar.markdown("---")
