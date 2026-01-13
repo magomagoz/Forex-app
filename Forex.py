@@ -315,58 +315,81 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (CORRETTO E SENZA INDENTAZIONE) ---
+# --- 5. POPUP ALERT (CENTERED & TELEGRAM BUTTON) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
-
-    # Logica colori per il popup
     is_buy = alert['Direzione'] == 'COMPRA'
     main_color = "#00ffcc" if is_buy else "#ff4b4b"
-    # Gradienti definiti su una riga per evitare errori di indentazione
-    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
+    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.8) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.8) 100%)"
 
-    # Usiamo un placeholder per bloccare l'interfaccia
-    with st.empty().container():
-        # NOTA: L'HTML qui sotto è tutto allineato a sinistra per evitare che venga letto come codice
-        st.markdown(f"""
-<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; display: flex; align-items: center; justify-content: center;">
-    <div style="width: 90%; max-width: 600px; background: {bg_gradient}; border: 4px solid {main_color}; border-radius: 20px; padding: 30px; text-align: center; box-shadow: 0 0 50px {main_color};">
-        <h1 style="font-size: 3em; color: {main_color}; margin: 0;">🚀 {alert['Direzione']} ORA</h1>
-        <h2 style="color: white; font-size: 2.5em; margin: 10px 0;">{alert['Asset']}</h2>
-        <div style="background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; margin: 20px 0;">
-            <p style="color: #FFD700; font-size: 1.5em; font-weight: bold; margin:0;">SIZE: {alert['Size']} LOTTI</p>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <div style="text-align: center;">
-                <p style="color: #aaa; margin:0; font-size: 0.9em;">ENTRY</p>
-                <h3 style="color: white; margin:0;">{alert['Prezzo']}</h3>
-            </div>
-            <div style="text-align: center;">
-                <p style="color: #ff4b4b; margin:0; font-size: 0.9em;">🛑 STOP LOSS</p>
-                <h3 style="color: #ff4b4b; margin:0;">{alert['SL']}</h3>
-            </div>
-            <div style="text-align: center;">
-                <p style="color: #00ffcc; margin:0; font-size: 0.9em;">🎯 TARGET MAX</p>
-                <h3 style="color: #00ffcc; margin:0;">{alert['TP']}</h3>
-            </div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    # 1. CSS per il posizionamento dei pulsanti e del contenitore
+    st.markdown(f"""
+        <style>
+            /* Overlay scuro di sfondo */
+            .overlay {{
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.7); z-index: 9998;
+            }}
+            /* Contenitore pulsanti */
+            .btn-container {{
+                position: fixed;
+                bottom: 25%; left: 50%;
+                transform: translateX(-50%);
+                z-index: 10000;
+                display: flex; gap: 15px;
+            }}
+            /* Stile unico pulsanti */
+            div.stButton > button {{
+                border-radius: 10px !important;
+                padding: 10px 25px !important;
+                font-weight: bold !important;
+            }}
+        </style>
+        <div class="overlay"></div>
+    """, unsafe_allow_html=True)
 
-        # TASTO CHIUDI (Nativo Streamlit per interattività)
-        # Usiamo colonne per centrare il bottone visivamente sotto il div
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.write("") # Spaziatore
-            st.write("") 
-            if st.button("✅ HO CAPITO - CHIUDI POPUP", type="primary", use_container_width=True):
-                st.session_state['last_alert'] = None
-                st.rerun()
-        
-        # STOP ESECUZIONE: Importante per evitare sovrapposizioni grafiche
-        #st.stop()
+    # 2. Popup centrale (HTML)
+    st.markdown(f"""
+        <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                    width: 90%; max-width: 500px; background: {bg_gradient}; 
+                    border: 3px solid {main_color}; border-radius: 25px; 
+                    padding: 35px; text-align: center; z-index: 9999;
+                    box-shadow: 0 10px 40px rgba(0,0,0,0.8);">
+            
+            <p style="color: {main_color}; margin: 0; font-size: 1em; letter-spacing: 2px;">SENTINEL ALERT</p>
+            <h1 style="font-size: 3.5em; color: white; margin: 0;">{alert['Asset']}</h1>
+            <h2 style="color: {main_color}; font-size: 2em; margin: 5px 0;">🚀 {alert['Direzione']}</h2>
+            
+            <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 15px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1);">
+                <span style="color: #FFD700; font-size: 1.4em; font-weight: bold;">LOTTI: {alert['Size']}</span>
+            </div>
+
+            <div style="display: flex; justify-content: space-around; margin-bottom: 40px;">
+                <div><p style="color: #aaa; margin:0; font-size: 0.8em;">ENTRY</p><b style="color: white;">{alert['Prezzo']}</b></div>
+                <div><p style="color: #ff4b4b; margin:0; font-size: 0.8em;">STOP</p><b style="color: #ff4b4b;">{alert['SL']}</b></div>
+                <div><p style="color: #00ffcc; margin:0; font-size: 0.8em;">TARGET</p><b style="color: #00ffcc;">{alert['TP']}</b></div>
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
+
+    # 3. Pulsanti Streamlit (Posizionati nel container)
+    st.markdown('<div class="btn-container">', unsafe_allow_html=True)
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        if st.button("📢 TELEGRAM", key="tg_btn"):
+            msg = f"🚀 *SEGNALE {alert['Direzione']}*\n📈 *{alert['Asset']}*\n💰 Prezzo: {alert['Prezzo']}\n🎯 TP: {alert['TP']}\n🛑 SL: {alert['SL']}"
+            send_telegram_msg(msg)
+            st.toast("Inviato a Telegram!", icon="📲")
+            
+    with col_btn2:
+        if st.button("❌ CHIUDI", key="close_btn"):
+            st.session_state['last_alert'] = None
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    st.stop()
 
 
 # --- ESECUZIONE MOTORI DI BACKGROUND ---
