@@ -315,70 +315,88 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (FIX FINALE RENDERING E TELEGRAM) ---
+# --- 5. POPUP ALERT (FIX LAYOUT PULSANTI) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
     is_buy = alert['Direzione'] == 'COMPRA'
     main_color = "#00ffcc" if is_buy else "#ff4b4b"
-    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.8) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.8) 100%)"
+    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
 
-    # CSS per forzare il posizionamento dei pulsanti sopra il popup centrale
+    # 1. CSS per Overlay e Posizionamento Singoli Pulsanti
     st.markdown(f"""
 <style>
-    .overlay-sfondo {{
+    .overlay-black {{
         position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.85); z-index: 9998;
+        background: rgba(0,0,0,0.9); z-index: 9998;
     }}
-    .container-pulsanti {{
-        position: fixed; bottom: 30%; left: 50%;
-        transform: translateX(-50%); z-index: 10000;
-        display: flex; gap: 20px;
+    /* Contenitore per allineare i tasti orizzontalmente senza colonne */
+    .button-zone {{
+        position: fixed;
+        bottom: 32%; /* Alzato un po' per stare dentro la scheda */
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10001;
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        width: 100%;
+        max-width: 400px;
     }}
-    /* Stile pulsanti nativi Streamlit per farli risaltare */
+    /* Stile forzato per i bottoni Streamlit */
     div.stButton > button {{
-        background-color: #262730 !important;
+        width: 160px !important;
+        height: 50px !important;
+        background-color: #1e1e1e !important;
         color: white !important;
-        border: 1px solid {main_color} !important;
-        border-radius: 10px !important;
-        padding: 10px 20px !important;
+        border: 2px solid {main_color} !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
     }}
 </style>
-<div class="overlay-sfondo"></div>
+<div class="overlay-black"></div>
 """, unsafe_allow_html=True)
 
-    # Il Popup Centrale - NOTA: Il codice inizia senza spazi a sinistra
-    html_popup = f"""
+    # 2. Popup Centrale (Senza pulsanti interni, solo grafica)
+    st.markdown(f"""
 <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 85%; max-width: 450px; background: {bg_gradient}; 
-            border: 3px solid {main_color}; border-radius: 25px; 
-            padding: 30px; text-align: center; z-index: 9999;
-            box-shadow: 0 0 50px {main_color}44;">
-    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 2px;">SENTINEL PRO AI</p>
-    <h1 style="font-size: 3em; color: white; margin: 10px 0;">{alert['Asset']}</h1>
-    <h2 style="color: {main_color}; font-size: 1.8em; margin: 0;">🚀 {alert['Direzione']}</h2>
-    <div style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 12px; margin: 20px 0; border: 1px solid rgba(255,255,255,0.1);">
-        <span style="color: #FFD700; font-size: 1.3em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
+            width: 90%; max-width: 450px; background: {bg_gradient}; 
+            border: 3px solid {main_color}; border-radius: 30px; 
+            padding: 40px; text-align: center; z-index: 9999;
+            box-shadow: 0 0 60px {main_color}33;">
+    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 3px; font-size: 0.8em;">SENTINEL MOMENTUM AI</p>
+    <h1 style="font-size: 3.5em; color: white; margin: 10px 0; font-family: sans-serif;">{alert['Asset']}</h1>
+    <h2 style="color: {main_color}; font-size: 2.2em; margin: 0;">🚀 {alert['Direzione']}</h2>
+    
+    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 15px; margin: 25px 0; border: 1px solid rgba(255,255,255,0.1);">
+        <span style="color: #FFD700; font-size: 1.5em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
     </div>
-    <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
-        <div><p style="color: #aaa; margin:0; font-size: 0.8em;">ENTRY</p><b style="color: white; font-size: 1.1em;">{alert['Prezzo']}</b></div>
-        <div><p style="color: #ff4b4b; margin:0; font-size: 0.8em;">STOP</p><b style="color: #ff4b4b; font-size: 1.1em;">{alert['SL']}</b></div>
-        <div><p style="color: #00ffcc; margin:0; font-size: 0.8em;">TARGET</p><b style="color: #00ffcc; font-size: 1.1em;">{alert['TP']}</b></div>
+
+    <div style="display: flex; justify-content: space-around; margin-bottom: 60px;">
+        <div><p style="color: #aaa; margin:0; font-size: 0.8em;">ENTRY</p><b style="color: white; font-size: 1.2em;">{alert['Prezzo']}</b></div>
+        <div><p style="color: #ff4b4b; margin:0; font-size: 0.8em;">STOP</p><b style="color: #ff4b4b; font-size: 1.2em;">{alert['SL']}</b></div>
+        <div><p style="color: #00ffcc; margin:0; font-size: 0.8em;">TARGET</p><b style="color: #00ffcc; font-size: 1.2em;">{alert['TP']}</b></div>
     </div>
-    <div style="height: 50px;"></div> </div>"""
+</div>
+""", unsafe_allow_html=True)
 
-    st.markdown(html_popup, unsafe_allow_html=True)
-
-    # Pulsanti Streamlit nel container dedicato
-    st.markdown('<div class="container-pulsanti">', unsafe_allow_html=True)
-    col_t1, col_t2 = st.columns(2)
-    with col_t1:
-        if st.button("📢 TELEGRAM", key="btn_tg"):
+    # 3. Posizionamento reale dei pulsanti tramite zona Flex
+    st.markdown('<div class="button-zone">', unsafe_allow_html=True)
+    # Usiamo il layout a due colonne di Streamlit SOLO se necessario, 
+    # ma qui usiamo un trucco più pulito:
+    btn_col1, btn_col2 = st.columns([1, 1]) 
+    
+    with btn_col1:
+        # Questo bottone apparirà a sinistra
+        if st.button("📢 TELEGRAM", key="tg_final"):
             msg = f"🚀 *SEGNALE {alert['Direzione']}*\n📈 *{alert['Asset']}*\n💰 Prezzo: {alert['Prezzo']}\n🎯 TP: {alert['TP']}\n🛑 SL: {alert['SL']}"
             send_telegram_msg(msg)
             st.toast("Inviato!", icon="📲")
-    with col_t2:
-        if st.button("❌ CHIUDI", key="btn_close"):
+            
+    with btn_col2:
+        # Questo bottone apparirà a destra
+        if st.button("❌ CHIUDI", key="close_final"):
             st.session_state['last_alert'] = None
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
