@@ -366,7 +366,7 @@ if st.session_state['last_alert']:
                 st.rerun()
         
         # STOP ESECUZIONE: Importante per evitare sovrapposizioni grafiche
-        st.stop()
+        #st.stop()
 
 
 # --- ESECUZIONE MOTORI DI BACKGROUND ---
