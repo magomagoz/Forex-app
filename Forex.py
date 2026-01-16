@@ -439,7 +439,7 @@ if 'signal_history' in st.session_state:
     run_sentinel()
 
 # Banner logic
-banner_path = "banner1.png"
+banner_path = "banner2.png"
 if os.path.exists(banner_path):
     st.image(banner_path, use_container_width=True)
 else:
