@@ -363,7 +363,7 @@ st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
     status_text = "OPEN" if is_open else "CLOSED"
-    st.sidebar.markdown(f"**{s_name}** <small>({status_text})</small> {color}",
+    st.sidebar.markdown(f"**{s_name}** <small>({status_text})</small>      {color}",
 unsafe_allow_html=True)
 
 # Win Rate Sidebar - Ora mostrerà i dati aggiornati
@@ -497,7 +497,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # --- AGGIUNTA GRIGLIA VERTICALE (OGNI 10 MINUTI) ---
     for t in p_df.index:
         if t.minute % 10 == 0:
-            fig.add_vline(x=t, line_width=1, line_dash="solid", line_color="rgba(0, 0, 0, 0.5)", layer="below")
+            fig.add_vline(x=t, line_width=0.5, line_dash="solid", line_color="rgba(0, 0, 0, 0.3)", layer="below")
 
     # Layout Grafico
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
