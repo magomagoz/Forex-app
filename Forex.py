@@ -192,84 +192,85 @@ def get_win_rate():
     wr = (wins / total) * 100
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
-def run_sentinel():
-    """Scansiona tutti gli asset (Senza barra progresso interna)"""
-    assets = list(asset_map.items())
-    
-    # Rimosso st.sidebar.progress da qui
-    
-    for i, (label, ticker) in enumerate(assets):
-        try:
-            st.session_state['last_scan_status'] = f"Analisi {label}..."
-            
-            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
-            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
-            
-            if df_rt_s.empty or df_d_s.empty: continue
-                
-            if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
-            if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
-            df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
-            df_d_s.columns = [c.lower() for c in df_d_s.columns]
-            
-            bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
-            c_l = [c for c in bb_s.columns if "BBL" in c.upper()][0]
-            c_u = [c for c in bb_s.columns if "BBU" in c.upper()][0]
-            
-            c_v = float(df_rt_s['close'].iloc[-1])
-            l_bb = float(bb_s[c_l].iloc[-1])
-            u_bb = float(bb_s[c_u].iloc[-1])
-            
-            rsi_s = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            atr_s = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
-            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
-            curr_adx = adx_df['ADX_14'].iloc[-1]
-              
-            s_action = None
-            if c_v < l_bb and rsi_s < 45 and curr_adx < 30: s_action = "COMPRA"
-            elif c_v > u_bb and rsi_s > 55 and curr_adx < 30: s_action = "VENDI"
-            
-            if s_action:
-                hist = st.session_state['signal_history']
-                is_duplicate = False
-                if not hist.empty:
-                    last_same_asset = hist[(hist['Asset'] == label) & (hist['Stato'] == 'In Corso')]
-                    if not last_same_asset.empty and last_same_asset.iloc[0]['Direzione'] == s_action:
-                        is_duplicate = True
+# --- 5. POPUP ALERT (CORRETTO E POSIZIONATO SOTTO) ---
+if st.session_state['last_alert']:
+    play_notification_sound()
+    alert = st.session_state['last_alert']
+    is_buy = alert['Direzione'] == 'COMPRA'
+    main_color = "#00ffcc" if is_buy else "#ff4b4b"
+    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
 
-                if not is_duplicate:
-                    p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                    sl = c_v - (1.5 * atr_s) if s_action == "COMPRA" else c_v + (1.5 * atr_s)
-                    tp = c_v + (3 * atr_s) if s_action == "COMPRA" else c_v - (3 * atr_s)
-                    risk_val = balance * (risk_pc / 100)
-                    dist_p = abs(c_v - sl) * p_mult
-                    sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
-                    
-                    new_sig = {
-                        'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), 
-                        'Asset': label, 
-                        'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(c_v), 
-                        'SL': p_fmt.format(sl), 
-                        'TP': p_fmt.format(tp), 
-                        'Size': f"{sz:.2f}", 
-                        'Stato': 'In Corso'
-                    }
-                    
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    st.session_state['last_alert'] = new_sig
-
-                    msg = f"🚀 *SEGNALE {s_action}*\n📈 *{label}*\n💰 Prezzo: {new_sig['Prezzo']}\n🎯 TP: {new_sig['TP']}\n🛑 SL: {new_sig['SL']}"
-                    send_telegram_msg(msg)
-
-                    st.rerun() 
+    # CSS Overlay e Posizionamento Tasto
+    st.markdown(f"""
+        <style>
+            /* Sfondo nero semi-trasparente */
+            .overlay-black {{
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); z-index: 9998;
+            }}
             
-            st.session_state['last_scan_status'] = f"✅ {label} OK"
-        except Exception as e:
-            st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
-            continue
+            /* Contenitore del bottone: Fissato in BASSO al centro */
+            .btn-zone {{
+                position: fixed; 
+                bottom: 10%; /* Distanza dal fondo */
+                left: 50%; 
+                transform: translateX(-50%);
+                z-index: 10002; /* Molto alto per essere cliccabile */
+                width: 280px;
+                text-align: center;
+            }}
+            
+            /* Stile forzato del bottone Streamlit dentro la zona */
+            .btn-zone button {{
+                width: 100% !important; 
+                height: 60px !important;
+                background-color: #222 !important; 
+                color: white !important;
+                border: 2px solid {main_color} !important; 
+                border-radius: 12px !important;
+                font-size: 20px !important;
+                font-weight: bold !important;
+                box-shadow: 0 0 20px {main_color}66 !important;
+                cursor: pointer !important;
+            }}
+            .btn-zone button:hover {{
+                background-color: {main_color} !important;
+                color: black !important;
+            }}
+        </style>
+        <div class="overlay-black"></div>
+    """, unsafe_allow_html=True)
+
+    # HTML Popup (Solo grafica, niente bottoni qui)
+    popup_html = f"""
+<div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); 
+            width: 90%; max-width: 500px; background: {bg_gradient}; 
+            border: 4px solid {main_color}; border-radius: 25px; 
+            padding: 30px; text-align: center; z-index: 9999;
+            box-shadow: 0 0 50px {main_color}44;">
+    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 2px;">SENTINEL AI DETECTED</p>
+    <h1 style="font-size: 3.5em; color: white; margin: 10px 0;">{alert['Asset']}</h1>
+    <h2 style="color: {main_color}; font-size: 2.5em; margin: 0;">🚀 {alert['Direzione']}</h2>
+    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; margin: 20px 0;">
+        <span style="color: #FFD700; font-size: 1.6em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
+    </div>
+    <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
+        <div><p style="color:#aaa; font-size:0.8em; margin:0;">ENTRY</p><b style="color:white; font-size:1.2em;">{alert['Prezzo']}</b></div>
+        <div><p style="color:#ff4b4b; font-size:0.8em; margin:0;">STOP</p><b style="color:#ff4b4b; font-size:1.2em;">{alert['SL']}</b></div>
+        <div><p style="color:#00ffcc; font-size:0.8em; margin:0;">TARGET</p><b style="color:#00ffcc; font-size:1.2em;">{alert['TP']}</b></div>
+    </div>
+</div>
+"""
+    st.markdown(popup_html, unsafe_allow_html=True)
+
+    # Pulsante Chiudi - Inserito nel contenitore .btn-zone
+    st.markdown('<div class="btn-zone">', unsafe_allow_html=True)
+    if st.button("❌ CHIUDI POPUP", key="close_main"):
+        st.session_state['last_alert'] = None
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    st.session_state['last_scan_status'] = "😴 Analisi completata"
+    st.stop() # Blocca l'esecuzione qui finché non si chiude
 
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
