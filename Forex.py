@@ -236,15 +236,24 @@ def run_sentinel():
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso'
                     }
+
+        
+                    
+                    
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
 
-            st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
-        except Exception as e:
-            st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
-            continue
+            now = get_now_rome().strftime("%H:%M:%S")
+            st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
+
+            #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
+    except Exception as e:
+        # Invece di un errore generico, mostriamo cosa è andato storto (es. timeout o dati mancanti)
+        error_type = "Timeout" if "timeout" in str(e).lower() else "Dati non disp."
+        st.session_state['last_scan_status'] = f"⚠️ {label}: {error_type}"
+        continue
 
 
 def get_win_rate():
@@ -349,7 +358,14 @@ st.sidebar.markdown("""
 
 st.sidebar.subheader("📡 Sentinel Status")
 status = st.session_state.get('last_scan_status', 'In attesa...')
-st.sidebar.code(status)
+
+# Usiamo un contenitore con colore dinamico
+if "⚠️" in status:
+    st.sidebar.error(status)
+elif "🔍" in status:
+    st.sidebar.success(status)
+else:
+    st.sidebar.info(status)
 
 # Parametri Input
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
