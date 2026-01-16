@@ -15,7 +15,7 @@ import os
 # --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# CSS Migliorato per nascondere header/footer e centrare il popup
+# CSS Migliorato
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem !important;}
@@ -26,9 +26,10 @@ st.markdown("""
         header {background-color: rgba(0,0,0,0) !important;} 
         
         /* Stile Tasti */
-        .stButton>button {
+        div.stButton > button {
             border-radius: 8px !important;
             font-weight: bold;
+            width: 100%;
         }
         
         /* Colori Tabella */
@@ -84,10 +85,6 @@ def get_session_status():
         "New York 🇺🇸": (time(14,0), time(23,0))
     }
     return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
-
-def is_low_liquidity():
-    now_rome = get_now_rome().time()
-    return time(23, 0) <= now_rome or now_rome <= time(1, 0)
 
 @st.cache_data(ttl=30)
 def get_realtime_data(ticker):
@@ -149,54 +146,63 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
-def get_win_rate():
-    if st.session_state['signal_history'].empty:
-        return "Nessun dato"
-    df = st.session_state['signal_history']
-    total = len(df[df['Stato'] != 'In Corso'])
-    if total == 0: return "In attesa di chiusure..."
-    wins = len(df[df['Stato'] == '✅ TARGET'])
-    wr = (wins / total) * 100
-    return f"Win Rate: {wr:.1f}% ({wins}/{total})"
-
-# --- 3. MOTORI DI BACKGROUND ---
-
 def update_signal_outcomes():
     """Controlla se i segnali aperti hanno raggiunto TP o SL"""
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     
+    updates_made = False
     # Itera solo su quelli in corso
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            data = yf.download(asset_map[row['Asset']], period="1d", interval="1m", progress=False)
+            ticker = asset_map[row['Asset']]
+            data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+                # Prendiamo i dati più recenti per controllare
                 high, low = data['High'].max(), data['Low'].min()
                 sl_v, tp_v = float(row['SL']), float(row['TP'])
                 
+                new_status = None
                 if row['Direzione'] == 'COMPRA':
-                    if high >= tp_v: df.at[idx, 'Stato'] = '✅ TARGET'
-                    elif low <= sl_v: df.at[idx, 'Stato'] = '❌ STOP LOSS'
-                else:
-                    if low <= tp_v: df.at[idx, 'Stato'] = '✅ TARGET'
-                    elif high >= sl_v: df.at[idx, 'Stato'] = '❌ STOP LOSS'
+                    if high >= tp_v: new_status = '✅ TARGET'
+                    elif low <= sl_v: new_status = '❌ STOP LOSS'
+                else: # VENDI
+                    if low <= tp_v: new_status = '✅ TARGET'
+                    elif high >= sl_v: new_status = '❌ STOP LOSS'
+                
+                if new_status:
+                    df.at[idx, 'Stato'] = new_status
+                    updates_made = True
         except: continue
     
-    st.session_state['signal_history'] = df
+    if updates_made:
+        st.session_state['signal_history'] = df
+
+def get_win_rate():
+    if st.session_state['signal_history'].empty:
+        return "Nessun dato"
+    df = st.session_state['signal_history']
+    # Consideriamo conclusi solo quelli che non sono "In Corso"
+    closed_trades = df[df['Stato'] != 'In Corso']
+    total = len(closed_trades)
+    
+    if total == 0: return "In attesa di chiusure..."
+    
+    wins = len(closed_trades[closed_trades['Stato'] == '✅ TARGET'])
+    wr = (wins / total) * 100
+    return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
 def run_sentinel():
     """Scansiona tutti gli asset con barra di progresso"""
     assets = list(asset_map.items())
-    progress_bar = st.sidebar.progress(0) # Crea la barra nella sidebar
+    progress_bar = st.sidebar.progress(0)
     
     for i, (label, ticker) in enumerate(assets):
-        # Aggiorna la barra di progresso
         progress_val = (i + 1) / len(assets)
         progress_bar.progress(progress_val)
         
         try:
-            # Aggiorna lo stato visivo
             st.session_state['last_scan_status'] = f"Analisi {label}..."
             
             df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
@@ -228,8 +234,7 @@ def run_sentinel():
             
             if s_action:
                 hist = st.session_state['signal_history']
-                
-                # Evita duplicati: controlla se c'è già un segnale identico IN CORSO
+                # Evita duplicati
                 is_duplicate = False
                 if not hist.empty:
                     last_same_asset = hist[(hist['Asset'] == label) & (hist['Stato'] == 'In Corso')]
@@ -255,24 +260,27 @@ def run_sentinel():
                         'Stato': 'In Corso'
                     }
                     
-                    # SALVATAGGIO IN SESSION STATE
+                    # SALVATAGGIO PRIMA DEL RERUN
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
 
-                    # INVIO TELEGRAM
+                    # INVIO TELEGRAM AUTOMATICO
                     msg = f"🚀 *SEGNALE {s_action}*\n📈 *{label}*\n💰 Prezzo: {new_sig['Prezzo']}\n🎯 TP: {new_sig['TP']}\n🛑 SL: {new_sig['SL']}"
                     send_telegram_msg(msg)
 
-                    st.rerun() # Ricarica immediata per mostrare popup
+                    st.rerun() 
             
             st.session_state['last_scan_status'] = f"✅ {label} OK"
         except Exception as e:
             st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
             continue
     
-    # Una volta finito il giro
     st.session_state['last_scan_status'] = "😴 Sentinel in pausa (30s)"
-    progress_bar.empty() # Rimuove la barra alla fine del ciclo
+    progress_bar.empty()
+
+# --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
+# Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
+update_signal_outcomes()
 
 # --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (30s)")
@@ -297,7 +305,7 @@ for s_name, is_open in get_session_status().items():
     st.sidebar.markdown(f"{color} **{s_name}** <small>({status_text})</small>",
 unsafe_allow_html=True)
 
-# Win Rate Sidebar
+# Win Rate Sidebar - Ora mostrerà i dati aggiornati
 st.sidebar.markdown("---")
 st.sidebar.subheader("🏆 **Performance Oggi**")
 wr = get_win_rate()
@@ -315,7 +323,7 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (FIX LAYOUT PULSANTI) ---
+# --- 5. POPUP ALERT (CORRETTO E PULITO) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
@@ -323,100 +331,68 @@ if st.session_state['last_alert']:
     main_color = "#00ffcc" if is_buy else "#ff4b4b"
     bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
 
-    # 1. CSS per Overlay e Posizionamento Singoli Pulsanti
+    # CSS Overlay
     st.markdown(f"""
-<style>
-    .overlay-black {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-        background: rgba(0,0,0,0.9); z-index: 9998;
-    }}
-    /* Contenitore per allineare i tasti orizzontalmente senza colonne */
-    .button-zone {{
-        position: fixed;
-        bottom: 32%; /* Alzato un po' per stare dentro la scheda */
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 10001;
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        width: 100%;
-        max-width: 400px;
-    }}
-    /* Stile forzato per i bottoni Streamlit */
-    div.stButton > button {{
-        width: 160px !important;
-        height: 50px !important;
-        background-color: #1e1e1e !important;
-        color: white !important;
-        border: 2px solid {main_color} !important;
-        font-weight: bold !important;
-        font-size: 16px !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.5) !important;
-    }}
-</style>
-<div class="overlay-black"></div>
-""", unsafe_allow_html=True)
+        <style>
+            .overlay-black {{
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.9); z-index: 9998;
+            }}
+            .btn-zone {{
+                position: fixed; top: 75%; left: 50%; transform: translateX(-50%);
+                z-index: 10001; width: 200px;
+            }}
+            div.stButton > button {{
+                width: 100% !important; height: 55px !important;
+                background-color: #1e1e1e !important; color: white !important;
+                border: 2px solid {main_color} !important; font-size: 18px !important;
+                box-shadow: 0 0 15px {main_color};
+            }}
+        </style>
+        <div class="overlay-black"></div>
+    """, unsafe_allow_html=True)
 
-    # 2. Popup Centrale (Senza pulsanti interni, solo grafica)
-    st.markdown(f"""
+    # HTML Popup - NOTA: Tutto allineato a sinistra per evitare errori
+    popup_html = f"""
 <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 90%; max-width: 450px; background: {bg_gradient}; 
-            border: 3px solid {main_color}; border-radius: 30px; 
-            padding: 40px; text-align: center; z-index: 9999;
-            box-shadow: 0 0 60px {main_color}33;">
-    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 3px; font-size: 0.8em;">SENTINEL MOMENTUM AI</p>
-    <h1 style="font-size: 3.5em; color: white; margin: 10px 0; font-family: sans-serif;">{alert['Asset']}</h1>
-    <h2 style="color: {main_color}; font-size: 2.2em; margin: 0;">🚀 {alert['Direzione']}</h2>
-    
-    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 15px; margin: 25px 0; border: 1px solid rgba(255,255,255,0.1);">
-        <span style="color: #FFD700; font-size: 1.5em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
+            width: 90%; max-width: 500px; background: {bg_gradient}; 
+            border: 4px solid {main_color}; border-radius: 25px; 
+            padding: 30px; text-align: center; z-index: 9999;
+            box-shadow: 0 0 50px {main_color}44;">
+    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 2px;">SENTINEL AI DETECTED</p>
+    <h1 style="font-size: 3.5em; color: white; margin: 10px 0;">{alert['Asset']}</h1>
+    <h2 style="color: {main_color}; font-size: 2.5em; margin: 0;">🚀 {alert['Direzione']}</h2>
+    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; margin: 20px 0;">
+        <span style="color: #FFD700; font-size: 1.6em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
     </div>
-
-    <div style="display: flex; justify-content: space-around; margin-bottom: 60px;">
-        <div><p style="color: #aaa; margin:0; font-size: 0.8em;">ENTRY</p><b style="color: white; font-size: 1.2em;">{alert['Prezzo']}</b></div>
-        <div><p style="color: #ff4b4b; margin:0; font-size: 0.8em;">STOP</p><b style="color: #ff4b4b; font-size: 1.2em;">{alert['SL']}</b></div>
-        <div><p style="color: #00ffcc; margin:0; font-size: 0.8em;">TARGET</p><b style="color: #00ffcc; font-size: 1.2em;">{alert['TP']}</b></div>
+    <div style="display: flex; justify-content: space-around; margin-bottom: 50px;">
+        <div><p style="color:#aaa; font-size:0.8em; margin:0;">ENTRY</p><b style="color:white; font-size:1.2em;">{alert['Prezzo']}</b></div>
+        <div><p style="color:#ff4b4b; font-size:0.8em; margin:0;">STOP</p><b style="color:#ff4b4b; font-size:1.2em;">{alert['SL']}</b></div>
+        <div><p style="color:#00ffcc; font-size:0.8em; margin:0;">TARGET</p><b style="color:#00ffcc; font-size:1.2em;">{alert['TP']}</b></div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+"""
+    st.markdown(popup_html, unsafe_allow_html=True)
 
-    # 3. Posizionamento reale dei pulsanti tramite zona Flex
-    st.markdown('<div class="button-zone">', unsafe_allow_html=True)
-    # Usiamo il layout a due colonne di Streamlit SOLO se necessario, 
-    # ma qui usiamo un trucco più pulito:
-    btn_col1, btn_col2 = st.columns([1, 1]) 
-    
-    with btn_col1:
-        # Questo bottone apparirà a sinistra
-        if st.button("📢 TELEGRAM", key="tg_final"):
-            msg = f"🚀 *SEGNALE {alert['Direzione']}*\n📈 *{alert['Asset']}*\n💰 Prezzo: {alert['Prezzo']}\n🎯 TP: {alert['TP']}\n🛑 SL: {alert['SL']}"
-            send_telegram_msg(msg)
-            st.toast("Inviato!", icon="📲")
-            
-    with btn_col2:
-        # Questo bottone apparirà a destra
-        if st.button("❌ CHIUDI", key="close_final"):
-            st.session_state['last_alert'] = None
-            st.rerun()
+    # Pulsante Chiudi Centrale
+    st.markdown('<div class="btn-zone">', unsafe_allow_html=True)
+    if st.button("✅ CHIUDI E TORNA AL MONITOR", key="close_main"):
+        st.session_state['last_alert'] = None
+        st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
-    st.stop()
+    st.stop() # Blocca qui se c'è l'alert
 
 
-# --- ESECUZIONE MOTORI DI BACKGROUND ---
-update_signal_outcomes()
+# --- 6. BODY PRINCIPALE ---
+# Eseguiamo Sentinel solo se non c'è alert attivo (codice sopra lo blocca)
 run_sentinel()
 
-
-# --- 6. HEADER E GRAFICO AVANZATO ---
-
-# Banner Logic
+# Banner logic
 banner_path = "banner.png"
 if os.path.exists(banner_path):
     st.image(banner_path, use_container_width=True)
 else:
-    # Fallback se non c'è l'immagine
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
@@ -436,7 +412,6 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     df_d['rsi'] = ta.rsi(df_d['close'], length=14)
     df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
           
-    # Definizioni Colonne Bande
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
     c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
@@ -446,7 +421,6 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     rsi_val = float(df_d['rsi'].iloc[-1]) 
     last_atr = float(df_d['atr'].iloc[-1])
     
-    # Calcolo Score
     score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
 
     # --- COSTRUZIONE GRAFICO ---
@@ -473,7 +447,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # --- AGGIUNTA GRIGLIA VERTICALE (OGNI 10 MINUTI) ---
     for t in p_df.index:
         if t.minute % 10 == 0:
-            fig.add_vline(x=t, line_width=1, line_dash="dot", line_color="rgba(255, 255, 255, 0.12)")
+            fig.add_vline(x=t, line_width=1, line_dash="solid", line_color="rgba(0, 0, 0, 0.5)", layer="below")
 
     # Layout Grafico
     fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
@@ -554,7 +528,6 @@ if not st.session_state['signal_history'].empty:
         hide_index=True
     )
     
-    # TASTO DOWNLOAD
     csv = display_df.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Esporta CSV", csv, "cronologia_forex.csv", "text/csv")
 else:
