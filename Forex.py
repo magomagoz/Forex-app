@@ -403,6 +403,7 @@ if st.session_state['last_alert']:
     
     st.stop()
 
+
 # --- ESECUZIONE MOTORI DI BACKGROUND ---
 update_signal_outcomes()
 run_sentinel()
