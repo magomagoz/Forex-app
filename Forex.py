@@ -192,85 +192,61 @@ def get_win_rate():
     wr = (wins / total) * 100
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
-# --- 5. POPUP ALERT (CORRETTO E POSIZIONATO SOTTO) ---
+# --- 5. POPUP ALERT ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
-    is_buy = alert['Direzione'] == 'COMPRA'
-    main_color = "#00ffcc" if is_buy else "#ff4b4b"
-    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
+    main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-    # CSS Overlay e Posizionamento Tasto
+    # Overlay Scuro e stile bottone
     st.markdown(f"""
         <style>
-            /* Sfondo nero semi-trasparente */
-            .overlay-black {{
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.9); z-index: 9998;
+            .full-overlay {{
+                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                background: rgba(0,0,0,0.85); z-index: 9999;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
             }}
-            
-            /* Contenitore del bottone: Fissato in BASSO al centro */
-            .btn-zone {{
-                position: fixed; 
-                bottom: 10%; /* Distanza dal fondo */
-                left: 50%; 
-                transform: translateX(-50%);
-                z-index: 10002; /* Molto alto per essere cliccabile */
-                width: 280px;
-                text-align: center;
+            .close-trigger {{
+                margin-top: 20px; /* Spazio sotto il popup */
+                z-index: 10001;
             }}
-            
-            /* Stile forzato del bottone Streamlit dentro la zona */
-            .btn-zone button {{
-                width: 100% !important; 
-                height: 60px !important;
-                background-color: #222 !important; 
+            /* Stile forzato del bottone Streamlit */
+            div.stButton > button:first-child {{
+                background-color: #111 !important;
                 color: white !important;
-                border: 2px solid {main_color} !important; 
-                border-radius: 12px !important;
-                font-size: 20px !important;
+                border: 2px solid {main_color} !important;
+                padding: 10px 40px !important;
                 font-weight: bold !important;
-                box-shadow: 0 0 20px {main_color}66 !important;
-                cursor: pointer !important;
-            }}
-            .btn-zone button:hover {{
-                background-color: {main_color} !important;
-                color: black !important;
             }}
         </style>
-        <div class="overlay-black"></div>
+        <div class="full-overlay"></div>
     """, unsafe_allow_html=True)
 
-    # HTML Popup (Solo grafica, niente bottoni qui)
-    popup_html = f"""
-<div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); 
-            width: 90%; max-width: 500px; background: {bg_gradient}; 
-            border: 4px solid {main_color}; border-radius: 25px; 
-            padding: 30px; text-align: center; z-index: 9999;
-            box-shadow: 0 0 50px {main_color}44;">
-    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 2px;">SENTINEL AI DETECTED</p>
-    <h1 style="font-size: 3.5em; color: white; margin: 10px 0;">{alert['Asset']}</h1>
-    <h2 style="color: {main_color}; font-size: 2.5em; margin: 0;">🚀 {alert['Direzione']}</h2>
-    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; margin: 20px 0;">
-        <span style="color: #FFD700; font-size: 1.6em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
+    # Contenitore Grafico Popup
+    st.markdown(f"""
+    <div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); 
+                width: 85%; max-width: 500px; background: #111; 
+                border: 3px solid {main_color}; border-radius: 20px; 
+                padding: 25px; text-align: center; z-index: 10000;
+                box-shadow: 0 0 40px {main_color}33;">
+        <h2 style="color: {main_color}; margin:0;">{alert['Asset']}</h2>
+        <h1 style="color: white; font-size: 3em; margin: 10px 0;">🚀 {alert['Direzione']}</h1>
+        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px;">
+            <p style="color: #FFD700; font-size: 1.2em; margin:0;">SIZE: {alert['Size']} LOTTI</p>
+        </div>
     </div>
-    <div style="display: flex; justify-content: space-around; margin-bottom: 10px;">
-        <div><p style="color:#aaa; font-size:0.8em; margin:0;">ENTRY</p><b style="color:white; font-size:1.2em;">{alert['Prezzo']}</b></div>
-        <div><p style="color:#ff4b4b; font-size:0.8em; margin:0;">STOP</p><b style="color:#ff4b4b; font-size:1.2em;">{alert['SL']}</b></div>
-        <div><p style="color:#00ffcc; font-size:0.8em; margin:0;">TARGET</p><b style="color:#00ffcc; font-size:1.2em;">{alert['TP']}</b></div>
-    </div>
-</div>
-"""
-    st.markdown(popup_html, unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-    # Pulsante Chiudi - Inserito nel contenitore .btn-zone
-    st.markdown('<div class="btn-zone">', unsafe_allow_html=True)
-    if st.button("❌ CHIUDI POPUP", key="close_main"):
-        st.session_state['last_alert'] = None
-        st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # Pulsante di chiusura posizionato dinamicamente sotto
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col2:
+        # Questo placeholder invisibile spinge il bottone in primo piano sopra l'overlay
+        st.markdown('<div style="height: 65vh;"></div>', unsafe_allow_html=True)
+        if st.button("❌ CHIUDI E TORNA AL MONITOR", key="btn_close_final"):
+            st.session_state['last_alert'] = None
+            st.rerun()
     
-    st.stop() # Blocca l'esecuzione qui finché non si chiude
+    st.stop()
 
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
@@ -528,3 +504,9 @@ else:
     st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
 
 st.markdown("---")
+
+# IN FONDO AL FILE
+if __name__ == "__main__":
+    # Esegui la scansione solo se la sidebar è già stata renderizzata
+    if 'signal_history' in st.session_state:
+        run_sentinel()
