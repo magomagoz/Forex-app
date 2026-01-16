@@ -254,25 +254,47 @@ update_signal_outcomes()
 
 # --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (30s)")
-if "start_time" not in st.session_state: st.session_state.start_time = time_lib.time()
-countdown = 30 - int(time_lib.time() - st.session_state.start_time) % 60
-st.sidebar.markdown(f"⏳ **Prossimo Scan: {countdown}s**")
+
+# Countdown Testuale e Barra Rossa Animata
+st.sidebar.markdown("⏳ **Prossimo Scan**")
+
+# CSS per la barra che si riempie in 30 secondi
+st.sidebar.markdown("""
+    <style>
+        @keyframes progressFill {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+        .container-bar {
+            width: 100%; background-color: #222; border-radius: 5px;
+            height: 12px; margin-bottom: 25px; border: 1px solid #444; overflow: hidden;
+        }
+        .red-bar {
+            height: 100%; background-color: #ff4b4b; width: 0%;
+            animation: progressFill 30s linear infinite;
+            box-shadow: 0 0 10px #ff4b4b;
+        }
+    </style>
+    <div class="container-bar"><div class="red-bar"></div></div>
+""", unsafe_allow_html=True)
 
 st.sidebar.subheader("📡 Sentinel Status")
 status = st.session_state.get('last_scan_status', 'In attesa...')
 st.sidebar.code(status)
 
+# Parametri Input
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
 st.sidebar.markdown("---")
+# ... (restante codice sidebar: sessioni, win rate, reset)
 st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
     status_text = "OPEN" if is_open else "CLOSED"
-    st.sidebar.markdown(f"{color} **{s_name}** <small>({status_text})</small>",
+    st.sidebar.markdown(f"**{s_name}** <small>({status_text})</small> {color}",
 unsafe_allow_html=True)
 
 # Win Rate Sidebar - Ora mostrerà i dati aggiornati
