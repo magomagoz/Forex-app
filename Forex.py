@@ -250,15 +250,8 @@ def run_sentinel():
         except Exception as e:
             now = get_now_rome().strftime("%H:%M:%S")
             log_entry = f"🔴 {now} - {label}: Errore dati"
-        
-            # Aggiorniamo la cronologia (teniamo solo gli ultimi 5 eventi)
-            st.session_state['sentinel_logs'].insert(0, log_entry)
-            st.session_state['sentinel_logs'] = st.session_state['sentinel_logs'][:5]
-        
-            # Aggiorniamo lo stato principale per compatibilità con il resto del codice
-            st.session_state['last_scan_status'] = log_entry
                                    
-            #st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
+            st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
 
             #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
         except Exception as e:
