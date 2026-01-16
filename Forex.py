@@ -46,7 +46,6 @@ asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "
 # Refresh automatico ogni 30 secondi
 st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
 
-
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
@@ -194,14 +193,12 @@ def get_win_rate():
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
 def run_sentinel():
-    """Scansiona tutti gli asset con barra di progresso"""
+    """Scansiona tutti gli asset (Senza barra progresso interna)"""
     assets = list(asset_map.items())
-    progress_bar = st.sidebar.progress(0)
+    
+    # Rimosso st.sidebar.progress da qui
     
     for i, (label, ticker) in enumerate(assets):
-        progress_val = (i + 1) / len(assets)
-        progress_bar.progress(progress_val)
-        
         try:
             st.session_state['last_scan_status'] = f"Analisi {label}..."
             
@@ -234,7 +231,6 @@ def run_sentinel():
             
             if s_action:
                 hist = st.session_state['signal_history']
-                # Evita duplicati
                 is_duplicate = False
                 if not hist.empty:
                     last_same_asset = hist[(hist['Asset'] == label) & (hist['Stato'] == 'In Corso')]
@@ -260,11 +256,9 @@ def run_sentinel():
                         'Stato': 'In Corso'
                     }
                     
-                    # SALVATAGGIO PRIMA DEL RERUN
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
 
-                    # INVIO TELEGRAM AUTOMATICO
                     msg = f"🚀 *SEGNALE {s_action}*\n📈 *{label}*\n💰 Prezzo: {new_sig['Prezzo']}\n🎯 TP: {new_sig['TP']}\n🛑 SL: {new_sig['SL']}"
                     send_telegram_msg(msg)
 
@@ -275,8 +269,7 @@ def run_sentinel():
             st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
             continue
     
-    st.session_state['last_scan_status'] = "😴 Sentinel in pausa (30s)"
-    progress_bar.empty()
+    st.session_state['last_scan_status'] = "😴 Analisi completata"
 
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
