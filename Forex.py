@@ -315,66 +315,54 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (CORRETTO E PULITO) ---
+# --- 5. POPUP ALERT (RE-DESIGNED) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
-    is_buy = alert['Direzione'] == 'COMPRA'
-    main_color = "#00ffcc" if is_buy else "#ff4b4b"
-    bg_gradient = "linear-gradient(135deg, #1e1e1e 0%, rgba(0, 50, 20, 0.9) 100%)" if is_buy else "linear-gradient(135deg, #1e1e1e 0%, rgba(50, 0, 0, 0.9) 100%)"
+    main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-    # CSS Overlay
+    # Overlay Totale
     st.markdown(f"""
         <style>
-            .overlay-black {{
+            .full-screen-overlay {{
                 position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.9); z-index: 9998;
+                background: rgba(0,0,0,0.92); z-index: 9990;
             }}
-            .btn-zone {{
-                position: fixed; top: 75%; left: 50%; transform: translateX(-50%);
-                z-index: 10001; width: 200px;
+            .popup-card {{
+                position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+                width: 85%; max-width: 450px; background: #111;
+                border: 3px solid {main_color}; border-radius: 20px;
+                padding: 30px; text-align: center; z-index: 9995;
+                box-shadow: 0 0 50px {main_color}44;
             }}
-            div.stButton > button {{
-                width: 100% !important; height: 55px !important;
-                background-color: #1e1e1e !important; color: white !important;
-                border: 2px solid {main_color} !important; font-size: 18px !important;
-                box-shadow: 0 0 15px {main_color};
+            /* Container per il tasto chiudi proprio sotto il popup */
+            .button-container {{
+                position: fixed; top: 70%; left: 50%; transform: translateX(-50%);
+                z-index: 10000; width: 300px;
             }}
         </style>
-        <div class="overlay-black"></div>
+        <div class="full-screen-overlay"></div>
+        <div class="popup-card">
+            <h2 style="color: {main_color}; margin:0; letter-spacing:2px;">AI ALERT</h2>
+            <h1 style="color: white; font-size: 3.5em; margin: 10px 0;">{alert['Asset']}</h1>
+            <h2 style="color: white; background: {main_color}; border-radius: 10px; padding: 5px; color: black;">
+                🚀 {alert['Direzione']}
+            </h2>
+            <div style="margin-top: 20px; display: flex; justify-content: space-around;">
+                <div><small style="color:#888;">ENTRY</small><br><b style="font-size:1.2em;">{alert['Prezzo']}</b></div>
+                <div><small style="color:#888;">TARGET</small><br><b style="color:{main_color}; font-size:1.2em;">{alert['TP']}</b></div>
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
-    # HTML Popup - NOTA: Tutto allineato a sinistra per evitare errori
-    popup_html = f"""
-<div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-            width: 90%; max-width: 500px; background: {bg_gradient}; 
-            border: 4px solid {main_color}; border-radius: 25px; 
-            padding: 30px; text-align: center; z-index: 9999;
-            box-shadow: 0 0 50px {main_color}44;">
-    <p style="color: {main_color}; margin: 0; font-weight: bold; letter-spacing: 2px;">SENTINEL AI DETECTED</p>
-    <h1 style="font-size: 3.5em; color: white; margin: 10px 0;">{alert['Asset']}</h1>
-    <h2 style="color: {main_color}; font-size: 2.5em; margin: 0;">🚀 {alert['Direzione']}</h2>
-    <div style="background: rgba(0,0,0,0.5); padding: 15px; border-radius: 10px; margin: 20px 0;">
-        <span style="color: #FFD700; font-size: 1.6em; font-weight: bold;">SIZE: {alert['Size']} LOTTI</span>
-    </div>
-    <div style="display: flex; justify-content: space-around; margin-bottom: 50px;">
-        <div><p style="color:#aaa; font-size:0.8em; margin:0;">ENTRY</p><b style="color:white; font-size:1.2em;">{alert['Prezzo']}</b></div>
-        <div><p style="color:#ff4b4b; font-size:0.8em; margin:0;">STOP</p><b style="color:#ff4b4b; font-size:1.2em;">{alert['SL']}</b></div>
-        <div><p style="color:#00ffcc; font-size:0.8em; margin:0;">TARGET</p><b style="color:#00ffcc; font-size:1.2em;">{alert['TP']}</b></div>
-    </div>
-</div>
-"""
-    st.markdown(popup_html, unsafe_allow_html=True)
-
-    # Pulsante Chiudi Centrale
-    st.markdown('<div class="btn-zone">', unsafe_allow_html=True)
-    if st.button("✅ CHIUDI E TORNA AL MONITOR", key="close_main"):
+    # Pulsante Chiudi Effettivo (Streamlit)
+    st.markdown('<div class="button-container">', unsafe_allow_html=True)
+    if st.button("❌ CHIUDI E TORNA AL MONITOR", key="close_final_btn"):
         st.session_state['last_alert'] = None
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
     
-    st.stop() # Blocca qui se c'è l'alert
-
+    st.stop()
 
 # --- 6. BODY PRINCIPALE ---
 # Eseguiamo Sentinel solo se non c'è alert attivo (codice sopra lo blocca)
