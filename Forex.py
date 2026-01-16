@@ -49,6 +49,8 @@ st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
     st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+if 'sentinel_logs' not in st.session_state:
+    st.session_state['sentinel_logs'] = []
 if 'last_alert' not in st.session_state:
     st.session_state['last_alert'] = None
 if 'last_scan_status' not in st.session_state:
@@ -236,17 +238,27 @@ def run_sentinel():
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso'
                     }
-
-        
-                    
-                    
+               
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
 
             now = get_now_rome().strftime("%H:%M:%S")
-            st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
+            log_entry = f"🟢 {now} - {label}: OK"
+            
+        except Exception as e:
+            now = get_now_rome().strftime("%H:%M:%S")
+            log_entry = f"🔴 {now} - {label}: Errore dati"
+        
+            # Aggiorniamo la cronologia (teniamo solo gli ultimi 5 eventi)
+            st.session_state['sentinel_logs'].insert(0, log_entry)
+            st.session_state['sentinel_logs'] = st.session_state['sentinel_logs'][:5]
+        
+            # Aggiorniamo lo stato principale per compatibilità con il resto del codice
+            st.session_state['last_scan_status'] = log_entry
+                                   
+            #st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
 
             #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
         except Exception as e:
