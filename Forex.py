@@ -449,7 +449,9 @@ st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(a
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
 st.markdown("---")
-st.subheader("📈 Grafico in tempo reale (30s) con BB e RSI")
+#st.subheader("📈 Grafico in tempo reale (30s) con BB e RSI")
+st.subheader(f"📈 Grafico {selected_label} (30s) con BB e RSI")
+
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
