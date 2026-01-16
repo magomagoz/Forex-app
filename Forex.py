@@ -178,6 +178,75 @@ def update_signal_outcomes():
     if updates_made:
         st.session_state['signal_history'] = df
 
+def run_sentinel():
+    """Scansiona tutti gli asset definiti in asset_map"""
+    assets = list(asset_map.items())
+    for label, ticker in assets:
+        try:
+            # Scarichiamo i dati necessari per l'analisi
+            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
+            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
+            
+            if df_rt_s.empty or df_d_s.empty: continue
+            
+            # Normalizzazione colonne
+            if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
+            df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
+            df_d_s.columns = [c.lower() for c in df_d_s.columns]
+
+            # Calcolo indicatori Sentinel
+            bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
+            c_low = [c for c in bb_s.columns if "BBL" in c.upper()][0]
+            c_up = [c for c in bb_s.columns if "BBU" in c.upper()][0]
+            
+            curr_v = float(df_rt_s['close'].iloc[-1])
+            low_bb = float(bb_s[c_low].iloc[-1])
+            up_bb = float(bb_s[c_up].iloc[-1])
+            
+            rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
+            atr_d = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            curr_adx = adx_df['ADX_14'].iloc[-1]
+
+            # Logica Segnale
+            s_action = None
+            if curr_v < low_bb and rsi_d < 45 and curr_adx < 30: s_action = "COMPRA"
+            elif curr_v > up_bb and rsi_d > 55 and curr_adx < 30: s_action = "VENDI"
+
+            if s_action:
+                hist = st.session_state['signal_history']
+                # Evita duplicati se c'è già un segnale "In Corso" per lo stesso asset
+                if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
+                    p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
+                    sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
+                    tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
+                    
+                    # Calcolo Size automatica (basata sul rischio impostato in sidebar)
+                    risk_val = balance * (risk_pc / 100)
+                    dist_p = abs(curr_v - sl) * p_mult
+                    sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
+                    
+                    new_sig = {
+                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+                        'Asset': label, 
+                        'Direzione': s_action, 
+                        'Prezzo': p_fmt.format(curr_v), 
+                        'SL': p_fmt.format(sl), 
+                        'TP': p_fmt.format(tp), 
+                        'Size': f"{sz:.2f}", 
+                        'Stato': 'In Corso'
+                    }
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
+                    st.session_state['last_alert'] = new_sig
+                    send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
+                    st.rerun()
+
+            st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
+        except Exception as e:
+            st.session_state['last_scan_status'] = f"⚠️ Errore {label}"
+            continue
+
+
 def get_win_rate():
     if st.session_state['signal_history'].empty:
         return "Nessun dato"
@@ -365,8 +434,9 @@ if st.session_state['last_alert']:
     st.stop()
 
 # --- 6. BODY PRINCIPALE ---
-# Eseguiamo Sentinel solo se non c'è alert attivo (codice sopra lo blocca)
-run_sentinel()
+# Assicuriamoci che le variabili balance e risk_pc esistano già (create nella sidebar)
+if 'signal_history' in st.session_state:
+    run_sentinel()
 
 # Banner logic
 banner_path = "banner.png"
