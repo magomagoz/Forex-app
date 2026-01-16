@@ -249,11 +249,11 @@ def run_sentinel():
             st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
 
             #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
-    except Exception as e:
+        except Exception as e:
         # Invece di un errore generico, mostriamo cosa è andato storto (es. timeout o dati mancanti)
-        error_type = "Timeout" if "timeout" in str(e).lower() else "Dati non disp."
-        st.session_state['last_scan_status'] = f"⚠️ {label}: {error_type}"
-        continue
+            error_type = "Timeout" if "timeout" in str(e).lower() else "Dati non disp."
+            st.session_state['last_scan_status'] = f"⚠️ {label}: {error_type}"
+            continue
 
 
 def get_win_rate():
