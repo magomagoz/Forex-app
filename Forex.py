@@ -362,7 +362,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
-    status_text = "OPEN" if is_open else "CLOSED"
+    status_text = "APERTO" if is_open else "CHIUSO"
     st.sidebar.markdown(f"**{s_name}** <small>({status_text})</small>      {color}",
 unsafe_allow_html=True)
 
@@ -446,9 +446,11 @@ else:
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
 st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (30s).")
+st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 su Forex e 2 su Crypto) in tempo reale (30s).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
+st.markdown("---")
+st.subheader("📈 Grafico in tempo reale (30s) con BB e RSI")
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
