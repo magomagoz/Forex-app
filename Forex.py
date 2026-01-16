@@ -445,6 +445,10 @@ if os.path.exists(banner_path):
 else:
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
+st.markdown("---")
+st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (30s).")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
@@ -558,10 +562,6 @@ else:
     st.info("⏳ Caricamento dati macro in corso...")
 
 # --- 8. FOOTER & CRONOLOGIA ---
-st.markdown("---")
-st.info(f"🛰️ **Sentinel AI Engine Attiva**: Monitoraggio in corso su {len(asset_map)} asset in tempo reale (30s).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
-
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
