@@ -212,8 +212,8 @@ def run_sentinel():
 
             # Logica Segnale
             s_action = None
-            if curr_v < low_bb and rsi_d < 45 and curr_adx < 30: s_action = "COMPRA"
-            elif curr_v > up_bb and rsi_d > 55 and curr_adx < 30: s_action = "VENDI"
+            if curr_v < low_bb and rsi_d < 50 and curr_adx < 40: s_action = "COMPRA"
+            elif curr_v > up_bb and rsi_d > 50 and curr_adx < 40: s_action = "VENDI"
 
             if s_action:
                 hist = st.session_state['signal_history']
