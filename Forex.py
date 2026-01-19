@@ -46,16 +46,6 @@ asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "
 # Refresh automatico ogni 30 secondi
 st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
 
-# --- INIZIALIZZAZIONE STATO (Session State) ---
-if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = load_history_from_csv()
-if 'sentinel_logs' not in st.session_state:
-    st.session_state['sentinel_logs'] = []
-if 'last_alert' not in st.session_state:
-    st.session_state['last_alert'] = None
-if 'last_scan_status' not in st.session_state:
-    st.session_state['last_scan_status'] = "In attesa..."
-
 # --- 2. FUNZIONI TECNICHE ---
 def save_history_permanently():
     """Salva la cronologia attuale su un file fisico CSV"""
@@ -324,6 +314,16 @@ def get_equity_data():
             current_bal -= risk_amount
         equity_curve.append(current_bal)
     return pd.Series(equity_curve)
+
+# --- INIZIALIZZAZIONE STATO (Session State) ---
+if 'signal_history' not in st.session_state: 
+    st.session_state['signal_history'] = load_history_from_csv()
+if 'sentinel_logs' not in st.session_state:
+    st.session_state['sentinel_logs'] = []
+if 'last_alert' not in st.session_state:
+    st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (30s)")
