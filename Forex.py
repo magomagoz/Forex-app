@@ -571,7 +571,14 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
         elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
         return [''] * len(row)
 
-    st.table(adx_guide.style.apply(highlight_adx, axis=1))
+    #st.table(adx_guide.style.apply(highlight_adx, axis=1))
+
+    # Creiamo lo stile e nascondiamo l'indice (index)
+    styled_adx = adx_guide.style.apply(highlight_adx, axis=1).hide(axis='index')
+
+    # Visualizziamo la tabella senza la colonna dei numeri
+    st.table(styled_adx)
+
 
 # --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
@@ -611,6 +618,8 @@ if not st.session_state['signal_history'].empty:
         if '✅' in val: return 'background-color: rgba(0, 255, 204, 0.1); color: #00ffcc; font-weight: bold'
         if '❌' in val: return 'background-color: rgba(255, 75, 75, 0.1); color: #ff4b4b; font-weight: bold'
         return 'color: #ffcc00; font-weight: bold'
+
+    st.dataframe(display_df, hide_index=True)
     
     st.dataframe(
         display_df.style.map(style_status, subset=['Stato']), 
