@@ -570,7 +570,7 @@ if not st.session_state['signal_history'].empty:
         filtro = st.selectbox("🔍 Filtra per stato:", ["Tutti", "In Corso", "✅ TARGET", "❌ STOP LOSS"])
     
     if filtro != "Tutti":
-        display_df = df_hist[df_hist['Stato'] == filtro]
+        display_df = display_df[display_df['Stato'] == filtro]
     
     def style_status(val):
         if '✅' in val: return 'background-color: rgba(0, 255, 204, 0.1); color: #00ffcc; font-weight: bold'
