@@ -262,7 +262,7 @@ def run_sentinel():
                     }
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    save_history_permanently() # <--- AGGIUNGI QUI
+                    #save_history_permanently() # <--- AGGIUNGI QUI
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
