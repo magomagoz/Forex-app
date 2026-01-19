@@ -203,8 +203,11 @@ def update_signal_outcomes():
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
                     updates_made = True
-        except: continue
-    
+                    play_close_sound()
+                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nPrezzo Entry: {row['Prezzo']}"
+                    send_telegram_msg(msg)
+        except: continue 
+        
     if updates_made:
         st.session_state['signal_history'] = df
         save_history_permanently()
