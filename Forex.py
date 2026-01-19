@@ -262,34 +262,17 @@ def run_sentinel():
                     }
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    #save_history_permanently() # <--- AGGIUNGI QUI
+                    save_history_permanently() # <--- AGGIUNGI QUI
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
 
-            now = get_now_rome().strftime("%H:%M:%S")
-            log_entry = f"🟢 {now} - {label}: OK"
-            
-        except Exception as e:
-            now = get_now_rome().strftime("%H:%M:%S")
-            # Determina se è un timeout o altro
-            err_msg = "Timeout" if "timeout" in str(e).lower() else "Errore dati"
-            log_entry = f"🔴 {now} - {label}: {err_msg}"
-                                   
-            # Aggiornamento Log (comune sia a try che except)
-            st.session_state['sentinel_logs'].insert(0, log_entry)
-            st.session_state['sentinel_logs'] = st.session_state['sentinel_logs'][:5]
 
-            st.session_state['last_scan_status'] = log_entry
 
-            #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
+            st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
         except Exception as e:
-        # Invece di un errore generico, mostriamo cosa è andato storto (es. timeout o dati mancanti)
-            error_type = "Timeout" if "timeout" in str(e).lower() else "Dati non disp."
-            st.session_state['last_scan_status'] = f"⚠️ {label}: {error_type}"
+            st.session_state['last_scan_status'] = f"🔴 Errore {label}: {str(e)[:20]}"
             continue
-
-save_history_permanently()
 
 def get_win_rate():
     if st.session_state['signal_history'].empty:
