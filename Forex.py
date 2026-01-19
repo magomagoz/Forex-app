@@ -554,9 +554,18 @@ st.subheader("📜 Cronologia Segnali")
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
     
+    # --- FILTRI RAPIDI ---
+    col_f1, col_f2 = st.columns([1, 2])
+    with col_f1:
+        filtro = st.selectbox("🔍 Filtra per stato:", ["Tutti", "In Corso", "✅ TARGET", "❌ STOP LOSS"])
+    
+    if filtro != "Tutti":
+        display_df = df_hist[df_hist['Stato'] == filtro]
+    
     def style_status(val):
-        color = '#00ffcc' if '✅' in val else '#ff4b4b' if '❌' in val else '#ffcc00'
-        return f'color: {color}; font-weight: bold'
+        if '✅' in val: return 'background-color: rgba(0, 255, 204, 0.1); color: #00ffcc; font-weight: bold'
+        if '❌' in val: return 'background-color: rgba(255, 75, 75, 0.1); color: #ff4b4b; font-weight: bold'
+        return 'color: #ffcc00; font-weight: bold'
     
     st.dataframe(
         display_df.style.map(style_status, subset=['Stato']), 
