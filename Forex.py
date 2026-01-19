@@ -292,6 +292,16 @@ def get_win_rate():
     wr = (wins / total) * 100
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
+# --- INIZIALIZZAZIONE STATO (Session State) ---
+if 'signal_history' not in st.session_state: 
+    st.session_state['signal_history'] = load_history_from_csv()
+if 'sentinel_logs' not in st.session_state:
+    st.session_state['sentinel_logs'] = []
+if 'last_alert' not in st.session_state:
+    st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
+
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
 update_signal_outcomes()
@@ -314,16 +324,6 @@ def get_equity_data():
             current_bal -= risk_amount
         equity_curve.append(current_bal)
     return pd.Series(equity_curve)
-
-# --- INIZIALIZZAZIONE STATO (Session State) ---
-if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = load_history_from_csv()
-if 'sentinel_logs' not in st.session_state:
-    st.session_state['sentinel_logs'] = []
-if 'last_alert' not in st.session_state:
-    st.session_state['last_alert'] = None
-if 'last_scan_status' not in st.session_state:
-    st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (30s)")
