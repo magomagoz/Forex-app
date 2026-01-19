@@ -57,6 +57,27 @@ if 'last_scan_status' not in st.session_state:
     st.session_state['last_scan_status'] = "In attesa..."
 
 # --- 2. FUNZIONI TECNICHE ---
+def save_history_permanently():
+    """Salva la cronologia attuale su un file fisico CSV"""
+    try:
+        if 'signal_history' in st.session_state and not st.session_state['signal_history'].empty:
+            st.session_state['signal_history'].to_csv("permanent_signals_db.csv", index=False)
+    except Exception as e:
+        print(f"Errore salvataggio file: {e}")
+
+def load_history_from_csv():
+    """Carica la cronologia dal file CSV all'avvio"""
+    if os.path.exists("permanent_signals_db.csv"):
+        try:
+            df = pd.read_csv("permanent_signals_db.csv")
+            # Assicurati che le colonne siano corrette
+            expected_cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato']
+            for col in expected_cols:
+                if col not in df.columns: df[col] = ""
+            return df
+        except:
+            return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+    return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 
 def send_telegram_msg(msg):
     """Invia un avviso istantaneo su Telegram"""
@@ -146,7 +167,7 @@ def detect_divergence(df):
     if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DECRESCITA"
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
-
+    
 def update_signal_outcomes():
     """Controlla se i segnali aperti hanno raggiunto TP o SL"""
     if st.session_state['signal_history'].empty: return
@@ -179,8 +200,7 @@ def update_signal_outcomes():
     
     if updates_made:
         st.session_state['signal_history'] = df
-
-save_history_permanently()
+        save_history_permanently()
 
 def run_sentinel():
     """Scansiona tutti gli asset definiti in asset_map"""
