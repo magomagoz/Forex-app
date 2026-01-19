@@ -306,6 +306,25 @@ def get_win_rate():
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
 update_signal_outcomes()
 
+def get_equity_data():
+    """Calcola l'andamento del saldo basandosi sulla cronologia"""
+    initial_balance = balance 
+    equity_curve = [initial_balance]
+    if st.session_state['signal_history'].empty:
+        return pd.Series(equity_curve)
+    
+    # Calcolo dal segnale più vecchio al più recente
+    df_sorted = st.session_state['signal_history'].iloc[::-1]
+    current_bal = initial_balance
+    for _, row in df_sorted.iterrows():
+        risk_amount = initial_balance * (risk_pc / 100)
+        if row['Stato'] == '✅ TARGET':
+            current_bal += (risk_amount * 2) 
+        elif row['Stato'] == '❌ STOP LOSS':
+            current_bal -= risk_amount
+        equity_curve.append(current_bal)
+    return pd.Series(equity_curve)
+
 # --- 4. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (30s)")
 
@@ -358,12 +377,28 @@ for s_name, is_open in get_session_status().items():
     st.sidebar.markdown(f"**{s_name}** <small>({status_text})</small>      {color}",
 unsafe_allow_html=True)
 
-# Win Rate Sidebar - Ora mostrerà i dati aggiornati
+# Win Rate Sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("🏆 **Performance Oggi**")
+st.sidebar.subheader("🏆 Performance")
 wr = get_win_rate()
 if wr:
     st.sidebar.info(wr)
+
+# Grafico Equity Line
+equity_series = get_equity_data()
+fig_equity = go.Figure()
+fig_equity.add_trace(go.Scatter(
+    y=equity_series, mode='lines+markers',
+    line=dict(color='#00ffcc', width=2),
+    fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.1)'
+))
+fig_equity.update_layout(
+    height=150, margin=dict(l=0,r=0,t=0,b=0),
+    xaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+)
+st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
+st.sidebar.metric("Saldo Stimato", f"€ {equity_series.iloc[-1]:.2f}", 
+                 delta=f"{equity_series.iloc[-1] - balance:.2f} €")
 
 # Reset Sidebar
 st.sidebar.markdown("---")
