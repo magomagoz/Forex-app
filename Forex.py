@@ -267,12 +267,16 @@ def run_sentinel():
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
 
-
-
+            
+            # Log di successo aggiornato correttamente
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
+            
         except Exception as e:
-            st.session_state['last_scan_status'] = f"🔴 Errore {label}: {str(e)[:20]}"
-            continue
+            # Gestione errori migliorata per evitare crash
+            now = get_now_rome().strftime("%H:%M:%S")
+            err_msg = "Timeout/Dati" if "timeout" in str(e).lower() else "Errore"
+            st.session_state['last_scan_status'] = f"🔴 {now} - {label}: {err_msg}"
+            continue # Passa all'asset successivo senza fermare tutto
 
 def get_win_rate():
     if st.session_state['signal_history'].empty:
