@@ -48,7 +48,7 @@ st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
 
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+    st.session_state['signal_history'] = load_history_from_csv()
 if 'sentinel_logs' not in st.session_state:
     st.session_state['sentinel_logs'] = []
 if 'last_alert' not in st.session_state:
@@ -180,6 +180,8 @@ def update_signal_outcomes():
     if updates_made:
         st.session_state['signal_history'] = df
 
+save_history_permanently()
+
 def run_sentinel():
     """Scansiona tutti gli asset definiti in asset_map"""
     assets = list(asset_map.items())
@@ -238,8 +240,9 @@ def run_sentinel():
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso'
                     }
-                    
+
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
+                    save_history_permanently() # <--- AGGIUNGI QUI
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
@@ -266,6 +269,7 @@ def run_sentinel():
             st.session_state['last_scan_status'] = f"⚠️ {label}: {error_type}"
             continue
 
+save_history_permanently()
 
 def get_win_rate():
     if st.session_state['signal_history'].empty:
@@ -348,9 +352,10 @@ if wr:
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
     st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
+
     if st.button("SÌ, CANCELLA ORA"):
         st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-        st.session_state['last_alert'] = None
+        save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
         st.rerun()
 
 st.sidebar.markdown("---")
