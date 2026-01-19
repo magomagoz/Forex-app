@@ -238,7 +238,7 @@ def run_sentinel():
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso'
                     }
-               
+                    
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
@@ -249,9 +249,15 @@ def run_sentinel():
             
         except Exception as e:
             now = get_now_rome().strftime("%H:%M:%S")
-            log_entry = f"🔴 {now} - {label}: Errore dati"
+            # Determina se è un timeout o altro
+            err_msg = "Timeout" if "timeout" in str(e).lower() else "Errore dati"
+            log_entry = f"🔴 {now} - {label}: {err_msg}"
                                    
-            st.session_state['last_scan_status'] = f"🔍 {label}: Analisi completata ({now})"
+            # Aggiornamento Log (comune sia a try che except)
+            st.session_state['sentinel_logs'].insert(0, log_entry)
+            st.session_state['sentinel_logs'] = st.session_state['sentinel_logs'][:5]
+
+            st.session_state['last_scan_status'] = log_entry
 
             #st.session_state['last_scan_status'] = f"✅ {label} Analizzato"
         except Exception as e:
@@ -274,62 +280,6 @@ def get_win_rate():
     wins = len(closed_trades[closed_trades['Stato'] == '✅ TARGET'])
     wr = (wins / total) * 100
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
-
-# --- 5. POPUP ALERT ---
-if st.session_state['last_alert']:
-    play_notification_sound()
-    alert = st.session_state['last_alert']
-    main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
-
-    # Overlay Scuro e stile bottone
-    st.markdown(f"""
-        <style>
-            .full-overlay {{
-                position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                background: rgba(0,0,0,0.85); z-index: 9999;
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-            }}
-            .close-trigger {{
-                margin-top: 20px; /* Spazio sotto il popup */
-                z-index: 10001;
-            }}
-            /* Stile forzato del bottone Streamlit */
-            div.stButton > button:first-child {{
-                background-color: #111 !important;
-                color: white !important;
-                border: 2px solid {main_color} !important;
-                padding: 10px 40px !important;
-                font-weight: bold !important;
-            }}
-        </style>
-        <div class="full-overlay"></div>
-    """, unsafe_allow_html=True)
-
-    # Contenitore Grafico Popup
-    st.markdown(f"""
-    <div style="position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%); 
-                width: 85%; max-width: 500px; background: #111; 
-                border: 3px solid {main_color}; border-radius: 20px; 
-                padding: 25px; text-align: center; z-index: 10000;
-                box-shadow: 0 0 40px {main_color}33;">
-        <h2 style="color: {main_color}; margin:0;">{alert['Asset']}</h2>
-        <h1 style="color: white; font-size: 3em; margin: 10px 0;">🚀 {alert['Direzione']}</h1>
-        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px;">
-            <p style="color: #FFD700; font-size: 1.2em; margin:0;">SIZE: {alert['Size']} LOTTI</p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Pulsante di chiusura posizionato dinamicamente sotto
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col2:
-        # Questo placeholder invisibile spinge il bottone in primo piano sopra l'overlay
-        st.markdown('<div style="height: 65vh;"></div>', unsafe_allow_html=True)
-        if st.button("❌ CHIUDI E TORNA AL MONITOR", key="btn_close_final"):
-            st.session_state['last_alert'] = None
-            st.rerun()
-    
-    st.stop()
 
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
@@ -608,9 +558,3 @@ else:
     st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
 
 st.markdown("---")
-
-# IN FONDO AL FILE
-if __name__ == "__main__":
-    # Esegui la scansione solo se la sidebar è già stata renderizzata
-    if 'signal_history' in st.session_state:
-        run_sentinel()
