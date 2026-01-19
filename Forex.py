@@ -99,6 +99,13 @@ def play_notification_sound():
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
+def play_close_sound():
+    # Un suono più breve e "cash register" per le chiusure
+    audio_html = """
+        <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3" type="audio/mpeg"></audio>
+    """
+    st.markdown(audio_html, unsafe_allow_html=True)
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
