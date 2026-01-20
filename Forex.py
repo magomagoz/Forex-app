@@ -166,37 +166,44 @@ def detect_divergence(df):
     return "Neutrale"
     
 def update_signal_outcomes():
-    """Controlla se i segnali aperti hanno raggiunto TP o SL"""
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     
     updates_made = False
-    # Itera solo su quelli in corso
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
+            # Scarichiamo solo l'ultima candela per velocità
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
+            
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
-                # Prendiamo i dati più recenti per controllare
-                high, low = data['High'].max(), data['Low'].min()
-                sl_v, tp_v = float(row['SL']), float(row['TP'])
+                
+                # Conversione sicura in float
+                current_high = float(data['High'].iloc[-1])
+                current_low = float(data['Low'].iloc[-1])
+                
+                # IMPORTANTE: Convertiamo i valori salvati (che sono stringhe) in float
+                sl_v = float(str(row['SL']).replace(',', '.')) 
+                tp_v = float(str(row['TP']).replace(',', '.'))
                 
                 new_status = None
                 if row['Direzione'] == 'COMPRA':
-                    if high >= tp_v: new_status = '✅ TARGET'
-                    elif low <= sl_v: new_status = '❌ STOP LOSS'
-                else: # VENDI
-                    if low <= tp_v: new_status = '✅ TARGET'
-                    elif high >= sl_v: new_status = '❌ STOP LOSS'
+                    if current_high >= tp_v: new_status = '✅ TARGET'
+                    elif current_low <= sl_v: new_status = '❌ STOP LOSS'
+                elif row['Direzione'] == 'VENDI':
+                    if current_low <= tp_v: new_status = '✅ TARGET'
+                    elif current_high >= sl_v: new_status = '❌ STOP LOSS'
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
                     updates_made = True
                     play_close_sound()
-                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nPrezzo Entry: {row['Prezzo']}"
+                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nProfit/Loss: Controlla Dashboard"
                     send_telegram_msg(msg)
-        except: continue 
+        except Exception as e:
+            print(f"Errore update {row['Asset']}: {e}")
+            continue 
         
     if updates_made:
         st.session_state['signal_history'] = df
@@ -258,7 +265,7 @@ def run_sentinel():
                 if not is_running:
                     # Qui prendi i parametri. ATTENZIONE: balance e risk_pc sono variabili globali
                     # Assicurati che siano definite prima di chiamare run_sentinel
-                    p_unit, p_fmt, p_mult, a_type = get_asset_params(ticker) # Aggiunto a_type per evitare errore unpack
+                    p_unit, p_fmt, p_mult, _ = get_asset_params(ticker) # Aggiunto a_type per evitare errore unpack
                     
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
                     tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
