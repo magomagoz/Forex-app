@@ -43,8 +43,8 @@ st.markdown("""
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
 
-# Refresh automatico ogni 30 secondi
-st_autorefresh(interval=30 * 1000, key="sentinel_refresh")
+# Refresh automatico ogni 60 secondi
+st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 # --- 2. FUNZIONI TECNICHE ---
 def save_history_permanently():
@@ -105,7 +105,7 @@ def get_session_status():
     }
     return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=60)
 def get_realtime_data(ticker):
     try:
         df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
@@ -326,12 +326,12 @@ def get_equity_data():
     return pd.Series(equity_curve)
 
 # --- 4. SIDEBAR ---
-st.sidebar.header("🛠 Trading Desk (30s)")
+st.sidebar.header("🛠 Trading Desk (1m)")
 
 # Countdown Testuale e Barra Rossa Animata
 st.sidebar.markdown("⏳ **Prossimo Scan**")
 
-# CSS per la barra che si riempie in 30 secondi
+# CSS per la barra che si riempie in 60 secondi
 st.sidebar.markdown("""
     <style>
         @keyframes progressFill {
@@ -344,7 +344,7 @@ st.sidebar.markdown("""
         }
         .red-bar {
             height: 100%; background-color: #ff4b4b; width: 0%;
-            animation: progressFill 30s linear infinite;
+            animation: progressFill 60s linear infinite;
             box-shadow: 0 0 10px #ff4b4b;
         }
     </style>
@@ -557,7 +557,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
     col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
 
-     # --- TABELLA GUIDA ADX COLORATA ---
+    # --- TABELLA GUIDA ADX COLORATA ---
     st.markdown("### 📊 Guida alla Volatilità (ADX)")
     adx_guide = pd.DataFrame([
         {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
