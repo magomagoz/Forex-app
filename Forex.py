@@ -469,8 +469,8 @@ if st.session_state['last_alert']:
         </div>
     """, unsafe_allow_html=True)
 
-    # Pulsante Chiudi Effettivo (Streamlit)
-    st.markdown('<div class="button-container">', unsafe_allow_html=True)
+    # Pulsante Chiudi con priorità visiva
+    st.markdown('<div style="position:fixed; top:75%; left:50%; transform:translateX(-50%); z-index:10001;">', unsafe_allow_html=True)
     if st.button("❌ CHIUDI E TORNA AL MONITOR", key="close_final_btn"):
         st.session_state['last_alert'] = None
         st.rerun()
