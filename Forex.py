@@ -389,6 +389,26 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
 risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
 
+# --- CALCOLO INVESTIMENTO SIMULATO ---
+investimento_simulato = balance * (risk_pc / 100)
+saldo_residuo = balance - investimento_simulato
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("💰 Gestione Capitale")
+col_cap1, col_cap2 = st.sidebar.columns(2)
+col_cap1.metric("Conto", f"€ {balance}")
+col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
+
+st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
+
+# Dettagli operazione selezionata (se presente)
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+if not active_trades.empty:
+    st.sidebar.warning("⚡ Operazione Attiva")
+    last_t = active_trades.iloc[0]
+    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
+    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
+
 st.sidebar.markdown("---")
 # ... (restante codice sidebar: sessioni, win rate, reset)
 st.sidebar.subheader("🌍 Sessioni di Mercato")
