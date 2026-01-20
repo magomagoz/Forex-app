@@ -260,7 +260,7 @@ def run_sentinel():
                         'SL': p_fmt.format(sl), 
                         'TP': p_fmt.format(tp), 
                         'Size': f"{sz:.2f}", 
-                        'Stato': 'In Corso'
+                        'Stato': 'In Corso',
                         'Size': f"{sz:.2f}",
                         'Rischio €': f"{risk_val:.2f}"
                     }
