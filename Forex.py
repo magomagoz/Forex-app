@@ -251,16 +251,16 @@ def run_sentinel():
                 # Controllo incrociato: asset uguale E stato 'In Corso' 
                 is_duplicate = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-                if not is_duplicate:
+            if not is_duplicate:
     
-                if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
-                    p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                    sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
-                    tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
+            if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
+                p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
+                sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
+                tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
                         
-                    risk_val = balance * (risk_pc / 100)
-                    dist_p = abs(curr_v - sl) * p_mult
-                    sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
+                risk_val = balance * (risk_pc / 100)
+                dist_p = abs(curr_v - sl) * p_mult
+                sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                         
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
