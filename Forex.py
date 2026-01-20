@@ -259,8 +259,10 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso'
+                        'Size': f"{sz:.2f}",
+                        'Rischio €': f"{risk_val:.2f}"
                     }
-
+                    
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently() # <--- AGGIUNGI QUI
                     st.session_state['last_alert'] = new_sig
@@ -307,22 +309,30 @@ if 'last_scan_status' not in st.session_state:
 update_signal_outcomes()
 
 def get_equity_data():
-    """Calcola l'andamento del saldo basandosi sulla cronologia"""
+    """Calcola l'andamento del saldo applicando il rischio scelto ai trade chiusi"""
     initial_balance = balance 
     equity_curve = [initial_balance]
+    
     if st.session_state['signal_history'].empty:
         return pd.Series(equity_curve)
     
-    # Calcolo dal segnale più vecchio al più recente
+    # Invertiamo per calcolare dal primo trade all'ultimo
     df_sorted = st.session_state['signal_history'].iloc[::-1]
     current_bal = initial_balance
+    
     for _, row in df_sorted.iterrows():
-        risk_amount = initial_balance * (risk_pc / 100)
+        # Calcoliamo quanto stiamo rischiando in questo specifico trade
+        risk_amount = current_bal * (risk_pc / 100)
+        
         if row['Stato'] == '✅ TARGET':
+            # Simuliamo un profitto con Ratio 1:2 (guadagni il doppio di quanto rischi)
             current_bal += (risk_amount * 2) 
         elif row['Stato'] == '❌ STOP LOSS':
+            # Perdi esattamente la quota di rischio impostata
             current_bal -= risk_amount
+            
         equity_curve.append(current_bal)
+        
     return pd.Series(equity_curve)
 
 # --- 4. SIDEBAR ---
@@ -400,6 +410,18 @@ st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayMo
 st.sidebar.metric("Saldo Stimato", f"€ {equity_series.iloc[-1]:.2f}", 
                  delta=f"{equity_series.iloc[-1] - balance:.2f} €")
 
+# Nella sezione SIDEBAR dopo il grafico equity
+st.sidebar.markdown("---")
+current_equity = equity_series.iloc[-1]
+total_return = ((current_equity - balance) / balance) * 100
+
+st.sidebar.metric("Saldo Attuale", f"€ {current_equity:.2f}", delta=f"{total_return:.2f}%")
+
+# Calcolo rapido Drawdown
+max_val = equity_series.max()
+dd = ((current_equity - max_val) / max_val) * 100
+st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
+    
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
