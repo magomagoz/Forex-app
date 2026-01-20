@@ -262,23 +262,23 @@ def run_sentinel():
                 dist_p = abs(curr_v - sl) * p_mult
                 sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                         
-                    new_sig = {
-                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
-                        'Asset': label, 
-                        'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(curr_v), 
-                        'SL': p_fmt.format(sl), 
-                        'TP': p_fmt.format(tp), 
-                        'Size': f"{sz:.2f}", 
-                        'Stato': 'In Corso',
-                        'Rischio €': f"{risk_val:.2f}"
-                    }
+                new_sig = {
+                    'DataOra': get_now_rome().strftime("%H:%M:%S"),
+                    'Asset': label, 
+                    'Direzione': s_action, 
+                    'Prezzo': p_fmt.format(curr_v), 
+                    'SL': p_fmt.format(sl), 
+                    'TP': p_fmt.format(tp), 
+                    'Size': f"{sz:.2f}", 
+                    'Stato': 'In Corso',
+                    'Rischio €': f"{risk_val:.2f}"
+                }
                     
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    save_history_permanently()
-                    st.session_state['last_alert'] = new_sig
-                    send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
-                    st.rerun()
+                st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
+                save_history_permanently()
+                st.session_state['last_alert'] = new_sig
+                send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
+                st.rerun()
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
             
