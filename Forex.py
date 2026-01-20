@@ -557,7 +557,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
     col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
 
-    # --- TABELLA GUIDA ADX COLORATA ---
+     # --- TABELLA GUIDA ADX COLORATA ---
     st.markdown("### 📊 Guida alla Volatilità (ADX)")
     adx_guide = pd.DataFrame([
         {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
@@ -571,14 +571,11 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
         elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
         return [''] * len(row)
 
-    #st.table(adx_guide.style.apply(highlight_adx, axis=1))
-
-    # Creiamo lo stile e nascondiamo l'indice (index)
+    # Applichiamo lo stile E nascondiamo l'indice
     styled_adx = adx_guide.style.apply(highlight_adx, axis=1).hide(axis='index')
 
-    # Visualizziamo la tabella senza la colonna dei numeri
+    # Visualizziamo la tabella finale
     st.table(styled_adx)
-
 
 # --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
