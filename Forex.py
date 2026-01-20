@@ -12,6 +12,16 @@ from plotly.subplots import make_subplots
 import requests
 import os
 
+# --- INIZIALIZZAZIONE STATO (Session State) ---
+if 'signal_history' not in st.session_state: 
+    st.session_state['signal_history'] = load_history_from_csv()
+if 'sentinel_logs' not in st.session_state:
+    st.session_state['sentinel_logs'] = []
+if 'last_alert' not in st.session_state:
+    st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
+
 # --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
@@ -296,16 +306,6 @@ def get_win_rate():
     wr = (wins / total) * 100
     return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
-# --- INIZIALIZZAZIONE STATO (Session State) ---
-if 'signal_history' not in st.session_state: 
-    st.session_state['signal_history'] = load_history_from_csv()
-if 'sentinel_logs' not in st.session_state:
-    st.session_state['sentinel_logs'] = []
-if 'last_alert' not in st.session_state:
-    st.session_state['last_alert'] = None
-if 'last_scan_status' not in st.session_state:
-    st.session_state['last_scan_status'] = "In attesa..."
-
 # --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
 update_signal_outcomes()
@@ -391,49 +391,28 @@ unsafe_allow_html=True)
 
 # Win Rate Sidebar
 st.sidebar.markdown("---")
+# --- SIDEBAR PERFORMANCE ---
 st.sidebar.subheader("🏆 Performance")
-wr = get_win_rate()
-if wr:
-    st.sidebar.info(wr)
 
-# Grafico Equity Line
 equity_series = get_equity_data()
-fig_equity = go.Figure()
-fig_equity.add_trace(go.Scatter(
-    y=equity_series, mode='lines+markers',
-    line=dict(color='#00ffcc', width=2),
-    fill='tozeroy', fillcolor='rgba(0, 255, 204, 0.1)'
-))
-fig_equity.update_layout(
-    height=150, margin=dict(l=0,r=0,t=0,b=0),
-    xaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-)
-st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
-
-# Sotto st.sidebar.plotly_chart(fig_equity, ...)
 current_equity = equity_series.iloc[-1]
-max_equity = equity_series.max()
-# Calcolo Drawdown (la perdita massima dal picco precedente)
-drawdown = ((current_equity - max_equity) / max_equity) * 100 if max_equity > 0 else 0
+initial_bal = balance if balance > 0 else 1000
+total_return = ((current_equity - initial_bal) / initial_bal) * 100
 
-st.sidebar.metric("Saldo Attuale", f"€ {current_equity:.2f}")
-st.sidebar.metric("Drawdown Massimo", f"{drawdown:.2f}%", delta_color="inverse")
-
-st.sidebar.metric("Saldo Stimato", f"€ {equity_series.iloc[-1]:.2f}", 
-                 delta=f"{equity_series.iloc[-1] - balance:.2f} €")
-
-# Nella sezione SIDEBAR dopo il grafico equity
-st.sidebar.markdown("---")
-current_equity = equity_series.iloc[-1]
-total_return = ((current_equity - balance) / balance) * 100
-
-st.sidebar.metric("Saldo Attuale", f"€ {current_equity:.2f}", delta=f"{total_return:.2f}%")
-
-# Calcolo rapido Drawdown
+# Calcolo Drawdown
 max_val = equity_series.max()
-dd = ((current_equity - max_val) / max_val) * 100
+dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
+
+# Visualizzazione Metriche
+st.sidebar.metric("Saldo Attuale", f"€ {current_equity:.2f}", delta=f"{total_return:.2f}%")
 st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
-    
+
+# Grafico Equity (Piccolo e pulito)
+fig_equity = go.Figure()
+fig_equity.add_trace(go.Scatter(y=equity_series, mode='lines', fill='tozeroy', line=dict(color='#00ffcc')))
+fig_equity.update_layout(height=100, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
+   
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
