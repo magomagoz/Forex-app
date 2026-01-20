@@ -251,7 +251,7 @@ def run_sentinel():
                 # Controllo incrociato: asset uguale E stato 'In Corso' 
                 is_duplicate = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-            if not is_duplicate:
+            #if not is_duplicate:
     
             if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
                 p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
