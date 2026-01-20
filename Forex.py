@@ -245,9 +245,11 @@ def run_sentinel():
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
                     tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
                     
-                    # Calcolo Size automatica (basata sul rischio impostato in sidebar)
+                    # Calcolo rischio monetario basato sul saldo del momento dello scan
                     risk_val = balance * (risk_pc / 100)
                     dist_p = abs(curr_v - sl) * p_mult
+                    
+                    # Formula: Rischio / (Distanza SL * Valore Punto)
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                     
                     new_sig = {
@@ -316,19 +318,19 @@ def get_equity_data():
     if st.session_state['signal_history'].empty:
         return pd.Series(equity_curve)
     
-    # Invertiamo per calcolare dal primo trade all'ultimo
+    # Ordiniamo dal più vecchio al più recente per la curva temporale
     df_sorted = st.session_state['signal_history'].iloc[::-1]
     current_bal = initial_balance
     
     for _, row in df_sorted.iterrows():
-        # Calcoliamo quanto stiamo rischiando in questo specifico trade
+        # Applichiamo il rischio scelto sulla barra al saldo attuale
         risk_amount = current_bal * (risk_pc / 100)
         
         if row['Stato'] == '✅ TARGET':
-            # Simuliamo un profitto con Ratio 1:2 (guadagni il doppio di quanto rischi)
+            # Simuliamo un profitto con Reward Ratio 1:2
             current_bal += (risk_amount * 2) 
         elif row['Stato'] == '❌ STOP LOSS':
-            # Perdi esattamente la quota di rischio impostata
+            # Perdita fissa della quota rischio
             current_bal -= risk_amount
             
         equity_curve.append(current_bal)
@@ -407,6 +409,16 @@ fig_equity.update_layout(
     xaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
 )
 st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
+
+# Sotto st.sidebar.plotly_chart(fig_equity, ...)
+current_equity = equity_series.iloc[-1]
+max_equity = equity_series.max()
+# Calcolo Drawdown (la perdita massima dal picco precedente)
+drawdown = ((current_equity - max_equity) / max_equity) * 100 if max_equity > 0 else 0
+
+st.sidebar.metric("Saldo Attuale", f"€ {current_equity:.2f}")
+st.sidebar.metric("Drawdown Massimo", f"{drawdown:.2f}%", delta_color="inverse")
+
 st.sidebar.metric("Saldo Stimato", f"€ {equity_series.iloc[-1]:.2f}", 
                  delta=f"{equity_series.iloc[-1] - balance:.2f} €")
 
