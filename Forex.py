@@ -557,8 +557,9 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
     col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
 
-    # --- TABELLA GUIDA ADX COLORATA ---
+    # --- TABELLA GUIDA ADX COLORATA (FULL WIDTH) ---
     st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    
     adx_guide = pd.DataFrame([
         {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
         {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
@@ -571,10 +572,15 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
         elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
         return [''] * len(row)
 
-    # Applichiamo lo stile, nascondiamo l'indice e convertiamo in HTML
-    styled_adx_html = adx_guide.style.apply(highlight_adx, axis=1).hide(axis='index').to_html()
+    # 1. Applichiamo lo stile e nascondiamo l'indice
+    # 2. Aggiungiamo 'set_table_attributes' per forzare la larghezza al 100%
+    styled_adx_html = (adx_guide.style
+                       .apply(highlight_adx, axis=1)
+                       .hide(axis='index')
+                       .set_table_attributes('style="width:100%; border-collapse: collapse; text-align: left;"')
+                       .to_html())
 
-    # Usiamo st.markdown con unsafe_allow_html per visualizzarla senza indice
+    # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
 # --- 7. CURRENCY STRENGTH ---
