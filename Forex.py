@@ -207,18 +207,20 @@ def run_sentinel():
     assets = list(asset_map.items())
     for label, ticker in assets:
         try:
-            # Scarichiamo i dati necessari per l'analisi
+            # 1. DOWNLOAD DATI
             df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             
             if df_rt_s.empty or df_d_s.empty: continue
             
-            # Normalizzazione colonne
+            # Normalizzazione colonne (Fix per errori MultiIndex)
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
+            if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
+            
             df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
             df_d_s.columns = [c.lower() for c in df_d_s.columns]
 
-            # Calcolo indicatori Sentinel
+            # 2. CALCOLO INDICATORI
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
             c_low = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_up = [c for c in bb_s.columns if "BBU" in c.upper()][0]
@@ -232,25 +234,27 @@ def run_sentinel():
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1]
 
-            # Logica Segnale Ottimizzata
+            # 3. LOGICA SEGNALE (OTTIMIZZATA)
             s_action = None
-            # Rilassiamo l'ADX a 45 e rendiamo l'RSI Daily meno punitivo (60 invece di 50)
-            if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: s_action = "COMPRA"
-            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: s_action = "VENDI"
+            
+            # DEBUG: Stampa i valori reali per capire perché non entrano segnali
+            # print(f"Analisi {label}: Prezzo {curr_v:.5f} | BB_Low {low_bb:.5f} | RSI_D {rsi_d:.1f} | ADX {curr_adx:.1f}")
+
+            # Limiti leggermente più ampi: RSI Daily (40-60) e ADX fino a 45
+            if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
+                s_action = "COMPRA"
+            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
+                s_action = "VENDI"
 
             if s_action:
                 hist = st.session_state['signal_history']
-                # Evita duplicati se c'è già un segnale "In Corso" per lo stesso asset
                 if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
                     p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
                     tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
                     
-                    # Calcolo rischio monetario basato sul saldo del momento dello scan
                     risk_val = balance * (risk_pc / 100)
                     dist_p = abs(curr_v - sl) * p_mult
-                    
-                    # Formula: Rischio / (Distanza SL * Valore Punto)
                     sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
                     
                     new_sig = {
@@ -262,26 +266,25 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso',
-                        'Size': f"{sz:.2f}",
                         'Rischio €': f"{risk_val:.2f}"
                     }
                     
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    save_history_permanently() # <--- AGGIUNGI QUI
+                    save_history_permanently()
                     st.session_state['last_alert'] = new_sig
                     send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
                     st.rerun()
 
-            
-            # Log di successo aggiornato correttamente
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
             
+            # --- POSIZIONE DELLO SLEEP ---
+            # Questo mette in pausa il bot per mezzo secondo prima di passare all'asset successivo
+            time_lib.sleep(0.5) 
+            
         except Exception as e:
-            # Gestione errori migliorata per evitare crash
             now = get_now_rome().strftime("%H:%M:%S")
-            err_msg = "Timeout/Dati" if "timeout" in str(e).lower() else "Errore"
-            st.session_state['last_scan_status'] = f"🔴 {now} - {label}: {err_msg}"
-            continue # Passa all'asset successivo senza fermare tutto
+            st.session_state['last_scan_status'] = f"🔴 {now} - {label}: Errore"
+            continue
 
 def get_win_rate():
     if st.session_state['signal_history'].empty:
