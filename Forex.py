@@ -571,11 +571,11 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
         elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
         return [''] * len(row)
 
-    # Applichiamo lo stile E nascondiamo l'indice
-    styled_adx = adx_guide.style.apply(highlight_adx, axis=1).hide(axis='index')
+    # Applichiamo lo stile, nascondiamo l'indice e convertiamo in HTML
+    styled_adx_html = adx_guide.style.apply(highlight_adx, axis=1).hide(axis='index').to_html()
 
-    # Visualizziamo la tabella finale
-    st.table(styled_adx)
+    # Usiamo st.markdown con unsafe_allow_html per visualizzarla senza indice
+    st.markdown(styled_adx_html, unsafe_allow_html=True)
 
 # --- 7. CURRENCY STRENGTH ---
 st.markdown("---")
