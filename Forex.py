@@ -477,7 +477,7 @@ if st.session_state['last_alert']:
             /* Container per il tasto chiudi proprio sotto il popup */
             .button-container {{
                 position: fixed; top: 70%; left: 50%; transform: translateX(-50%);
-                z-index: 10000; width: 300px;
+                z-index: 11000; width: 300px;
             }}
         </style>
         <div class="full-screen-overlay"></div>
