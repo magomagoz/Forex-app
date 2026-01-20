@@ -232,10 +232,11 @@ def run_sentinel():
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1]
 
-            # Logica Segnale
+            # Logica Segnale Ottimizzata
             s_action = None
-            if curr_v < low_bb and rsi_d < 50 and curr_adx < 40: s_action = "COMPRA"
-            elif curr_v > up_bb and rsi_d > 50 and curr_adx < 40: s_action = "VENDI"
+            # Rilassiamo l'ADX a 45 e rendiamo l'RSI Daily meno punitivo (60 invece di 50)
+            if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: s_action = "COMPRA"
+            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: s_action = "VENDI"
 
             if s_action:
                 hist = st.session_state['signal_history']
