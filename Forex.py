@@ -454,53 +454,96 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (RE-DESIGNED) ---
+# --- 5. POPUP ALERT (CORRETTO) ---
 if st.session_state['last_alert']:
     play_notification_sound()
     alert = st.session_state['last_alert']
     main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-    # Overlay Totale
+    # CSS Unificato: Overlay + Card + FORZATURA Posizione Pulsante
     st.markdown(f"""
         <style>
+            /* 1. Overlay Sfondo */
             .full-screen-overlay {{
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0,0,0,0.92); z-index: 9990;
+                position: fixed;
+                top: 0; 
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.85); /* Un po' più scuro per contrasto */
+                z-index: 9990;
+                backdrop-filter: blur(5px);
             }}
+
+            /* 2. Card Centrale */
             .popup-card {{
-                position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
-                width: 85%; max-width: 450px; background: #111;
-                border: 3px solid {main_color}; border-radius: 20px;
-                padding: 30px; text-align: center; z-index: 9995;
-                box-shadow: 0 0 50px {main_color}44;
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 90%;
+                max-width: 500px;
+                background: #111;
+                border: 3px solid {main_color};
+                border-radius: 20px;
+                padding: 40px;
+                text-align: center;
+                z-index: 9995;
+                box-shadow: 0 0 60px {main_color}44;
             }}
-            /* Container per il tasto chiudi proprio sotto il popup */
-            .button-container {{
-                position: fixed; top: 70%; left: 50%; transform: translateX(-50%);
-                z-index: 10000; width: 300px;
+
+            /* 3. FORZATURA PULSANTE STREAMLIT */
+            /* Questo aggancia direttamente il pulsante generato da Python */
+            div.stButton > button {{
+                position: fixed !important;
+                bottom: 15% !important; /* Posizionato in basso */
+                left: 50% !important;
+                transform: translateX(-50%) !important;
+                z-index: 10000 !important; /* Sopra tutto */
+                width: 300px !important;
+                background-color: {main_color} !important;
+                color: black !important;
+                border: 2px solid white !important;
+                font-weight: bold !important;
+                font-size: 1.2rem !important;
+                box-shadow: 0 0 20px rgba(0,0,0,0.5) !important;
+            }}
+            
+            div.stButton > button:hover {{
+                transform: translateX(-50%) scale(1.05) !important;
+                box-shadow: 0 0 30px {main_color} !important;
             }}
         </style>
+
         <div class="full-screen-overlay"></div>
         <div class="popup-card">
-            <h2 style="color: {main_color}; margin:0; letter-spacing:2px;">AI ALERT</h2>
-            <h1 style="color: white; font-size: 3.5em; margin: 10px 0;">{alert['Asset']}</h1>
-            <h2 style="color: white; background: {main_color}; border-radius: 10px; padding: 5px; color: black;">
-                🚀 {alert['Direzione']}
-            </h2>
-            <div style="margin-top: 20px; display: flex; justify-content: space-around;">
-                <div><small style="color:#888;">ENTRY</small><br><b style="font-size:1.2em;">{alert['Prezzo']}</b></div>
-                <div><small style="color:#888;">TARGET</small><br><b style="color:{main_color}; font-size:1.2em;">{alert['TP']}</b></div>
+            <h3 style="color: {main_color}; margin:0; text-transform:uppercase; letter-spacing:3px;">AI SIGNAL DETECTED</h3>
+            <h1 style="color: white; font-size: 4em; margin: 10px 0; font-weight: 800;">{alert['Asset']}</h1>
+            
+            <div style="background:{main_color}; color:black; padding:10px; border-radius:10px; margin: 20px 0;">
+                <h2 style="margin:0; font-weight:900;">🚀 {alert['Direzione']}</h2>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 30px; border-top: 1px solid #333; padding-top: 20px;">
+                <div style="text-align: left;">
+                    <small style="color:#aaa;">ENTRY PRICE</small><br>
+                    <span style="font-size:1.5em; color: white;">{alert['Prezzo']}</span>
+                </div>
+                <div style="text-align: right;">
+                    <small style="color:#aaa;">TARGET PRICE</small><br>
+                    <span style="font-size:1.5em; color: {main_color};">{alert['TP']}</span>
+                </div>
             </div>
         </div>
     """, unsafe_allow_html=True)
 
-    # Pulsante Chiudi con priorità visiva
-    st.markdown('<div style="position:fixed; top:75%; left:50%; transform:translateX(-50%); z-index:11000;">', unsafe_allow_html=True)
-    if st.button("❌ CHIUDI E TORNA AL MONITOR", key="close_final_btn"):
+    # Il pulsante Python ora viene "catturato" dal CSS sopra (div.stButton > button)
+    # Non serve metterlo dentro div html, il CSS lo sposta automaticamente
+    if st.button("❌ CHIUDI MONITOR", key="close_alert_btn"):
         st.session_state['last_alert'] = None
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
     
+    # Blocca l'esecuzione del resto della pagina sotto l'overlay
     st.stop()
 
 # --- 6. BODY PRINCIPALE ---
