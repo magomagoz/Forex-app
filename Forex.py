@@ -477,7 +477,7 @@ if st.session_state['last_alert']:
             /* Container per il tasto chiudi proprio sotto il popup */
             .button-container {{
                 position: fixed; top: 70%; left: 50%; transform: translateX(-50%);
-                z-index: 11000; width: 300px;
+                z-index: 10000; width: 300px;
             }}
         </style>
         <div class="full-screen-overlay"></div>
@@ -495,7 +495,7 @@ if st.session_state['last_alert']:
     """, unsafe_allow_html=True)
 
     # Pulsante Chiudi con priorità visiva
-    st.markdown('<div style="position:fixed; top:75%; left:50%; transform:translateX(-50%); z-index:10001;">', unsafe_allow_html=True)
+    st.markdown('<div style="position:fixed; top:75%; left:50%; transform:translateX(-50%); z-index:11000;">', unsafe_allow_html=True)
     if st.button("❌ CHIUDI E TORNA AL MONITOR", key="close_final_btn"):
         st.session_state['last_alert'] = None
         st.rerun()
@@ -664,7 +664,7 @@ if not st.session_state['signal_history'].empty:
         if '❌' in val: return 'background-color: rgba(255, 75, 75, 0.1); color: #ff4b4b; font-weight: bold'
         return 'color: #ffcc00; font-weight: bold'
 
-    st.dataframe(display_df, hide_index=True)
+    #st.dataframe(display_df, hide_index=True)
     
     st.dataframe(
         display_df.style.map(style_status, subset=['Stato']), 
