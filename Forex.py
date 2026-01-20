@@ -246,39 +246,47 @@ def run_sentinel():
             elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
                 s_action = "VENDI"
 
+            # ... calcolo s_action ...
+            
+            # CORREZIONE QUI: Tutto questo blocco deve essere indentato sotto 'if s_action:'
             if s_action:
                 hist = st.session_state['signal_history']
-                # Controllo incrociato: asset uguale E stato 'In Corso' 
-                is_duplicate = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-            #if not is_duplicate:
-    
-            if hist.empty or not ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any():
-                p_unit, p_fmt, p_mult = get_asset_params(ticker)[:3]
-                sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
-                tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
-                        
-                risk_val = balance * (risk_pc / 100)
-                dist_p = abs(curr_v - sl) * p_mult
-                sz = risk_val / (dist_p * 10) if dist_p > 0 else 0
-                        
-                new_sig = {
-                    'DataOra': get_now_rome().strftime("%H:%M:%S"),
-                    'Asset': label, 
-                    'Direzione': s_action, 
-                    'Prezzo': p_fmt.format(curr_v), 
-                    'SL': p_fmt.format(sl), 
-                    'TP': p_fmt.format(tp), 
-                    'Size': f"{sz:.2f}", 
-                    'Stato': 'In Corso',
-                    'Rischio €': f"{risk_val:.2f}"
-                }
+                # Controllo se esiste già un trade aperto per questo asset
+                is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
+                
+                if not is_running:
+                    # Qui prendi i parametri. ATTENZIONE: balance e risk_pc sono variabili globali
+                    # Assicurati che siano definite prima di chiamare run_sentinel
+                    p_unit, p_fmt, p_mult, a_type = get_asset_params(ticker) # Aggiunto a_type per evitare errore unpack
                     
-                st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                save_history_permanently()
-                st.session_state['last_alert'] = new_sig
-                send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
-                st.rerun()
+                    sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
+                    tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
+                            
+                    risk_val = balance * (risk_pc / 100)
+                    dist_p = abs(curr_v - sl) * p_mult
+                    
+                    # Protezione divisione per zero
+                    if dist_p == 0: dist_p = 0.0001
+                    sz = risk_val / (dist_p * 10) # *10 è standard forex approx, verifica per crypto
+                            
+                    new_sig = {
+                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+                        'Asset': label, 
+                        'Direzione': s_action, 
+                        'Prezzo': p_fmt.format(curr_v), 
+                        'SL': p_fmt.format(sl), 
+                        'TP': p_fmt.format(tp), 
+                        'Size': f"{sz:.2f}", 
+                        'Stato': 'In Corso',
+                        'Rischio €': f"{risk_val:.2f}"
+                    }
+                        
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
+                    save_history_permanently()
+                    st.session_state['last_alert'] = new_sig
+                    send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
+                    st.rerun()
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
             
