@@ -631,7 +631,7 @@ if not st.session_state['signal_history'].empty:
     )
     
     csv = display_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Esporta CSV", csv, "cronologia_forex.csv", "text/csv")
+    st.download_button("📥 Salva Cronologia", csv, "cronologia_forex.csv", "text/csv")
 else:
     st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
 
