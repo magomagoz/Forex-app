@@ -387,7 +387,7 @@ else:
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000)
-risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0)
+risk_pc = st.sidebar.slider("**Rischio %**", 0.5, 5.0, 1.0, step=0.5)
 
 # --- CALCOLO INVESTIMENTO SIMULATO ---
 investimento_simulato = balance * (risk_pc / 100)
