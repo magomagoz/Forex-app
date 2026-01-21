@@ -412,7 +412,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
 col_cap1, col_cap2 = st.sidebar.columns(2)
 col_cap1.metric("Conto", f"€ {balance}")
-col_cap2.metric("Investimento", f"€ {investimento_simulato}")
+col_cap2.metric("Blocco investimento", f"€ {investimento_simulato}")
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
@@ -455,7 +455,7 @@ st.sidebar.subheader("🌍 Sessioni di Mercato")
 for s_name, is_open in get_session_status().items():
     color = "🟢" if is_open else "🔴"
     status_text = "APERTO" if is_open else "CHIUSO"
-    st.sidebar.markdown(f"**{s_name}** <small>{status_text}</small> {color}",
+    st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
    
 # Reset Sidebar
@@ -514,10 +514,17 @@ if st.session_state['last_alert']:
                     <div style="color:#aaa; font-size:0.8em;">ENTRY PRICE</div>
                     <div style="font-size:1.5em;">{alert['Prezzo']}</div>
                 </div>
-                <div style="text-align:right;">
+
+                <div style="text-align:center;">
                     <div style="color:#aaa; font-size:0.8em;">TARGET PRICE</div>
                     <div style="font-size:1.5em; color:{main_color};">{alert['TP']}</div>
                 </div>
+
+                <div style="text-align:right;">
+                    <div style="color:#aaa; font-size:0.8em;">STOP LOSS</div>
+                    <div style="font-size:1.5em;">{alert['SL']}</div>
+                </div>
+            
             </div>
         </div>
     """
