@@ -292,7 +292,11 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
                     st.session_state['last_alert'] = new_sig
-                    send_telegram_msg(f"🚀 *{s_action}* {label}\nPrezzo: {new_sig['Prezzo']}")
+                    send_telegram_msg(f"🚀 *{s_action}* {label}\n\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']}\n"
+                        f"SL: {new_sig['SL']}\n"
+                        f"Rischio: {new_sig['Rischio €']}€")
                     st.rerun()
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
@@ -514,17 +518,14 @@ if st.session_state['last_alert']:
                     <div style="color:#aaa; font-size:0.8em;">ENTRY PRICE</div>
                     <div style="font-size:1.5em;">{alert['Prezzo']}</div>
                 </div>
-
                 <div style="text-align:center;">
                     <div style="color:#aaa; font-size:0.8em;">TARGET PRICE</div>
                     <div style="font-size:1.5em; color:{main_color};">{alert['TP']}</div>
                 </div>
-
                 <div style="text-align:right;">
                     <div style="color:#aaa; font-size:0.8em;">STOP LOSS</div>
                     <div style="font-size:1.5em;">{alert['SL']}</div>
-                </div>
-            
+                </div>            
             </div>
         </div>
     """
