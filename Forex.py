@@ -190,7 +190,7 @@ def update_signal_outcomes():
                 investimento = float(str(row['Investimento €']).replace(',', '.'))
                 
                 new_status = None
-                risultato finale = 0.0
+                risultato_finale = 0.0
                 
                 if row['Direzione'] == 'COMPRA':
                     if current_high >= tp_v: 
