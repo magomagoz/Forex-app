@@ -171,7 +171,7 @@ def update_signal_outcomes():
     df = st.session_state['signal_history']
     
     # Parametri simulazione broker (Spread/Commissioni approx)
-    COMMISSIONE_APPROX = 0.02 # Sottrae 0.02€ ogni 10€ di investimento per simulare lo spread
+    COMMISSIONE_APPROX = 0.02 
     
     updates_made = False
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
@@ -180,34 +180,65 @@ def update_signal_outcomes():
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             
             if not data.empty:
-                if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+                if isinstance(data.columns, pd.MultiIndex): 
+                    data.columns = data.columns.get_level_values(0)
                 
+                # Dati prezzi attuali
                 current_high = float(data['High'].iloc[-1])
                 current_low = float(data['Low'].iloc[-1])
+                current_close = float(data['Close'].iloc[-1])
+                
+                # Valori convertiti
+                entry_v = float(str(row['Prezzo']).replace(',', '.'))
                 sl_v = float(str(row['SL']).replace(',', '.')) 
                 tp_v = float(str(row['TP']).replace(',', '.'))
                 investimento = float(str(row['Investimento €']).replace(',', '.'))
                 
                 new_status = None
                 risultato_finale = 0.0
+
+                # --- LOGICA TARGET DINAMICO (PROTEZIONE PROFITTO) ---
+                dist_target = abs(tp_v - entry_v)
+                progresso = abs(current_close - entry_v)
                 
+                # Se profitto > 25% del percorso e non abbiamo ancora protetto
+                if progresso >= (dist_target * 0.25) and row.get('Stato_Prot') != 'Garantito':
+                    if row['Direzione'] == 'COMPRA':
+                        nuovo_sl = entry_v + (dist_target * 0.20)
+                    else:
+                        nuovo_sl = entry_v - (dist_target * 0.20)
+                    
+                    # Aggiorniamo lo Stop Loss nel DataFrame per bloccare il profitto
+                    df.at[idx, 'SL'] = f"{nuovo_sl:.5f}" if "JPY" not in row['Asset'] else f"{nuovo_sl:.2f}"
+                    df.at[idx, 'Stato_Prot'] = 'Garantito'
+                    updates_made = True
+                    send_telegram_msg(f"🛡️ **TARGET DINAMICO**\n{row['Asset']}: Stop Loss spostato in profitto garantito (20%)!")
+
+                # --- CONTROLLO CHIUSURA (TP o SL aggiornato) ---
                 if row['Direzione'] == 'COMPRA':
                     if current_high >= tp_v: 
                         new_status = '✅ TARGET'
-                        # Profitto IQOption (Reward 1:2 meno spread approx)
                         risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
                     elif current_low <= sl_v: 
-                        new_status = '❌ STOP LOSS'
-                        # Perdita (Investimento + spread approx)
-                        risultato_finale = -(investimento + COMMISSIONE_APPROX)
+                        # Se lo SL era "Garantito", calcoliamo il profitto del 20%
+                        if row.get('Stato_Prot') == 'Garantito':
+                            new_status = '🛡️ SL DINAMICO'
+                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX # 20% del movimento = approx 40% dell'investimento se RR è 1:2
+                        else:
+                            new_status = '❌ STOP LOSS'
+                            risultato_finale = -(investimento + COMMISSIONE_APPROX)
                         
                 elif row['Direzione'] == 'VENDI':
                     if current_low <= tp_v: 
                         new_status = '✅ TARGET'
                         risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
                     elif current_high >= sl_v: 
-                        new_status = '❌ STOP LOSS'
-                        risultato_finale = -(investimento + COMMISSIONE_APPROX)
+                        if row.get('Stato_Prot') == 'Garantito':
+                            new_status = '🛡️ SL DINAMICO'
+                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
+                        else:
+                            new_status = '❌ STOP LOSS'
+                            risultato_finale = -(investimento + COMMISSIONE_APPROX)
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
@@ -330,6 +361,7 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
                         'Protezione': "ATTIVA (50%)" if is_protected else "Standard",
+                        'Stato_prot': 'In Attesa',
                         'Stato': 'In Corso',
                         'Investimento €': f"{risk_val:.2f}",
                         'Risultato €': "0.00"  # Inizialmente neutro
