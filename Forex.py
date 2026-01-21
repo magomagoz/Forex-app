@@ -253,9 +253,29 @@ def run_sentinel():
 
             if s_action:
                 hist = st.session_state['signal_history']
+                
+                # 1. Controllo se c'è un trade APERTO (In Corso)
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-                if not is_running:
+                # 2. Controllo TEMPORALE (Nessun segnale duplicato negli ultimi 30 minuti)
+                recent_signals = []
+                if not hist.empty:
+                    # Filtriamo i segnali dell'asset corrente
+                    asset_hist = hist[hist['Asset'] == label]
+                    if not asset_hist.empty:
+                        # Convertiamo l'orario del segnale in oggetto datetime per il calcolo
+                        last_sig_time_str = asset_hist.iloc[0]['DataOra']
+                        last_sig_time = datetime.strptime(last_sig_time_str, "%H:%M:%S").time()
+                        now_time = get_now_rome().time()
+                        
+                        # Calcolo differenza approssimativa in minuti
+                        diff_min = (now_time.hour * 60 + now_time.minute) - (last_sig_time.hour * 60 + last_sig_time.minute)
+                        
+                        # Se il segnale è avvenuto meno di 30 minuti fa, lo ignoriamo
+                        if 0 <= diff_min < 30:
+                            s_action = None 
+
+                if s_action and not is_running:
                     p_unit, p_fmt, p_mult, _ = get_asset_params(ticker)
                     
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
