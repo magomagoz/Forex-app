@@ -412,7 +412,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
 col_cap1, col_cap2 = st.sidebar.columns(2)
 col_cap1.metric("Conto", f"€ {balance}")
-col_cap2.metric("Blocco investimento", f"€ {investimento_simulato}")
+col_cap2.metric("Investimento", f"€ {investimento_simulato}:.0f")
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
