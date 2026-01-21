@@ -582,12 +582,17 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (CON PROTEZIONE 50% VISIBILE) ---
+# --- 5. POPUP ALERT (CORRETTO E SEMPLIFICATO) ---
 if st.session_state.get('last_alert'):
     # Inizializzazione Timer
     if 'alert_start_time' not in st.session_state:
         st.session_state['alert_start_time'] = time_lib.time()
-        play_notification_sound()
+        
+        # Riproduce suono solo alla prima apparizione
+        if st.session_state['last_alert'].get('Stato_Prot') == 'Garantito':
+            play_safe_sound()
+        else:
+            play_notification_sound()
 
     # Logica tempo
     elapsed = time_lib.time() - st.session_state['alert_start_time']
@@ -602,8 +607,17 @@ if st.session_state.get('last_alert'):
     if st.session_state.get('last_alert'):
         alert = st.session_state['last_alert']
         main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+        
+        # --- FIX: Calcoliamo l'HTML della protezione PRIMA, per evitare errori di virgolette ---
+        protection_badge_html = ""
+        if alert.get("Protezione") != "Standard":
+            protection_badge_html = f"""
+                <div style="font-size:0.7em; color:#ff4b4b; font-weight:bold; margin-top:4px; background:rgba(255, 75, 75, 0.1); padding:2px 5px; border-radius:4px; display:inline-block;">
+                    ⚠️ {alert["Protezione"]}
+                </div>
+            """
 
-        # CSS per il layout
+        # HTML Principale
         st.markdown(f"""
             <style>
                 .fixed-overlay {{
@@ -611,56 +625,65 @@ if st.session_state.get('last_alert'):
                     background: rgba(0, 0, 0, 0.9); z-index: 8888; backdrop-filter: blur(10px);
                 }}
                 .fixed-card {{
-                    position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
-                    width: 85%; max-width: 400px; background: #000;
-                    border: 3px solid {main_color}; border-radius: 20px;
-                    padding: 30px; text-align: center; z-index: 8889;
-                    box-shadow: 0 0 50px {main_color}44; color: white !important;
+                    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
+                    width: 90%; max-width: 420px; background: #000;
+                    border: 2px solid {main_color}; border-radius: 20px;
+                    padding: 25px; text-align: center; z-index: 8889;
+                    box-shadow: 0 0 40px {main_color}33; color: white !important; font-family: sans-serif;
                 }}
                 .element-container:has(button[key="close_manual"]) {{
-                    position: fixed !important; bottom: 20%; left: 50%;
+                    position: fixed !important; bottom: 15%; left: 50%;
                     transform: translateX(-50%); z-index: 9999 !important;
                 }}
                 div.stButton > button[key="close_manual"] {{
                     background-color: {main_color} !important;
-                    color: black !important; font-weight: 900 !important;
-                    width: 220px !important; height: 50px !important;
-                    border-radius: 10px !important; border: none !important;
+                    color: black !important; font-weight: 800 !important;
+                    width: 200px !important; height: 45px !important;
+                    border-radius: 50px !important; border: none !important;
+                    box-shadow: 0 4px 15px {main_color}66 !important;
+                    transition: transform 0.1s;
+                }}
+                div.stButton > button[key="close_manual"]:active {{
+                    transform: translateX(-50%) scale(0.95);
                 }}
             </style>
             
             <div class="fixed-overlay"></div>
             <div class="fixed-card">
-                <div style="color:{main_color}; font-weight:bold; letter-spacing:3px; font-size:0.9em;">SENTINEL AI SIGNAL</div>
-                <div style="font-size: 3.2em; font-weight: 900; margin: 10px 0;">{alert['Asset']}</div>
-                <div style="background:{main_color}; color:black; padding:10px; border-radius:10px; font-weight:bold; font-size:1.4em;">
+                <div style="color:{main_color}; font-weight:bold; letter-spacing:2px; font-size:0.8em; margin-bottom:5px; opacity:0.8;">
+                    SENTINEL AI SIGNAL
+                </div>
+                <div style="font-size: 3em; font-weight: 900; margin: 0; line-height:1;">
+                    {alert['Asset']}
+                </div>
+                <div style="background:{main_color}; color:black; padding:8px 20px; border-radius:8px; font-weight:900; font-size:1.5em; margin: 15px auto; display:inline-block;">
                     {alert['Direzione']}
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; text-align: left; border-top: 1px solid #333; padding-top: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; text-align: left; border-top: 1px solid #333; padding-top: 20px;">
                     <div>
-                        <small style="color:#888;">ENTRY</small><br>
-                        <b style="font-size:1.1em;">{alert['Prezzo']}</b>
+                        <small style="color:#888; font-size:0.7em; text-transform:uppercase;">Entry Price</small><br>
+                        <b style="font-size:1.2em;">{alert['Prezzo']}</b>
                     </div>
                     <div style="text-align:right;">
-                        <small style="color:#888;">TARGET</small><br>
-                        <b style="color:{main_color}; font-size:1.1em;">{alert['TP']}</b>
+                        <small style="color:#888; font-size:0.7em; text-transform:uppercase;">Take Profit</small><br>
+                        <b style="color:{main_color}; font-size:1.2em;">{alert['TP']}</b>
                     </div>
                     <div>
-                        <small style="color:#888;">STOP LOSS</small><br>
-                        <b style="color:#ff4b4b; font-size:1.1em;">{alert['SL']}</b>
-                        {f'<div style="font-size:0.7em; color:#ff4b4b; font-weight:bold; margin-top:2px;">⚠️ {alert["Protezione"]}</div>' if alert.get("Protezione") != "Standard" else ""}
+                        <small style="color:#888; font-size:0.7em; text-transform:uppercase;">Stop Loss</small><br>
+                        <b style="color:#ff4b4b; font-size:1.2em;">{alert['SL']}</b>
+                        {protection_badge_html}
                     </div>
                     <div style="text-align:right;">
-                        <small style="color:#888;">AUTO-OFF</small><br>
-                        <b style="font-size:1.1em;">{countdown}s</b>
+                        <small style="color:#888; font-size:0.7em; text-transform:uppercase;">Auto-Close</small><br>
+                        <b style="font-size:1.2em;">{countdown}s</b>
                     </div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
         # Tasto Chiudi
-        if st.button(f"✖ CHIUDI ({countdown}s)", key="close_manual"):
+        if st.button(f"CHIUDI ✖", key="close_manual"):
             st.session_state['last_alert'] = None
             if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
             st.rerun()
