@@ -647,7 +647,6 @@ if st.session_state.get('last_alert'):
             st.rerun()
 
 # --- 7. BODY PRINCIPALE ---
-
 # Banner logic
 banner_path = "banner1.png"
 if os.path.exists(banner_path):
@@ -784,7 +783,7 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 8. CRONOLOGIA SEGNALI (CORREZIONE ERRORI) ---
+# --- 9. CRONOLOGIA SEGNALI (CORREZIONE ERRORI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
