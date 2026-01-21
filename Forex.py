@@ -776,80 +776,34 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. FOOTER & CRONOLOGIA (FIX ERRORI STILE) ---
+# --- 8. CRONOLOGIA SEGNALI (CORREZIONE ERRORI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-# 1. Definiamo le funzioni di stile (Mancavano queste!)
-def style_status(val):
-    """Colora lo stato dell'operazione"""
-    val = str(val)
-    if 'TARGET' in val: return 'color: #00ffcc; font-weight: bold' # Verde Acqua
-    if 'STOP' in val: return 'color: #ff4b4b; font-weight: bold'   # Rosso
-    if 'DINAMICO' in val: return 'color: #ffd700; font-weight: bold' # Oro (Nuovo!)
-    if 'In Corso' in val: return 'color: #ffffff; font-weight: bold' # Bianco
-    return ''
-
-def style_results(val):
-    """Colora il risultato monetario"""
-    if not isinstance(val, str): return ''
-    if '+' in val: return 'color: #00ffcc; font-weight: bold'
-    if '-' in val: return 'color: #ff4b4b; font-weight: bold'
-    return ''
+# Inizializziamo display_df sempre, anche se vuoto, per evitare NameError
+display_df = pd.DataFrame()
 
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
-    display_df = display_df.iloc[::-1]
     
-    # --- FILTRI RAPIDI ---
-    col_f1, col_f2 = st.columns([1, 2])
-    with col_f1:
-        filtro = st.selectbox("🔍 Filtra per stato:", ["Tutti", "In Corso", "✅ TARGET", "❌ STOP LOSS"])
-    
-    if filtro != "Tutti":
-        display_df = display_df[display_df['Stato'] == filtro]
-
-# 2. Visualizzazione Tabella
-if not st.session_state['signal_history'].empty:
-    # Creiamo una copia per la visualizzazione
-    display_df = st.session_state['signal_history'].copy()
-    
-    # Ordiniamo per vedere i più recenti in alto
+    # Invertiamo l'ordine per vedere i più recenti in alto
     display_df = display_df.iloc[::-1]
 
-    # Filtri opzionali (se vuoi tenerli)
-    status_filter = st.selectbox("Filtra per stato:", ["Tutti", "In Corso", "Chiusi"], key="hist_filter")
-    if status_filter == "In Corso":
-        display_df = display_df[display_df['Stato'] == 'In Corso']
-    elif status_filter == "Chiusi":
-        display_df = display_df[display_df['Stato'] != 'In Corso']
-
-    # Visualizziamo il DataFrame con lo stile
-    # Il try-except evita crash se mancano colonne durante i test
     try:
+        # Usiamo map invece di applymap (nuova sintassi Pandas)
         st.dataframe(
-            display_df.style
-            .map(style_status, subset=['Stato'])
-            .map(style_results, subset=['Risultato €']),
+            display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
             column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
         )
+        
+        # Bottone download - ora display_df esiste sicuramente
+        csv_data = display_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Esporta CSV", csv_data, "trading_history.csv", "text/csv")
+        
     except Exception as e:
-        st.error(f"Errore visualizzazione tabella: {e}")
-        st.dataframe(display_df, use_container_width=True) # Fallback senza colori
-
-    # Bottone Reset (Utile per pulire errori vecchi)
-    if st.button("🗑️ Reset Cronologia"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=[
-            'DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 
-            'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'
-        ])
-        save_history_permanently()
-    
-    # Bottone Download
-    csv = display_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Esporta CSV", csv, "trading_history.csv", "text/csv")
-
+        # Se lo stile fallisce, mostra la tabella semplice invece di crashare
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 else:
-    st.info("Nessun segnale registrato oggi.")
+    st.info("Nessun segnale registrato.")
