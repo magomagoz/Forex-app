@@ -596,6 +596,8 @@ if st.sidebar.button("TEST ALERT"):
     if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
     st.rerun()
 
+st.sidebar.markdown("---")
+
 # --- 6. POPUP ALERT (CORRETTO E SEMPLIFICATO) ---
 if st.session_state.get('last_alert'):
     # Inizializzazione Timer
