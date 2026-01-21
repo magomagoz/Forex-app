@@ -212,6 +212,7 @@ def update_signal_outcomes():
 
 def run_sentinel():
     """Scansiona tutti gli asset definiti in asset_map"""
+    # Usiamo i nomi corretti recuperati dallo stato o dai widget
     current_balance = st.session_state.get('balance_val', 1000)
     current_risk = st.session_state.get('risk_val', 1.0)
     
@@ -224,7 +225,6 @@ def run_sentinel():
             
             if df_rt_s.empty or df_d_s.empty: continue
             
-            # Normalizzazione colonne (Fix per errori MultiIndex)
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
             
@@ -246,7 +246,6 @@ def run_sentinel():
             curr_adx = adx_df['ADX_14'].iloc[-1]
 
             s_action = None
-
             if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
                 s_action = "COMPRA"
             elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
@@ -257,17 +256,16 @@ def run_sentinel():
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
                 if not is_running:
-                    p_unit, p_fmt, p_mult, _ = get_asset_params(ticker) # Aggiunto a_type per evitare errore unpack
+                    p_unit, p_fmt, p_mult, _ = get_asset_params(ticker)
                     
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
                     tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
                             
-                    risk_val = balance * (risk_pc / 100)
+                    # FIX: Uso delle variabili corrette definite all'inizio della funzione
+                    risk_val = current_balance * (current_risk / 100)
                     dist_p = abs(curr_v - sl) * p_mult
                     
-                    # Protezione divisione per zero
                     if dist_p == 0: dist_p = 0.0001
-                    sz = risk_val / (dist_p * 10) # *10 è standard forex approx, verifica per crypto
                             
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
@@ -283,18 +281,22 @@ def run_sentinel():
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
                     st.session_state['last_alert'] = new_sig
-                    send_telegram_msg(f"🚀 *{s_action}* {label}\nEntry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}\nInvestimento: {new_sig['Rischio €']})
-                    st.rerun() # Riavvia solo se trova un segnale
+
+                    # FIX: Chiusura corretta della stringa e della parentesi
+                    telegram_text = (f"🚀 *{s_action}* {label}\n"
+                                     f"Entry: {new_sig['Prezzo']}\n"
+                                     f"TP: {new_sig['TP']}\n"
+                                     f"SL: {new_sig['SL']}\n"
+                                     f"Investimento: {new_sig['Investimento €']}€")
+                    
+                    send_telegram_msg(telegram_text)
+                    st.rerun() 
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
-
-            # --- POSIZIONE DELLO SLEEP ---
-            # Questo mette in pausa il bot per mezzo secondo prima di passare all'asset successivo
             time_lib.sleep(0.5) 
 
         except Exception as e:
-            now = get_now_rome().strftime("%H:%M:%S")
-            st.session_state['last_scan_status'] = f"🔴 {now} - {label}: Errore"
+            st.session_state['last_scan_status'] = f"🔴 Errore {label}: {str(e)}"
             continue
                     
 def get_win_rate():
