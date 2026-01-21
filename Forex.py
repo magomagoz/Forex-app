@@ -187,20 +187,32 @@ def update_signal_outcomes():
                 # IMPORTANTE: Convertiamo i valori salvati (che sono stringhe) in float
                 sl_v = float(str(row['SL']).replace(',', '.')) 
                 tp_v = float(str(row['TP']).replace(',', '.'))
+                investimento = float(str(row['Investimento €']).replace(',', '.'))
                 
                 new_status = None
+                risultato finale = 0.0
+                
                 if row['Direzione'] == 'COMPRA':
-                    if current_high >= tp_v: new_status = '✅ TARGET'
+                    if current_high >= tp_v: 
+                        new_status = '✅ TARGET'
+                        risultato_finale = investimento * 2 # Reward 1:2
                     elif current_low <= sl_v: new_status = '❌ STOP LOSS'
+                        risultato_finale = -investimento
                 elif row['Direzione'] == 'VENDI':
-                    if current_low <= tp_v: new_status = '✅ TARGET'
-                    elif current_high >= sl_v: new_status = '❌ STOP LOSS'
+                    if current_low <= tp_v: 
+                        new_status = '✅ TARGET'
+                        risultato_finale = investimento * 2 # Reward 1:2
+                    elif current_high >= sl_v: 
+                        new_status = '❌ STOP LOSS'
+                        risultato_finale = -investimento
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
+                    df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
+                    
                     updates_made = True
                     play_close_sound()
-                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nProfit/Loss: Controlla Dashboard"
+                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nRisultato: {risultato_finale:+.2f}€"
                     send_telegram_msg(msg)
         except Exception as e:
             print(f"Errore update {row['Asset']}: {e}")
@@ -295,9 +307,10 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
                         'Stato': 'In Corso',
-                        'Investimento €': f"{risk_val:.2f}"
+                        'Investimento €': f"{risk_val:.2f}",
+                        'Risultato €': "0.00"  # Inizialmente neutro
                     }
-
+                    
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
                     st.session_state['last_alert'] = new_sig
@@ -711,16 +724,17 @@ if not st.session_state['signal_history'].empty:
     
     if filtro != "Tutti":
         display_df = display_df[display_df['Stato'] == filtro]
-    
-    def style_status(val):
-        if '✅' in val: return 'background-color: rgba(0, 255, 204, 0.1); color: #00ffcc; font-weight: bold'
-        if '❌' in val: return 'background-color: rgba(255, 75, 75, 0.1); color: #ff4b4b; font-weight: bold'
-        return 'color: #ffcc00; font-weight: bold'
 
-    #st.dataframe(display_df, hide_index=True)
+    def style_results(val):
+        if not isinstance(val, str): return ''
+        if '+' in val: return 'color: #00ffcc; font-weight: bold'
+        if '-' in val: return 'color: #ff4b4b; font-weight: bold'
+        return ''
     
+    # Nella visualizzazione del dataframe:
     st.dataframe(
-        display_df.style.map(style_status, subset=['Stato']), 
+        display_df.style.map(style_status, subset=['Stato'])
+                       .map(style_results, subset=['Risultato €']), 
         use_container_width=True,
         hide_index=True
     )
