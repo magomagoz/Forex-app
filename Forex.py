@@ -15,7 +15,6 @@ import os
 # --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
-# CSS Migliorato
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem !important;}
@@ -54,20 +53,6 @@ def save_history_permanently():
             st.session_state['signal_history'].to_csv("permanent_signals_db.csv", index=False)
     except Exception as e:
         print(f"Errore salvataggio file: {e}")
-
-def load_history_from_csv():
-    """Carica la cronologia dal file CSV all'avvio"""
-    if os.path.exists("permanent_signals_db.csv"):
-        try:
-            df = pd.read_csv("permanent_signals_db.csv")
-            # Assicurati che le colonne siano corrette
-            expected_cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato']
-            for col in expected_cols:
-                if col not in df.columns: df[col] = ""
-            return df
-        except:
-            return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-    return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 
 def load_history_from_csv():
     if os.path.exists("permanent_signals_db.csv"):
@@ -404,7 +389,6 @@ def run_sentinel():
                                      f"Investimento: {new_sig['Investimento €']}€")
                     
                     send_telegram_msg(telegram_text)
-                    st.rerun() 
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
             time_lib.sleep(0.5) 
@@ -913,7 +897,6 @@ if not st.session_state['signal_history'].empty:
             'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'
         ])
         save_history_permanently()
-        st.rerun()
     
     # Bottone Download
     csv = display_df.to_csv(index=False).encode('utf-8')
