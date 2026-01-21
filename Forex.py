@@ -486,77 +486,75 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (FIX: TASTO REALE + COUNTDOWN DINAMICO) ---
+# --- 5. POPUP ALERT (RE-ENGINEERED) ---
 if st.session_state.get('last_alert'):
-    # 1. Gestione Timer
+    # Inizializzazione Timer
     if 'alert_start_time' not in st.session_state:
         st.session_state['alert_start_time'] = time_lib.time()
         play_notification_sound()
 
-    # 2. Calcolo tempo rimanente
+    # Logica tempo
     elapsed = time_lib.time() - st.session_state['alert_start_time']
     countdown = max(0, int(30 - elapsed))
     
-    # 3. Auto-chiusura allo scadere dei 30 secondi
+    # Auto-chiusura
     if elapsed > 30:
         st.session_state['last_alert'] = None
         if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
         st.rerun()
 
-    # 4. Se l'alert è ancora attivo, mostralo
     if st.session_state.get('last_alert'):
         alert = st.session_state['last_alert']
         main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-        # CSS per posizionare il VERO tasto Streamlit sopra l'HTML
+        # 1. CSS per Overlay e Posizionamento Tasto
         st.markdown(f"""
             <style>
-                .full-screen-overlay {{
-                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                    background: rgba(0, 0, 0, 0.85); z-index: 9990; backdrop-filter: blur(5px);
+                /* Oscuramento totale */
+                .fixed-overlay {{
+                    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+                    background: rgba(0, 0, 0, 0.9); z-index: 8888; backdrop-filter: blur(10px);
                 }}
-                .popup-card {{
-                    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
-                    width: 90%; max-width: 450px; background: #111;
-                    border: 2px solid {main_color}; border-radius: 15px;
-                    padding: 30px; text-align: center; z-index: 9995; color: white !important;
+                /* Card del Segnale */
+                .fixed-card {{
+                    position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+                    width: 85%; max-width: 400px; background: #000;
+                    border: 3px solid {main_color}; border-radius: 20px;
+                    padding: 30px; text-align: center; z-index: 8889;
+                    box-shadow: 0 0 50px {main_color}44; color: white !important;
                 }}
-                /* Stile del vero tasto Streamlit */
+                /* Forza il tasto Streamlit ad apparire SOPRA la card */
+                .element-container:has(button[key="close_manual"]) {{
+                    position: fixed !important; bottom: 20%; left: 50%;
+                    transform: translateX(-50%); z-index: 9999 !important;
+                }}
                 div.stButton > button[key="close_manual"] {{
-                    position: fixed !important; 
-                    bottom: 25% !important; 
-                    left: 50% !important;
-                    transform: translateX(-50%) !important; 
-                    z-index: 10001 !important;
-                    width: 250px !important; 
                     background-color: {main_color} !important;
-                    color: black !important; 
-                    font-weight: bold !important;
-                    border-radius: 10px !important;
-                    height: 50px !important;
-                    border: none !important;
-                    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                    color: black !important; font-weight: 900 !important;
+                    width: 200px !important; height: 50px !important;
+                    border-radius: 10px !important; border: none !important;
+                    box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
                 }}
             </style>
             
-            <div class="full-screen-overlay"></div>
-            <div class="popup-card">
-                <div style="letter-spacing:2px; color:{main_color}; font-size:0.8em; font-weight:bold;">SENTINEL AI SIGNAL</div>
-                <div style="font-size: 3.5em; font-weight: 800; margin: 10px 0;">{alert['Asset']}</div>
-                <div style="background:{main_color}; color:black; padding:12px; border-radius:10px; font-weight:900; font-size:1.6em; margin-bottom:20px;">
+            <div class="fixed-overlay"></div>
+            <div class="fixed-card">
+                <div style="color:{main_color}; font-weight:bold; letter-spacing:3px;">AI ALERT</div>
+                <div style="font-size: 3.5em; font-weight: 900; margin: 10px 0;">{alert['Asset']}</div>
+                <div style="background:{main_color}; color:black; padding:10px; border-radius:10px; font-weight:bold; font-size:1.5em;">
                     {alert['Direzione']}
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; border-top: 1px solid #333; padding-top: 20px; text-align: left;">
-                    <div><span style="color:#888; font-size:0.75em;">ENTRY</span><br><b style="font-size:1.2em;">{alert['Prezzo']}</b></div>
-                    <div style="text-align:right;"><span style="color:#888; font-size:0.75em;">TARGET</span><br><b style="font-size:1.2em; color:{main_color};">{alert['TP']}</b></div>
-                    <div><span style="color:#888; font-size:0.75em;">STOP LOSS</span><br><b style="font-size:1.2em; color:#ff4b4b;">{alert['SL']}</b></div>
-                    <div style="text-align:right;"><span style="color:#888; font-size:0.75em;">AUTO-CLOSE</span><br><b style="font-size:1.2em;">{countdown}s</b></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; text-align: left; border-top: 1px solid #333; padding-top: 20px;">
+                    <div><small style="color:#888;">PREZZO</small><br><b>{alert['Prezzo']}</b></div>
+                    <div style="text-align:right;"><small style="color:#888;">TARGET</small><br><b style="color:{main_color};">{alert['TP']}</b></div>
+                    <div><small style="color:#888;">STOP LOSS</small><br><b style="color:#ff4b4b;">{alert['SL']}</b></div>
+                    <div style="text-align:right;"><small style="color:#888;">AUTO-OFF</small><br><b>{countdown}s</b></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-        # 5. IL TASTO REALE (cliccabile subito)
-        if st.button(f"✖ CHIUDI MONITOR ({countdown}s)", key="close_manual"):
+        # 2. Il tasto deve essere fuori dal blocco markdown ma subito sotto
+        if st.button(f"CHIUDI ({countdown}s)", key="close_manual"):
             st.session_state['last_alert'] = None
             if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
             st.rerun()
