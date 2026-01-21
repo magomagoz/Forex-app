@@ -416,27 +416,8 @@ col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
-st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {current_equity:.2f}", delta=f"{total_return:.2f}%")
-
-# Dettagli operazione selezionata (se presente)
-active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
-if not active_trades.empty:
-    st.sidebar.warning("⚡ Ultima Operazione Attiva")
-    last_t = active_trades.iloc[0]
-    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
-    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
-
 st.sidebar.markdown("---")
-# ... (restante codice sidebar: sessioni, win rate, reset)
-st.sidebar.subheader("🌍 Sessioni di Mercato")
-for s_name, is_open in get_session_status().items():
-    color = "🟢" if is_open else "🔴"
-    status_text = "APERTO" if is_open else "CHIUSO"
-    st.sidebar.markdown(f"**{s_name}** <small>{status_text}</small> {color}",
-unsafe_allow_html=True)
 
-# Win Rate Sidebar
-st.sidebar.markdown("---")
 # --- SIDEBAR PERFORMANCE ---
 st.sidebar.subheader("🏆 Performance")
 
@@ -458,6 +439,24 @@ dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 #fig_equity.add_trace(go.Scatter(y=equity_series, mode='lines', fill='tozeroy', line=dict(color='#00ffcc')))
 #fig_equity.update_layout(height=100, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 #st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
+
+
+# Dettagli operazione selezionata (se presente)
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+if not active_trades.empty:
+    st.sidebar.warning("⚡ Ultima Operazione Attiva")
+    last_t = active_trades.iloc[0]
+    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
+    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
+
+st.sidebar.markdown("---")
+# ... (restante codice sidebar: sessioni, win rate, reset)
+st.sidebar.subheader("🌍 Sessioni di Mercato")
+for s_name, is_open in get_session_status().items():
+    color = "🟢" if is_open else "🔴"
+    status_text = "APERTO" if is_open else "CHIUSO"
+    st.sidebar.markdown(f"**{s_name}** <small>{status_text}</small> {color}",
+unsafe_allow_html=True)
    
 # Reset Sidebar
 st.sidebar.markdown("---")
