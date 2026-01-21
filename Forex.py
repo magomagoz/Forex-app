@@ -411,8 +411,8 @@ saldo_residuo = balance - investimento_simulato
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
 col_cap1, col_cap2 = st.sidebar.columns(2)
-col_cap1.metric("Conto", f"€ {balance}")
-col_cap2.metric("Investimento", f"€ {investimento_simulato}:.0f")
+col_cap1.metric("Conto", f"€ {balance:.2f}")
+col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
@@ -431,7 +431,7 @@ max_val = equity_series.max()
 dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 
 # Visualizzazione Metriche
-st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity}", delta=f"{total_return}%")
+st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity:.2f}", delta=f"{total_return}%")
 st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 
 # Grafico Equity (Piccolo e pulito)
