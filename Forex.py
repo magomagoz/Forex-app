@@ -170,21 +170,20 @@ def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     
+    # Parametri simulazione broker (Spread/Commissioni approx)
+    COMMISSIONE_APPROX = 0.02 # Sottrae 0.02€ ogni 10€ di investimento per simulare lo spread
+    
     updates_made = False
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
-            # Scarichiamo solo l'ultima candela per velocità
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
                 
-                # Conversione sicura in float
                 current_high = float(data['High'].iloc[-1])
                 current_low = float(data['Low'].iloc[-1])
-                
-                # IMPORTANTE: Convertiamo i valori salvati (che sono stringhe) in float
                 sl_v = float(str(row['SL']).replace(',', '.')) 
                 tp_v = float(str(row['TP']).replace(',', '.'))
                 investimento = float(str(row['Investimento €']).replace(',', '.'))
@@ -195,27 +194,31 @@ def update_signal_outcomes():
                 if row['Direzione'] == 'COMPRA':
                     if current_high >= tp_v: 
                         new_status = '✅ TARGET'
-                        risultato_finale = investimento * 2 # Reward 1:2
-                    elif current_low <= sl_v: new_status = '❌ STOP LOSS'
-                        risultato_finale = -investimento
+                        # Profitto IQOption (Reward 1:2 meno spread approx)
+                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                    elif current_low <= sl_v: 
+                        new_status = '❌ STOP LOSS'
+                        # Perdita (Investimento + spread approx)
+                        risultato_finale = -(investimento + COMMISSIONE_APPROX)
+                        
                 elif row['Direzione'] == 'VENDI':
                     if current_low <= tp_v: 
                         new_status = '✅ TARGET'
-                        risultato_finale = investimento * 2 # Reward 1:2
+                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
                     elif current_high >= sl_v: 
                         new_status = '❌ STOP LOSS'
-                        risultato_finale = -investimento
+                        risultato_finale = -(investimento + COMMISSIONE_APPROX)
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
                     df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
-                    
                     updates_made = True
                     play_close_sound()
-                    msg = f"🔔 **OPERAZIONE CHIUSA**\nAsset: {row['Asset']}\nEsito: {new_status}\nRisultato: {risultato_finale:+.2f}€"
+                    
+                    msg = f"🔔 **IQ OPTION - TRADE CHIUSO**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
                     send_telegram_msg(msg)
+                    
         except Exception as e:
-            print(f"Errore update {row['Asset']}: {e}")
             continue 
         
     if updates_made:
