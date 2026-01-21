@@ -914,13 +914,13 @@ if not st.session_state['signal_history'].empty:
         ])
         save_history_permanently()
         st.rerun()
-
-else:
-    st.info("Nessun segnale registrato oggi.")
     
     # Bottone Download
     csv = display_df.to_csv(index=False).encode('utf-8')
     st.download_button("📥 Esporta CSV", csv, "trading_history.csv", "text/csv")
+
+else:
+    st.info("Nessun segnale registrato oggi.")
 
 # --- 9. ESECUZIONE SENTINEL ---
 # Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
