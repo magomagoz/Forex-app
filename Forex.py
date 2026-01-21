@@ -598,7 +598,7 @@ if st.sidebar.button("TEST ALERT"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (RE-ENGINEERED) ---
+# --- 5. POPUP ALERT (VERSIONE DEFINITIVA COL TASTO) ---
 if st.session_state.get('last_alert'):
     # Inizializzazione Timer
     if 'alert_start_time' not in st.session_state:
@@ -619,54 +619,62 @@ if st.session_state.get('last_alert'):
         alert = st.session_state['last_alert']
         main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-        # 1. CSS per Overlay e Posizionamento Tasto
+        # 1. CSS - POSIZIONAMENTO TASTO E CARD
         st.markdown(f"""
             <style>
-                /* Oscuramento totale */
+                /* Overlay di sfondo */
                 .fixed-overlay {{
                     position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-                    background: rgba(0, 0, 0, 0.9); z-index: 8888; backdrop-filter: blur(10px);
+                    background: rgba(0, 0, 0, 0.95); z-index: 999990; backdrop-filter: blur(10px);
                 }}
                 /* Card del Segnale */
                 .fixed-card {{
-                    position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
-                    width: 85%; max-width: 400px; background: #000;
-                    border: 3px solid {main_color}; border-radius: 20px;
-                    padding: 30px; text-align: center; z-index: 8889;
-                    box-shadow: 0 0 50px {main_color}44; color: white !important;
+                    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
+                    width: 90%; max-width: 420px; background: #000;
+                    border: 4px solid {main_color}; border-radius: 30px;
+                    padding: 40px 30px; text-align: center; z-index: 999991;
+                    box-shadow: 0 0 70px {main_color}66; color: white !important;
                 }}
-                /* Forza il tasto Streamlit ad apparire SOPRA la card */
-                .element-container:has(button[key="close_manual"]) {{
-                    position: fixed !important; bottom: 20%; left: 50%;
-                    transform: translateX(-50%); z-index: 9999 !important;
+                /* IL SEGRETO: Forza il contenitore del bottone Streamlit in cima a tutto */
+                div[data-testid="stVerticalBlock"] > div:has(button[key="close_manual"]) {{
+                    position: fixed !important;
+                    bottom: 15% !important;
+                    left: 50% !important;
+                    transform: translateX(-50%) !important;
+                    z-index: 999999 !important;
                 }}
-                div.stButton > button[key="close_manual"] {{
+                /* Stile del Bottone */
+                button[key="close_manual"] {{
                     background-color: {main_color} !important;
-                    color: black !important; font-weight: 900 !important;
-                    width: 200px !important; height: 50px !important;
-                    border-radius: 10px !important; border: none !important;
-                    box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important;
+                    color: black !important;
+                    font-size: 1.2rem !important;
+                    font-weight: 900 !important;
+                    padding: 15px 40px !important;
+                    border-radius: 15px !important;
+                    border: none !important;
+                    box-shadow: 0 0 20px {main_color} !important;
+                    width: 250px !important;
                 }}
             </style>
             
             <div class="fixed-overlay"></div>
             <div class="fixed-card">
-                <div style="color:{main_color}; font-weight:bold; letter-spacing:3px;">AI ALERT</div>
-                <div style="font-size: 3.5em; font-weight: 900; margin: 10px 0;">{alert['Asset']}</div>
-                <div style="background:{main_color}; color:black; padding:10px; border-radius:10px; font-weight:bold; font-size:1.5em;">
+                <div style="color:{main_color}; font-weight:bold; letter-spacing:4px; font-size:1em; margin-bottom:10px;">SENTINEL AI SIGNAL</div>
+                <div style="font-size: 4em; font-weight: 900; margin: 0; line-height:1;">{alert['Asset']}</div>
+                <div style="background:{main_color}; color:black; padding:12px 30px; border-radius:15px; font-weight:900; font-size:2em; margin:25px auto; display:inline-block;">
                     {alert['Direzione']}
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; text-align: left; border-top: 1px solid #333; padding-top: 20px;">
-                    <div><small style="color:#888;">PREZZO</small><br><b>{alert['Prezzo']}</b></div>
-                    <div style="text-align:right;"><small style="color:#888;">TARGET</small><br><b style="color:{main_color};">{alert['TP']}</b></div>
-                    <div><small style="color:#888;">STOP LOSS</small><br><b style="color:#ff4b4b;">{alert['SL']}</b></div>
-                    <div style="text-align:right;"><small style="color:#888;">AUTO-OFF</small><br><b>{countdown}s</b></div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 30px; text-align: left; border-top: 1px solid #333; padding-top: 25px;">
+                    <div><small style="color:#888; font-size:0.8em;">PRICE</small><br><b style="font-size:1.4em;">{alert['Prezzo']}</b></div>
+                    <div style="text-align:right;"><small style="color:#888; font-size:0.8em;">TARGET</small><br><b style="color:{main_color}; font-size:1.4em;">{alert['TP']}</b></div>
+                    <div><small style="color:#888; font-size:0.8em;">STOP LOSS</small><br><b style="color:#ff4b4b; font-size:1.4em;">{alert['SL']}</b></div>
+                    <div style="text-align:right;"><small style="color:#888; font-size:0.8em;">CLOSE IN</small><br><b style="font-size:1.4em;">{countdown}s</b></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
 
-        # 2. Il tasto deve essere fuori dal blocco markdown ma subito sotto
-        if st.button(f"CHIUDI ({countdown}s)", key="close_manual"):
+        # 2. IL BOTTONE (Posizionato nel codice dopo il Markdown)
+        if st.button(f"CHIUDI SEGNALE", key="close_manual"):
             st.session_state['last_alert'] = None
             if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
             st.rerun()
