@@ -290,18 +290,38 @@ def run_sentinel():
                         if 0 <= diff_min < 30:
                             s_action = None 
 
-                if s_action and not is_running:
+                if not is_running:
                     p_unit, p_fmt, p_mult, _ = get_asset_params(ticker)
                     
-                    sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
-                    tp = curr_v + (3 * atr_d) if s_action == "COMPRA" else curr_v - (3 * atr_d)
-                            
-                    # FIX: Uso delle variabili corrette definite all'inizio della funzione
-                    risk_val = current_balance * (current_risk / 100)
-                    dist_p = abs(curr_v - sl) * p_mult
+                    # 1. Calcolo Tecnico basato sulla volatilità (ATR)
+                    atr_factor = 1.5
+                    sl_dist_tecnica = atr_d * atr_factor
                     
-                    if dist_p == 0: dist_p = 0.0001
-                            
+                    if s_action == "COMPRA":
+                        sl_proposto = curr_v - sl_dist_tecnica
+                        tp = curr_v + (sl_dist_tecnica * 2) # Reward 1:2
+                    else:
+                        sl_proposto = curr_v + sl_dist_tecnica
+                        tp = curr_v - (sl_dist_tecnica * 2)
+
+                    # 2. APPLICAZIONE REGOLA PROTEZIONE 50% (Hard Limit)
+                    # Il rischio massimo per singola operazione è risk_val. 
+                    # Se lo SL tecnico supera il 50% di risk_val, lo accorciamo.
+                    risk_val = current_balance * (current_risk / 100)
+                    max_loss_allowed = risk_val * 0.50 # Limite 50% dell'investito
+                    
+                    # Calcoliamo quanto dista lo SL in termini monetari
+                    distanza_punti = abs(curr_v - sl_proposto)
+                    perdita_monetaria_tecnica = distanza_punti * p_mult * 10 # Approx valore pip/punto
+                    
+                    is_protected = False # Inizialmente falso
+                    if perdita_monetaria_tecnica > max_loss_allowed:
+                        distanza_massima_punti = max_loss_allowed / (p_mult * 10)
+                        sl = curr_v - distanza_massima_punti if s_action == "COMPRA" else curr_v + distanza_massima_punti
+                        is_protected = True # La protezione è entrata in funzione
+                    else:
+                        sl = sl_proposto
+                
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -309,6 +329,7 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(curr_v), 
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
+                        'Protezione': "ATTIVA (50%)" if is_protected else "Standard",
                         'Stato': 'In Corso',
                         'Investimento €': f"{risk_val:.2f}",
                         'Risultato €': "0.00"  # Inizialmente neutro
