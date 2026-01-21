@@ -598,8 +598,9 @@ if st.sidebar.button("TEST ALERT"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (VERSIONE FINALE COMPATIBILE) ---
+# --- 6. POPUP ALERT (VERSIONE NATIVA - NON BLOCCA SIDEBAR) ---
 if st.session_state.get('last_alert'):
+    # Inizializzazione Timer
     if 'alert_start_time' not in st.session_state:
         st.session_state['alert_start_time'] = time_lib.time()
         play_notification_sound()
@@ -607,6 +608,7 @@ if st.session_state.get('last_alert'):
     elapsed = time_lib.time() - st.session_state['alert_start_time']
     countdown = max(0, int(30 - elapsed))
     
+    # Auto-chiusura
     if elapsed > 30:
         st.session_state['last_alert'] = None
         if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
@@ -614,37 +616,26 @@ if st.session_state.get('last_alert'):
 
     if st.session_state.get('last_alert'):
         alert = st.session_state['last_alert']
-        main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+        color = "success" if alert['Direzione'] == 'COMPRA' else "error"
+        hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-        # Creiamo un overlay che non blocca i click di sistema ma mostra il messaggio
-        st.markdown(f"""
-            <div style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.9); z-index:1000; backdrop-filter:blur(10px); display:flex; justify-content:center; align-items:center;">
-                <div style="width:90%; max-width:400px; background:#111; border:3px solid {main_color}; border-radius:25px; padding:30px; text-align:center; box-shadow:0 0 50px {main_color}44;">
-                    <div style="color:{main_color}; font-weight:bold; letter-spacing:3px; font-size:0.9em;">AI SENTINEL</div>
-                    <div style="font-size:3.5em; font-weight:900; color:white; margin:10px 0; line-height:1;">{alert['Asset']}</div>
-                    <div style="background:{main_color}; color:black; padding:10px 20px; border-radius:10px; font-weight:900; font-size:1.8em; margin:15px 0; display:inline-block;">{alert['Direzione']}</div>
-                    
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin:20px 0; text-align:left; border-top:1px solid #333; padding-top:20px; color:white;">
-                        <div><small style="color:#888;">PRICE</small><br><b>{alert['Prezzo']}</b></div>
-                        <div style="text-align:right;"><small style="color:#888;">TARGET</small><br><b style="color:{main_color};">{alert['TP']}</b></div>
-                        <div><small style="color:#888;">STOP LOSS</small><br><b style="color:#ff4b4b;">{alert['SL']}</b></div>
-                        <div style="text-align:right;"><small style="color:#888;">CLOSE</small><br><b>{countdown}s</b></div>
-                    </div>
-                    
-                    <a href="/" target="_self" style="text-decoration:none;">
-                        <div style="background:#333; color:white; padding:15px; border-radius:12px; font-weight:bold; cursor:pointer; border:1px solid #555;">
-                            CHIUDI E TORNA AL GRAFICO
-                        </div>
-                    </a>
+        # Creiamo un contenitore in cima alla pagina
+        with st.container():
+            st.markdown(f"""
+                <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+                    <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+                    <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+                    <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']} | Auto-chiusura in {countdown}s</p>
                 </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Pulsante di "sicurezza" standard di Streamlit nel caso il link sopra fallisse
-        if st.button("CHIUDI MANUALE (BACKUP)", key="close_manual"):
-            st.session_state['last_alert'] = None
-            if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-            st.rerun()
+            """, unsafe_allow_html=True)
+            
+            # Tasto CHIUDI nativo di Streamlit
+            if st.button("✅ HO VISTO, CHIUDI ALERT", key="close_manual", use_container_width=True):
+                st.session_state['last_alert'] = None
+                if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+                st.rerun()
+        
+        st.divider() # Separa l'alert dal resto del grafico
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
