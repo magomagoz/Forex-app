@@ -414,9 +414,13 @@ saldo_residuo = balance - investimento_simulato
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
-col_cap1, col_cap2 = st.sidebar.columns(2)
-col_cap1.metric("Conto", f"€ {balance:.2f}")
-col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
+#col_cap1, col_cap2 = st.sidebar.columns(2)
+#col_cap1.metric("Conto", f"€ {balance:.2f}")
+#col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
+
+st.sidebar.metric("Conto", f"€ {balance:.2f}")
+st.sidebar.metric("Investimento", f"€ {investimento_simulato:.2f}")
+
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
@@ -443,7 +447,6 @@ st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 #fig_equity.add_trace(go.Scatter(y=equity_series, mode='lines', fill='tozeroy', line=dict(color='#00ffcc')))
 #fig_equity.update_layout(height=100, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 #st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
-
 
 # Dettagli operazione selezionata (se presente)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
@@ -508,24 +511,30 @@ if st.session_state['last_alert']:
     html_content = f"""
         <div class="full-screen-overlay"></div>
         <div class="popup-card">
-            <div style="letter-spacing:3px; color:{main_color}; font-weight:bold;">AI SIGNAL DETECTED</div>
-            <div style="font-size: 4em; font-weight: 800; margin: 15px 0;">{alert['Asset']}</div>
-            <div style="background:{main_color}; color:black; padding:10px; border-radius:10px; font-weight:900; font-size:1.5em;">
+            <div style="letter-spacing:3px; color:{main_color}; font-weight:bold; font-size:0.9em;">AI SIGNAL DETECTED</div>
+            <div style="font-size: 3.5em; font-weight: 800; margin: 10px 0; line-height:1;">{alert['Asset']}</div>
+            
+            <div style="background:{main_color}; color:black; padding:12px; border-radius:12px; font-weight:900; font-size:1.6em; margin-bottom:20px;">
                 🚀 {alert['Direzione']}
             </div>
-            <div style="display:flex; justify-content:space-between; margin-top:30px; border-top:1px solid #333; padding-top:20px;">
-                <div style="text-align:left;">
-                    <div style="color:#aaa; font-size:0.8em;">ENTRY PRICE</div>
-                    <div style="font-size:1.5em;">{alert['Prezzo']}</div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; border-top: 1px solid #333; padding-top: 20px;">
+                <div style="text-align: left;">
+                    <div style="color:#888; font-size:0.7em; font-weight:bold;">ENTRY</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:white;">{alert['Prezzo']}</div>
                 </div>
-                <div style="text-align:center;">
-                    <div style="color:#aaa; font-size:0.8em;">TARGET PRICE</div>
-                    <div style="font-size:1.5em; color:{main_color};">{alert['TP']}</div>
+                <div style="text-align: right;">
+                    <div style="color:#888; font-size:0.7em; font-weight:bold;">TARGET (TP)</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:{main_color};">{alert['TP']}</div>
                 </div>
-                <div style="text-align:right;">
-                    <div style="color:#aaa; font-size:0.8em;">STOP LOSS</div>
-                    <div style="font-size:1.5em;">{alert['SL']}</div>
-                </div>            
+                <div style="text-align: left;">
+                    <div style="color:#888; font-size:0.7em; font-weight:bold;">STOP LOSS (SL)</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:#ff4b4b;">{alert['SL']}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color:#888; font-size:0.7em; font-weight:bold;">RISCHIO</div>
+                    <div style="font-size:1.3em; font-weight:bold; color:#aaa;">{st.session_state.get('risk_pc', '1.0')}%</div>
+                </div>
             </div>
         </div>
     """
