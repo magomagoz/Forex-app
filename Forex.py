@@ -282,11 +282,11 @@ def run_sentinel():
                         'Asset': label, 
                         'Direzione': s_action, 
                         'Prezzo': p_fmt.format(curr_v), 
-                        'SL': p_fmt.format(sl), 
                         'TP': p_fmt.format(tp), 
-                        'Size': f"{sz:.2f}", 
+                        'SL': p_fmt.format(sl), 
+                        #'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso',
-                        'Rischio €': f"{risk_val:.2f}"
+                        'Investimento €': f"{risk_val:.2f}"
                     }
                         
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
