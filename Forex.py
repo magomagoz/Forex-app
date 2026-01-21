@@ -477,75 +477,78 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (FIXED RENDERING) ---
+# --- 5. POPUP ALERT (NON-BLOCKING & AUTO-CLOSE) ---
 if st.session_state['last_alert']:
-    play_notification_sound()
-    alert = st.session_state['last_alert']
-    main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+    # 1. Inizializzazione Timer
+    if 'alert_start_time' not in st.session_state:
+        st.session_state['alert_start_time'] = time_lib.time()
+        play_notification_sound()
 
-    # 1. CSS separato per evitare conflitti di parsing
-    st.markdown(f"""
-        <style>
-            .full-screen-overlay {{
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                background: rgba(0, 0, 0, 0.85); z-index: 9990; backdrop-filter: blur(5px);
-            }}
-            .popup-card {{
-                position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                width: 90%; max-width: 500px; background: #111;
-                border: 3px solid {main_color}; border-radius: 20px;
-                padding: 40px; text-align: center; z-index: 9995;
-                box-shadow: 0 0 60px {main_color}44; color: white;
-            }}
-            div.stButton > button {{
-                position: fixed !important; bottom: 15% !important; left: 50% !important;
-                transform: translateX(-50%) !important; z-index: 10000 !important;
-                width: 280px !important; background-color: {main_color} !important;
-                color: black !important; font-weight: bold !important;
-                border-radius: 10px !important; border: none !important;
-            }}
-        </style>
-    """, unsafe_allow_html=True)
-
-    # 2. HTML pulito (usiamo stringhe semplici senza troppe variabili annidate)
-    html_content = f"""
-        <div class="full-screen-overlay"></div>
-        <div class="popup-card">
-            <div style="letter-spacing:3px; color:{main_color}; font-weight:bold; font-size:0.9em;">AI SIGNAL DETECTED</div>
-            <div style="font-size: 3.5em; font-weight: 800; margin: 10px 0; line-height:1;">{alert['Asset']}</div>
-            
-            <div style="background:{main_color}; color:black; padding:12px; border-radius:12px; font-weight:900; font-size:1.6em; margin-bottom:20px;">
-                🚀 {alert['Direzione']}
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; border-top: 1px solid #333; padding-top: 20px;">
-                <div style="text-align: left;">
-                    <div style="color:#888; font-size:0.7em; font-weight:bold;">ENTRY</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:white;">{alert['Prezzo']}</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="color:#888; font-size:0.7em; font-weight:bold;">TARGET (TP)</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:{main_color};">{alert['TP']}</div>
-                </div>
-                <div style="text-align: left;">
-                    <div style="color:#888; font-size:0.7em; font-weight:bold;">STOP LOSS (SL)</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:#ff4b4b;">{alert['SL']}</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="color:#888; font-size:0.7em; font-weight:bold;">RISCHIO</div>
-                    <div style="font-size:1.3em; font-weight:bold; color:#aaa;">{st.session_state.get('risk_pc', '1.0')}%</div>
-                </div>
-            </div>
-        </div>
-    """
-    st.markdown(html_content, unsafe_allow_html=True)
-
-    # 3. Il tasto fisico
-    if st.button("❌ CHIUDI MONITOR", key="close_alert_btn"):
-        st.session_state['last_alert'] = None
-        st.rerun()
+    # 2. Calcolo tempo trascorso
+    elapsed = time_lib.time() - st.session_state['alert_start_time']
     
-    st.stop()
+    # 3. Auto-chiusura dopo 30 secondi
+    if elapsed > 30:
+        st.session_state['last_alert'] = None
+        if 'alert_start_time' in st.session_state:
+            del st.session_state['alert_start_time']
+        st.rerun()
+
+    # 4. Rendering grafico (Solo se l'alert esiste ancora)
+    if st.session_state['last_alert']:
+        alert = st.session_state['last_alert']
+        main_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+        countdown = int(30 - elapsed)
+
+        st.markdown(f"""
+            <style>
+                .full-screen-overlay {{
+                    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0, 0, 0, 0.8); z-index: 9990; backdrop-filter: blur(4px);
+                }}
+                .popup-card {{
+                    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
+                    width: 90%; max-width: 450px; background: #111;
+                    border: 2px solid {main_color}; border-radius: 15px;
+                    padding: 30px; text-align: center; z-index: 9995;
+                    box-shadow: 0 0 40px {main_color}33; color: white !important;
+                }}
+                .timer-bar {{
+                    height: 4px; background: {main_color};
+                    width: {(countdown/30)*100}%; transition: width 1s linear;
+                    margin-top: 15px; border-radius: 2px;
+                }}
+                /* Posizionamento pulsante Streamlit */
+                div.stButton > button[key="close_alert_btn"] {{
+                    position: fixed !important; bottom: 25% !important; left: 50% !important;
+                    transform: translateX(-50%) !important; z-index: 10000 !important;
+                    width: 200px !important; background: {main_color} !important;
+                    color: black !important; font-weight: bold !important;
+                }}
+            </style>
+            <div class="full-screen-overlay"></div>
+            <div class="popup-card">
+                <div style="color:{main_color}; font-weight:bold; font-size:0.8em;">SENTINEL AI SIGNAL</div>
+                <div style="font-size: 3em; font-weight: 800; margin: 5px 0;">{alert['Asset']}</div>
+                <div style="background:{main_color}; color:black; padding:8px; border-radius:8px; font-weight:bold; font-size:1.2em;">
+                    {alert['Direzione']}
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; text-align: left; font-size: 0.9em;">
+                    <div><span style="color:#666;">ENTRY:</span><br><b>{alert['Prezzo']}</b></div>
+                    <div style="text-align:right;"><span style="color:#666;">TARGET:</span><br><b style="color:{main_color};">{alert['TP']}</b></div>
+                    <div><span style="color:#666;">STOP:</span><br><b style="color:#ff4b4b;">{alert['SL']}</b></div>
+                    <div style="text-align:right;"><span style="color:#666;">AUTO-CLOSE:</span><br><b>{countdown}s</b></div>
+                </div>
+                <div class="timer-bar"></div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Pulsante per chiusura manuale
+        if st.button("CHIUDI ORA", key="close_alert_btn"):
+            st.session_state['last_alert'] = None
+            if 'alert_start_time' in st.session_state:
+                del st.session_state['alert_start_time']
+            st.rerun()
 
 # --- 6. BODY PRINCIPALE ---
 # Assicuriamoci che le variabili balance e risk_pc esistano già (create nella sidebar)
