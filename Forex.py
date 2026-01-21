@@ -97,6 +97,13 @@ def play_close_sound():
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
+def play_safe_sound():
+    # Un suono tipo "scatto metallico" o "ding" per indicare la messa in sicurezza
+    audio_html = """
+        <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2021/2021-preview.mp3" type="audio/mpeg"></audio>
+    """
+    st.markdown(audio_html, unsafe_allow_html=True)
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -212,7 +219,8 @@ def update_signal_outcomes():
                     df.at[idx, 'SL'] = f"{nuovo_sl:.5f}" if "JPY" not in row['Asset'] else f"{nuovo_sl:.2f}"
                     df.at[idx, 'Stato_Prot'] = 'Garantito'
                     updates_made = True
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO**\n{row['Asset']}: Stop Loss spostato in profitto garantito (20%)!")
+                    play_safe_sound() 
+                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 20%!")
 
                 # --- CONTROLLO CHIUSURA (TP o SL aggiornato) ---
                 if row['Direzione'] == 'COMPRA':
