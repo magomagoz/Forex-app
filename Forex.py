@@ -69,6 +69,21 @@ def load_history_from_csv():
             return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
     return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
 
+def load_history_from_csv():
+    if os.path.exists("permanent_signals_db.csv"):
+        try:
+            df = pd.read_csv("permanent_signals_db.csv")
+            # Lista aggiornata con le nuove colonne monetarie e di protezione
+            expected_cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 
+                             'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
+            for col in expected_cols:
+                if col not in df.columns: 
+                    df[col] = "0.00" if "€" in col else "Standard"
+            return df
+        except:
+            return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
+    return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
+
 def send_telegram_msg(msg):
     token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10" 
     chat_id = "7191509088" 
@@ -295,6 +310,8 @@ def run_sentinel():
             up_bb = float(bb_s[c_up].iloc[-1])
             
             rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
+
+            # Sostituisci il calcolo ATR e ADX con i nomi minuscoli:
             atr_d = ta.atr(df_d_s['high'], df_d_s['low'], df_d_s['close'], length=14).iloc[-1]
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1]
@@ -826,12 +843,30 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 8. FOOTER & CRONOLOGIA ---
+# --- 8. FOOTER & CRONOLOGIA (FIX ERRORI STILE) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
+# 1. Definiamo le funzioni di stile (Mancavano queste!)
+def style_status(val):
+    """Colora lo stato dell'operazione"""
+    val = str(val)
+    if 'TARGET' in val: return 'color: #00ffcc; font-weight: bold' # Verde Acqua
+    if 'STOP' in val: return 'color: #ff4b4b; font-weight: bold'   # Rosso
+    if 'DINAMICO' in val: return 'color: #ffd700; font-weight: bold' # Oro (Nuovo!)
+    if 'In Corso' in val: return 'color: #ffffff; font-weight: bold' # Bianco
+    return ''
+
+def style_results(val):
+    """Colora il risultato monetario"""
+    if not isinstance(val, str): return ''
+    if '+' in val: return 'color: #00ffcc; font-weight: bold'
+    if '-' in val: return 'color: #ff4b4b; font-weight: bold'
+    return ''
+
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
+    display_df = display_df.iloc[::-1]
     
     # --- FILTRI RAPIDI ---
     col_f1, col_f2 = st.columns([1, 2])
@@ -841,27 +876,55 @@ if not st.session_state['signal_history'].empty:
     if filtro != "Tutti":
         display_df = display_df[display_df['Stato'] == filtro]
 
-    def style_results(val):
-        if not isinstance(val, str): return ''
-        if '+' in val: return 'color: #00ffcc; font-weight: bold'
-        if '-' in val: return 'color: #ff4b4b; font-weight: bold'
-        return ''
+# 2. Visualizzazione Tabella
+if not st.session_state['signal_history'].empty:
+    # Creiamo una copia per la visualizzazione
+    display_df = st.session_state['signal_history'].copy()
     
-    # Nella visualizzazione del dataframe:
-    st.dataframe(
-        display_df.style.map(style_status, subset=['Stato'])
-                       .map(style_results, subset=['Risultato €']), 
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    csv = display_df.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Salva Cronologia", csv, "cronologia_forex.csv", "text/csv")
+    # Ordiniamo per vedere i più recenti in alto
+    display_df = display_df.iloc[::-1]
+
+    # Filtri opzionali (se vuoi tenerli)
+    status_filter = st.selectbox("Filtra per stato:", ["Tutti", "In Corso", "Chiusi"], key="hist_filter")
+    if status_filter == "In Corso":
+        display_df = display_df[display_df['Stato'] == 'In Corso']
+    elif status_filter == "Chiusi":
+        display_df = display_df[display_df['Stato'] != 'In Corso']
+
+    # Visualizziamo il DataFrame con lo stile
+    # Il try-except evita crash se mancano colonne durante i test
+    try:
+        st.dataframe(
+            display_df.style
+            .map(style_status, subset=['Stato'])
+            .map(style_results, subset=['Risultato €']),
+            use_container_width=True,
+            hide_index=True,
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+        )
+    except Exception as e:
+        st.error(f"Errore visualizzazione tabella: {e}")
+        st.dataframe(display_df, use_container_width=True) # Fallback senza colori
+
+    # Bottone Reset (Utile per pulire errori vecchi)
+    if st.button("🗑️ Reset Cronologia"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=[
+            'DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 
+            'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'
+        ])
+        save_history_permanently()
+        st.rerun()
+
 else:
-    st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
+    st.info("Nessun segnale registrato oggi.")
+    
+    # Bottone Download
+    csv = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Esporta CSV", csv, "trading_history.csv", "text/csv")
+else:
+    st.info("Nessun segnale registrato oggi.")
 
-st.markdown("---")
-
-# Assicuriamoci che le variabili balance e risk_pc esistano già (create nella sidebar)
+# --- 9. ESECUZIONE SENTINEL ---
+# Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
 if 'signal_history' in st.session_state:
     run_sentinel()
