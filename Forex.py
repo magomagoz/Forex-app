@@ -212,6 +212,9 @@ def update_signal_outcomes():
 
 def run_sentinel():
     """Scansiona tutti gli asset definiti in asset_map"""
+    current_balance = st.session_state.get('balance_val', 1000)
+    current_risk = st.session_state.get('risk_val', 1.0)
+    
     assets = list(asset_map.items())
     for label, ticker in assets:
         try:
@@ -242,30 +245,18 @@ def run_sentinel():
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1]
 
-            # 3. LOGICA SEGNALE (OTTIMIZZATA)
             s_action = None
-            
-            # DEBUG: Stampa i valori reali per capire perché non entrano segnali
-            # print(f"Analisi {label}: Prezzo {curr_v:.5f} | BB_Low {low_bb:.5f} | RSI_D {rsi_d:.1f} | ADX {curr_adx:.1f}")
 
-            # Limiti leggermente più ampi: RSI Daily (40-60) e ADX fino a 45
             if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
                 s_action = "COMPRA"
             elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
                 s_action = "VENDI"
 
-            # ... calcolo s_action ...
-            
-            # CORREZIONE QUI: Tutto questo blocco deve essere indentato sotto 'if s_action:'
             if s_action:
                 hist = st.session_state['signal_history']
-                
-                # Controllo se esiste già un trade aperto per questo asset
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
                 if not is_running:
-                    # Qui prendi i parametri. ATTENZIONE: balance e risk_pc sono variabili globali
-                    # Assicurati che siano definite prima di chiamare run_sentinel
                     p_unit, p_fmt, p_mult, _ = get_asset_params(ticker) # Aggiunto a_type per evitare errore unpack
                     
                     sl = curr_v - (1.5 * atr_d) if s_action == "COMPRA" else curr_v + (1.5 * atr_d)
@@ -285,32 +276,27 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(curr_v), 
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
-                        #'Size': f"{sz:.2f}", 
                         'Stato': 'In Corso',
                         'Investimento €': f"{risk_val:.2f}"
                     }
-                        
+
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
                     st.session_state['last_alert'] = new_sig
-                    send_telegram_msg(f"🚀 *{s_action}* {label}\n\n"
-                        f"Entry: {new_sig['Prezzo']}\n"
-                        f"TP: {new_sig['TP']}\n"
-                        f"SL: {new_sig['SL']}\n"
-                        f"Rischio: {new_sig['Rischio €']}€")
-                    st.rerun()
+                    send_telegram_msg(f"🚀 *{s_action}* {label}\nEntry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}\nInvestimento: {new_sig['Rischio €']})
+                    st.rerun() # Riavvia solo se trova un segnale
 
             st.session_state['last_scan_status'] = f"🟢 {get_now_rome().strftime('%H:%M:%S')} - {label}: OK"
-            
+
             # --- POSIZIONE DELLO SLEEP ---
             # Questo mette in pausa il bot per mezzo secondo prima di passare all'asset successivo
             time_lib.sleep(0.5) 
-            
+
         except Exception as e:
             now = get_now_rome().strftime("%H:%M:%S")
             st.session_state['last_scan_status'] = f"🔴 {now} - {label}: Errore"
             continue
-
+                    
 def get_win_rate():
     if st.session_state['signal_history'].empty:
         return "Nessun dato"
@@ -406,8 +392,8 @@ else:
 # Parametri Input
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
-balance = st.sidebar.number_input("**Conto (€)**", value=1000)
-risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 1.0, step=0.5)
+balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
+risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 1.0, step=0.5, key="risk_val")
 
 # --- CALCOLO INVESTIMENTO SIMULATO ---
 investimento_simulato = balance * (risk_pc / 100)
@@ -554,9 +540,6 @@ if st.session_state.get('last_alert'):
             st.rerun()
 
 # --- 6. BODY PRINCIPALE ---
-# Assicuriamoci che le variabili balance e risk_pc esistano già (create nella sidebar)
-if 'signal_history' in st.session_state:
-    run_sentinel()
 
 # Banner logic
 banner_path = "banner1.png"
@@ -728,3 +711,7 @@ else:
     st.write("Nessun segnale rilevato finora. In attesa di opportunità...")
 
 st.markdown("---")
+
+# Assicuriamoci che le variabili balance e risk_pc esistano già (create nella sidebar)
+if 'signal_history' in st.session_state:
+    run_sentinel()
