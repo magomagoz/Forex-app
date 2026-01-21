@@ -598,7 +598,7 @@ if st.sidebar.button("TEST ALERT"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (CON TASTO CHIUDI CORRETTO) ---
+# --- 6. POPUP ALERT (CON TASTO CHIUDI CORRETTO) ---
 if st.session_state.get('last_alert'):
     if 'alert_start_time' not in st.session_state:
         st.session_state['alert_start_time'] = time_lib.time()
