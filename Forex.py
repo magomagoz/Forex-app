@@ -371,7 +371,7 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
                         'Protezione': "ATTIVA (50%)" if is_protected else "Standard",
-                        'Stato_prot': 'In Attesa',
+                        'Stato_Prot': 'In Attesa',
                         'Stato': 'In Corso',
                         'Investimento €': f"{risk_val:.2f}",
                         'Risultato €': "0.00"  # Inizialmente neutro
@@ -452,7 +452,12 @@ def get_equity_data():
         
     return pd.Series(equity_curve)
 
-# --- 4. SIDEBAR ---
+# --- 4. ESECUZIONE SENTINEL ---
+# Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
+if 'signal_history' in st.session_state:
+    run_sentinel()
+
+# --- 5. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (1m)")
 
 # Countdown Testuale e Barra Rossa Animata
@@ -583,7 +588,7 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- 5. POPUP ALERT (CORRETTO E SEMPLIFICATO) ---
+# --- 6. POPUP ALERT (CORRETTO E SEMPLIFICATO) ---
 if st.session_state.get('last_alert'):
     # Inizializzazione Timer
     if 'alert_start_time' not in st.session_state:
@@ -689,7 +694,7 @@ if st.session_state.get('last_alert'):
             if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
             st.rerun()
 
-# --- 6. BODY PRINCIPALE ---
+# --- 7. BODY PRINCIPALE ---
 
 # Banner logic
 banner_path = "banner1.png"
@@ -808,7 +813,7 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-# --- 7. CURRENCY STRENGTH ---
+# --- 8. CURRENCY STRENGTH ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
@@ -827,7 +832,7 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 8. FOOTER & CRONOLOGIA (FIX ERRORI STILE) ---
+# --- 9. FOOTER & CRONOLOGIA (FIX ERRORI STILE) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
@@ -904,8 +909,3 @@ if not st.session_state['signal_history'].empty:
 
 else:
     st.info("Nessun segnale registrato oggi.")
-
-# --- 9. ESECUZIONE SENTINEL ---
-# Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
-if 'signal_history' in st.session_state:
-    run_sentinel()
