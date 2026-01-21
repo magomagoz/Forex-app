@@ -427,8 +427,8 @@ st.sidebar.subheader("💰 Gestione Capitale")
 #col_cap1.metric("Conto", f"€ {balance:.2f}")
 #col_cap2.metric("Investimento", f"€ {investimento_simulato:.2f}")
 
-st.sidebar.metric("Conto", f"€ {balance:.2f}")
-st.sidebar.metric("Investimento", f"€ {investimento_simulato:.2f}")
+st.sidebar.metric("Conto iniziale", f"€ {balance:.2f}")
+st.sidebar.metric("Investimento per operazione", f"€ {investimento_simulato:.2f}")
 
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
