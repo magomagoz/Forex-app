@@ -454,6 +454,25 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
 risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 1.0, step=0.5, key="risk_val")
 
+# --- Sotto il widget risk_pc ---
+st.sidebar.markdown(
+    """
+    <div style='background-color: rgba(255, 152, 0, 0.1); 
+                border: 1px solid #ff9800; 
+                padding: 10px; 
+                border-radius: 5px; 
+                margin-top: 10px;'>
+        <span style='color: #ff9800; font-weight: bold; font-size: 0.85em;'>
+            🟠 IQOption Mode: ATTIVA
+        </span><br>
+        <small style='color: #888; font-size: 0.75em;'>
+            Commissioni e Spread simulati inclusi.
+        </small>
+    </div>
+    """, 
+    unsafe_allow_html=True
+)
+
 # --- CALCOLO INVESTIMENTO SIMULATO ---
 investimento_simulato = balance * (risk_pc / 100)
 saldo_residuo = balance - investimento_simulato
