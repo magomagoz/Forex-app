@@ -432,7 +432,7 @@ dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 
 # Visualizzazione Metriche
 st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity}", delta=f"{total_return}%")
-#st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
+st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
