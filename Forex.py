@@ -588,6 +588,14 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
+if st.sidebar.button("TEST ALERT"):
+    st.session_state['last_alert'] = {
+        'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000',
+        'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'
+    }
+    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+    st.rerun()
+
 # --- 6. POPUP ALERT (CORRETTO E SEMPLIFICATO) ---
 if st.session_state.get('last_alert'):
     # Inizializzazione Timer
