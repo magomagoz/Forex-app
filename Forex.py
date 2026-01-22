@@ -822,3 +822,5 @@ if not st.session_state['signal_history'].empty:
 # 4. SE LA CRONOLOGIA È VUOTA
 else:
     st.info("Nessun segnale registrato.")
+
+
