@@ -809,16 +809,16 @@ if not st.session_state['signal_history'].empty:
         )
         
 
-    # 2. PULSANTE DOWNLOAD (Spostato qui fuori, così è sempre visibile)
-    #st.markdown(   ) # Un po' di spazio
-    csv_data = display_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Esporta Cronologia (CSV)",
-        data=csv_data,
-        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True # Lo rende grande e facile da cliccare
-    )
+# 2. PULSANTE DOWNLOAD (Spostato qui fuori, così è sempre visibile)
+st.markdown("   ") # Un po' di spazio
+csv_data = display_df.to_csv(index=False).encode('utf-8')
+st.download_button(
+    label="📥 Esporta Cronologia (CSV)",
+    data=csv_data,
+    file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+    mime="text/csv",
+    use_container_width=True # Lo rende grande e facile da cliccare
+)
 
 else:
     st.info("Nessun segnale registrato.")        
