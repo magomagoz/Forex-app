@@ -783,47 +783,17 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CON GRAFICO E FILTRI) ---
+# --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
+# Inizializziamo display_df vuoto per evitare NameError
+#display_df = pd.DataFrame()
+
+# 1. CONTROLLO SE CI SONO DATI
 if not st.session_state['signal_history'].empty:
-    full_history = st.session_state['signal_history'].copy()
-    
-    # --- A. GRAFICO DELLE PERFORMANCE (COLONNE VERTICALI) ---
-    # Filtriamo solo i trade conclusi per il calcolo economico
-    closed_df = full_history[full_history['Stato'].isin(['✅ TARGET', '❌ STOP LOSS', '🛡️ SL DINAMICO'])]
-    
-    if not closed_df.empty:
-        # Pulizia valori monetari
-        def clean_val(val):
-            try: return float(str(val).replace('+', '').replace('€', '').strip())
-            except: return 0.0
-
-        profits = closed_df[closed_df['Risultato €'].apply(lambda x: clean_val(x) > 0)]['Risultato €'].apply(clean_val).sum()
-        losses = abs(closed_df[closed_df['Risultato €'].apply(lambda x: clean_val(x) < 0)]['Risultato €'].apply(clean_val).sum())
-        netto = profits - losses
-        
-        # Creazione Grafico a Colonne
-        fig_stats = go.Figure()
-        fig_stats.add_trace(go.Bar(x=['Lordo TP'], y=[profits], marker_color='#00ffcc', name='Profitti'))
-        fig_stats.add_trace(go.Bar(x=['Lordo SL'], y=[losses], marker_color='#ff4b4b', name='Perdite'))
-        fig_stats.add_trace(go.Bar(x=['Netto Finale'], y=[netto], marker_color='#FFA500' if netto > 0 else '#555555', name='Netto'))
-
-        fig_stats.update_layout(
-            height=300, template="plotly_dark", showlegend=False,
-            margin=dict(l=10, r=10, t=30, b=10),
-            yaxis_title="Euro (€)"
-        )
-        st.plotly_chart(fig_stats, use_container_width=True)
-        
-        # Metriche veloci sopra i filtri
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Tot. Gain", f"€ {profits:.2f}")
-        m2.metric("Tot. Loss", f"€ {losses:.2f}")
-        m3.metric("Profitto Netto", f"€ {netto:.2f}", delta=f"{netto:.2f}€")
-    
-    st.markdown("---")
+    display_df = st.session_state['signal_history'].copy()
+    display_df = display_df.iloc[::-1] # Recenti in alto
 
     # --- B. INTERFACCIA FILTRI ---
     col_f1, col_f2 = st.columns([1, 2])
@@ -845,25 +815,31 @@ if not st.session_state['signal_history'].empty:
     # Ordine cronologico inverso (recenti sopra)
     display_df = display_df.iloc[::-1] 
 
-    if not display_df.empty:
+    
+    # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
+    try:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
             column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
         )
-        
-        # Pulsante Esportazione (solo filtrati)
-        csv_data = display_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label=f"📥 Esporta vista attuale ({len(display_df)} operazioni)",
-            data=csv_data,
-            file_name="cronologia_filtrata.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    else:
-        st.warning("Nessun dato corrispondente ai filtri selezionati.")
+    
+    except Exception as e:
+        # Se lo stile fallisce, mostra la tabella semplice
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
+    # Spazio e pulsante esportazione
+    st.write("") 
+    csv_data = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Esporta Cronologia (CSV)",
+        data=csv_data,
+        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+# 4. SE LA CRONOLOGIA È VUOTA
 else:
-    st.info("Nessun segnale registrato nella cronologia.")
+    st.info("Nessun segnale registrato.")
