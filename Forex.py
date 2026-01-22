@@ -787,6 +787,61 @@ else:
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
+    # --- CALCOLO STATISTICHE PER GRAFICO ---
+    # Prendiamo solo i trade chiusi con esito certo
+    closed_df = full_history[full_history['Stato'].isin(['✅ TARGET', '❌ STOP LOSS', '🛡️ SL DINAMICO'])]
+    
+    if not closed_df.empty:
+        # Pulizia e conversione dei valori monetari
+        def clean_val(val):
+            try: return float(str(val).replace('+', '').replace('€', '').strip())
+            except: return 0.0
+
+        profits = closed_df[closed_df['Risultato €'].apply(lambda x: clean_val(x) > 0)]['Risultato €'].apply(clean_val).sum()
+        losses = abs(closed_df[closed_df['Risultato €'].apply(lambda x: clean_val(x) < 0)]['Risultato €'].apply(clean_val).sum())
+        netto = profits - losses
+        
+        # Creazione Grafico a Colonne
+        fig_stats = go.Figure()
+        
+        # Colonna Profitti (Verde)
+        fig_stats.add_trace(go.Bar(
+            x=['Profitti (TP)'], y=[profits],
+            marker_color='#00ffcc', name='Lordo TP'
+        ))
+        
+        # Colonna Perdite (Rossa)
+        fig_stats.add_trace(go.Bar(
+            x=['Perdite (SL)'], y=[losses],
+            marker_color='#ff4b4b', name='Lordo SL'
+        ))
+        
+        # Colonna Netto (Blu/Gold)
+        fig_stats.add_trace(go.Bar(
+            x=['Risultato Netto'], y=[netto],
+            marker_color='#FFA500' if netto > 0 else '#555555', name='Netto'
+        ))
+
+        fig_stats.update_layout(
+            height=350,
+            title="💰 Analisi Monetaria (Profit vs Loss)",
+            template="plotly_dark",
+            showlegend=False,
+            margin=dict(l=20, r=20, t=50, b=20),
+            yaxis_title="Euro (€)"
+        )
+        
+        st.plotly_chart(fig_stats, use_container_width=True)
+        
+        # Metriche riassuntive testuali
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Totale Profitti", f"€ {profits:.2f}")
+        c2.metric("Totale Perdite", f"€ {losses:.2f}")
+        c3.metric("Bilancio Netto", f"€ {netto:.2f}", delta=f"{netto:.2f}")
+    else:
+        st.info("Statistiche non disponibili: attendi la chiusura del primo trade.")
+
+
 # Inizializziamo display_df vuoto per evitare NameError
 #display_df = pd.DataFrame()
 
