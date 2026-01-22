@@ -785,43 +785,41 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-
-# --- 9. CRONOLOGIA SEGNALI (CORREZIONE ERRORI) ---
+# --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-# Inizializziamo display_df sempre, anche se vuoto, per evitare NameError
+# Inizializziamo display_df vuoto per evitare NameError
 display_df = pd.DataFrame()
 
+# 1. CONTROLLO SE CI SONO DATI
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
-    
-    # Invertiamo l'ordine per vedere i più recenti in alto
-    display_df = display_df.iloc[::-1]
+    display_df = display_df.iloc[::-1] # Recenti in alto
 
+    # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
     try:
-        # Usiamo map invece di applymap (nuova sintassi Pandas)
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_prot', 'Investimento', 'Risultato €']
         )
-        
+    except Exception as e:
+        # Se lo stile fallisce, mostra la tabella semplice
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-        # 2. PULSANTE DOWNLOAD (Spostato qui fuori, così è sempre visibile)
-        st.markdown("   ") # Un po' di spazio
-        csv_data = display_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Esporta Cronologia (CSV)",
-            data=csv_data,
-            file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv",
-            use_container_width=True # Lo rende grande e facile da cliccare
-        )
+    # 3. PULSANTE DOWNLOAD (Sempre dentro l'IF, dopo la tabella)
+    st.markdown(" ") 
+    csv_data = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Esporta Cronologia (CSV)",
+        data=csv_data,
+        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
 
-    else:
-        st.info("Nessun segnale registrato.")        
-        except Exception as e:
-            # Se lo stile fallisce, mostra la tabella semplice invece di crashare
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+# 4. SE LA CRONOLOGIA È VUOTA
+else:
+    st.info("Nessun segnale registrato.")
