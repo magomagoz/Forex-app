@@ -810,7 +810,7 @@ if not st.session_state['signal_history'].empty:
         
 
     # 2. PULSANTE DOWNLOAD (Spostato qui fuori, così è sempre visibile)
-    st.markdown(" ") # Un po' di spazio
+    st.markdown(   ) # Un po' di spazio
     csv_data = display_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Esporta Cronologia (CSV)",
