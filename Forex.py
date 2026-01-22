@@ -346,29 +346,31 @@ def run_sentinel():
                             s_action = None 
 
 
-                    # --- LOGICA DI CALCOLO PROTEZIONE ---
+                    # --- LOGICA DI CALCOLO PROTEZIONE (CORRETTA) ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     
-                    # 1. Definiamo il budget massimo per questo trade
+                    # 1. Definiamo il budget
                     investimento_totale = current_balance * (current_risk / 100)
-                    # 2. Il limite ferreo della perdita (50%)
                     max_perdita_euro = investimento_totale * 0.50 
                     
-                    # 3. Calcoliamo quanti PUNTI di movimento prezzo corrispondono a max_perdita_euro
-                    # Formula: Distanza = Soldi / Moltiplicatore
+                    # 2. Calcoliamo la distanza
                     distanza_prezzo_sl = max_perdita_euro / p_mult
                     
-                    # 4. Applichiamo lo Stop Loss matematico
+                    # 3. Applichiamo lo Stop Loss
                     if s_action == "COMPRA":
                         sl = curr_v - distanza_prezzo_sl
-                        tp = curr_v + (distanza_prezzo_sl * 2.0) # Reward 1:2
+                        tp = curr_v + (distanza_prezzo_sl * 2.0)
                     else:
                         sl = curr_v + distanza_prezzo_sl
                         tp = curr_v - (distanza_prezzo_sl * 2.0)
                     
-                    # Verifichiamo che lo SL non sia uguale al prezzo (evita il bug USDJPY)
+                    # Verifichiamo che lo SL non sia nullo
                     if abs(sl - curr_v) < p_unit:
                         sl = curr_v - (p_unit * 10) if s_action == "COMPRA" else curr_v + (p_unit * 10)
+                    
+                    # DEFINIAMO LE VARIABILI MANCANTI
+                    is_protected = True 
+                    risk_val = investimento_totale
                                 
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
@@ -796,8 +798,9 @@ if not st.session_state['signal_history'].empty:
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_prot', 'Investimento', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_prot', 'Investimento €', 'Risultato €']
         )
+    
     except Exception as e:
         # Se lo stile fallisce, mostra la tabella semplice
         st.dataframe(display_df, use_container_width=True, hide_index=True)
