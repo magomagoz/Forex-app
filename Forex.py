@@ -164,9 +164,18 @@ def get_currency_strength():
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
-    if "-" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
-    if "JPY" in pair: return 0.01, "{:.2f}", 1000, "FOREX" 
-    return 0.0001, "{:.5f}", 10, "FOREX"
+    """
+    Restituisce: (unità_minima, formato_prezzo, moltiplicatore_reale, tipo)
+    """
+    if "BTC" in pair or "ETH" in pair:
+        # Per Crypto: 1 punto = 1 Dollaro
+        return 1.0, "{:.2f}", 1, "CRYPTO"
+    elif "JPY" in pair:
+        # Per JPY: 0.01 = 1 punto
+        return 0.01, "{:.3f}", 100, "FOREX_JPY"
+    else:
+        # Per Forex standard (EURUSD ecc): 0.0001 = 1 punto (PIP)
+        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
@@ -336,47 +345,31 @@ def run_sentinel():
                         if 0 <= diff_min < 30:
                             s_action = None 
 
-                if not is_running:
-                    p_unit, p_fmt, p_mult, _ = get_asset_params(ticker)
-                    
-                    # 1. Calcolo Tecnico basato sulla volatilità (ATR)
-                    atr_factor = 1.5
-                    sl_dist_tecnica = atr_d * atr_factor
-                    
-                    # --- CALCOLO PROTEZIONE REALE 50% ---
-                    investimento_max = float(current_balance) * (current_risk / 100)
-                    perdita_limite = investimento_max * 0.50 # Qui fissiamo il tetto a metà puntata
-                    
-                    # Calcoliamo quanti punti di distanza corrispondono alla perdita del 50%
-                    # Formula inversa: Distanza = Soldi / (Moltiplicatore * Valore Punto)
-                    distanza_max_sicura = perdita_limite / (p_mult * 10) 
-                    
-                    if s_action == "COMPRA":
-                        sl = curr_v - distanza_max_sicura
-                        tp = curr_v + (distanza_max_sicura * 2) # RR 1:2
-                    else:
-                        sl = curr_v + distanza_max_sicura
-                        tp = curr_v - (distanza_max_sicura * 2)
 
+                    # --- LOGICA DI CALCOLO PROTEZIONE ---
+                    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     
-                    # 2. APPLICAZIONE REGOLA PROTEZIONE 50% (Hard Limit)
-                    # Il rischio massimo per singola operazione è risk_val. 
-                    # Se lo SL tecnico supera il 50% di risk_val, lo accorciamo.
-                    risk_val = current_balance * (current_risk / 100)
-                    max_loss_allowed = risk_val * 0.50 # Limite 50% dell'investito
+                    # 1. Definiamo il budget massimo per questo trade
+                    investimento_totale = current_balance * (current_risk / 100)
+                    # 2. Il limite ferreo della perdita (50%)
+                    max_perdita_euro = investimento_totale * 0.50 
                     
-                    # Calcoliamo quanto dista lo SL in termini monetari
-                    distanza_punti = abs(curr_v - sl_proposto)
-                    perdita_monetaria_tecnica = distanza_punti * p_mult * 10 # Approx valore pip/punto
+                    # 3. Calcoliamo quanti PUNTI di movimento prezzo corrispondono a max_perdita_euro
+                    # Formula: Distanza = Soldi / Moltiplicatore
+                    distanza_prezzo_sl = max_perdita_euro / p_mult
                     
-                    is_protected = False # Inizialmente falso
-                    if perdita_monetaria_tecnica > max_loss_allowed:
-                        distanza_massima_punti = max_loss_allowed / (p_mult * 10)
-                        sl = curr_v - distanza_massima_punti if s_action == "COMPRA" else curr_v + distanza_massima_punti
-                        is_protected = True # La protezione è entrata in funzione
+                    # 4. Applichiamo lo Stop Loss matematico
+                    if s_action == "COMPRA":
+                        sl = curr_v - distanza_prezzo_sl
+                        tp = curr_v + (distanza_prezzo_sl * 2.0) # Reward 1:2
                     else:
-                        sl = sl_proposto
-                
+                        sl = curr_v + distanza_prezzo_sl
+                        tp = curr_v - (distanza_prezzo_sl * 2.0)
+                    
+                    # Verifichiamo che lo SL non sia uguale al prezzo (evita il bug USDJPY)
+                    if abs(sl - curr_v) < p_unit:
+                        sl = curr_v - (p_unit * 10) if s_action == "COMPRA" else curr_v + (p_unit * 10)
+                                
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
