@@ -104,6 +104,11 @@ def play_safe_sound():
     """
     st.markdown(audio_html, unsafe_allow_html=True)
 
+def style_status(val):
+    if val == '✅ TARGET': return 'color: #00ffcc;'
+    if val == '❌ STOP LOSS': return 'color: #ff4b4b;'
+    return ''
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -338,13 +343,22 @@ def run_sentinel():
                     atr_factor = 1.5
                     sl_dist_tecnica = atr_d * atr_factor
                     
+                    # --- CALCOLO PROTEZIONE REALE 50% ---
+                    investimento_max = float(current_balance) * (current_risk / 100)
+                    perdita_limite = investimento_max * 0.50 # Qui fissiamo il tetto a metà puntata
+                    
+                    # Calcoliamo quanti punti di distanza corrispondono alla perdita del 50%
+                    # Formula inversa: Distanza = Soldi / (Moltiplicatore * Valore Punto)
+                    distanza_max_sicura = perdita_limite / (p_mult * 10) 
+                    
                     if s_action == "COMPRA":
-                        sl_proposto = curr_v - sl_dist_tecnica
-                        tp = curr_v + (sl_dist_tecnica * 2) # Reward 1:2
+                        sl = curr_v - distanza_max_sicura
+                        tp = curr_v + (distanza_max_sicura * 2) # RR 1:2
                     else:
-                        sl_proposto = curr_v + sl_dist_tecnica
-                        tp = curr_v - (sl_dist_tecnica * 2)
+                        sl = curr_v + distanza_max_sicura
+                        tp = curr_v - (distanza_max_sicura * 2)
 
+                    
                     # 2. APPLICAZIONE REGOLA PROTEZIONE 50% (Hard Limit)
                     # Il rischio massimo per singola operazione è risk_val. 
                     # Se lo SL tecnico supera il 50% di risk_val, lo accorciamo.
@@ -771,6 +785,7 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
+
 # --- 9. CRONOLOGIA SEGNALI (CORREZIONE ERRORI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
@@ -793,10 +808,20 @@ if not st.session_state['signal_history'].empty:
             column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
         )
         
-        # Bottone download - ora display_df esiste sicuramente
-        csv_data = display_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Esporta CSV", csv_data, "trading_history.csv", "text/csv")
-        
+
+    # 2. PULSANTE DOWNLOAD (Spostato qui fuori, così è sempre visibile)
+    st.markdown(" ") # Un po' di spazio
+    csv_data = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Esporta Cronologia (CSV)",
+        data=csv_data,
+        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        use_container_width=True # Lo rende grande e facile da cliccare
+    )
+
+else:
+    st.info("Nessun segnale registrato.")        
     except Exception as e:
         # Se lo stile fallisce, mostra la tabella semplice invece di crashare
         st.dataframe(display_df, use_container_width=True, hide_index=True)
