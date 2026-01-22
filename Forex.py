@@ -363,6 +363,7 @@ def run_sentinel():
                     
                     # Stop Loss Fisso su ampiezza banda o % fissa
                     distanza_sl = (curr_v * 0.0010) if "JPY" not in label else (curr_v * 0.0010) # 0.1% movimento
+                    sl_proposto = curr_v - distanza_sl
                     
                     if s_action == "COMPRA":
                         sl = curr_v - distanza_sl
@@ -544,7 +545,6 @@ st.sidebar.subheader("💰 Gestione Capitale")
 st.sidebar.metric("Conto iniziale", f"€ {balance:.2f}")
 st.sidebar.metric("Investimento per operazione", f"€ {investimento_simulato:.2f}")
 
-
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
 st.sidebar.markdown("---")
@@ -563,7 +563,22 @@ dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 
 # Visualizzazione Metriche
 st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity:.2f}", delta=f"{total_return}%")
-st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
+#st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
+
+# --- LOGICA COLORE DRAWDOWN ---
+# Verde se tra 0 e 10%, Rosso se oltre 20%, Grigio/Default tra 10 e 20
+dd_color = "normal" 
+if 0 <= abs(dd) <= 10:
+    dd_color = "normal" # Streamlit usa il verde di default per i delta positivi/normali
+elif abs(dd) > 20:
+    dd_color = "inverse" # Lo rende rosso se considerato come valore negativo
+
+st.sidebar.metric(
+    "Drawdown Massimo", 
+    f"{dd:.2f}%", 
+    delta="OTTIMO" if abs(dd) <= 10 else "ATTENZIONE" if abs(dd) > 20 else "",
+    delta_color=dd_color
+)
 
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
@@ -783,42 +798,43 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
+# --- 9. CRONOLOGIA SEGNALI (CON FILTRI DINAMICI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-# Inizializziamo display_df vuoto per evitare NameError
-#display_df = pd.DataFrame()
-
-# 1. CONTROLLO SE CI SONO DATI
 if not st.session_state['signal_history'].empty:
-    display_df = st.session_state['signal_history'].copy()
-    display_df = display_df.iloc[::-1] # Recenti in alto
-
-    # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
-    try:
+    full_history = st.session_state['signal_history'].copy()
+    
+    # Widget di Filtro
+    stati_disponibili = full_history['Stato'].unique().tolist()
+    scelte_filtro = st.multiselect(
+        "Filtra per esito operazione:",
+        options=stati_disponibili,
+        default=stati_disponibili  # Di default mostra tutto
+    )
+    
+    # Applichiamo il filtro al DataFrame
+    display_df = full_history[full_history['Stato'].isin(scelte_filtro)]
+    
+    # Visualizzazione Tabella
+    if not display_df.empty:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €']
         )
-    
-    except Exception as e:
-        # Se lo stile fallisce, mostra la tabella semplice
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
-
-    # Spazio e pulsante esportazione
-    st.write("") 
+    else:
+        st.warning("Nessun segnale trovato con i filtri selezionati.")
+        
+    # Pulsante Export
     csv_data = display_df.to_csv(index=False).encode('utf-8')
     st.download_button(
-        label="📥 Esporta Cronologia (CSV)",
+        label="📥 Esporta Vista Corrente (CSV)",
         data=csv_data,
-        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+        file_name="trading_history_filtered.csv",
         mime="text/csv",
         use_container_width=True
     )
-
-# 4. SE LA CRONOLOGIA È VUOTA
 else:
     st.info("Nessun segnale registrato.")
