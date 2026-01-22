@@ -795,27 +795,6 @@ if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
     display_df = display_df.iloc[::-1] # Recenti in alto
 
-    # --- B. INTERFACCIA FILTRI ---
-    col_f1, col_f2 = st.columns([1, 2])
-    
-    with col_f1:
-        stati_disponibili = full_history['Stato'].unique().tolist()
-        filtro_stato = st.multiselect("Filtra Esito:", options=stati_disponibili, default=stati_disponibili)
-    
-    with col_f2:
-        asset_disponibili = full_history['Asset'].unique().tolist()
-        filtro_asset = st.multiselect("Filtra Asset:", options=asset_disponibili, default=asset_disponibili)
-
-    # --- C. APPLICAZIONE FILTRI E TABELLA ---
-    display_df = full_history[
-        (full_history['Stato'].isin(filtro_stato)) & 
-        (full_history['Asset'].isin(filtro_asset))
-    ]
-    
-    # Ordine cronologico inverso (recenti sopra)
-    display_df = display_df.iloc[::-1] 
-
-    
     # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
     try:
         st.dataframe(
