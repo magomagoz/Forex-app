@@ -785,7 +785,7 @@ st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 # Inizializziamo display_df vuoto per evitare NameError
-display_df = pd.DataFrame()
+#display_df = pd.DataFrame()
 
 # 1. CONTROLLO SE CI SONO DATI
 if not st.session_state['signal_history'].empty:
@@ -798,15 +798,15 @@ if not st.session_state['signal_history'].empty:
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_prot', 'Investimento €', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
         )
     
     except Exception as e:
         # Se lo stile fallisce, mostra la tabella semplice
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-    # 3. PULSANTE DOWNLOAD (Sempre dentro l'IF, dopo la tabella)
-    st.markdown(" ") 
+    # Spazio e pulsante esportazione
+    st.write("") 
     csv_data = display_df.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Esporta Cronologia (CSV)",
