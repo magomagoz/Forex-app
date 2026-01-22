@@ -105,8 +105,9 @@ def play_safe_sound():
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def style_status(val):
-    if val == '✅ TARGET': return 'color: #00ffcc;'
-    if val == '❌ STOP LOSS': return 'color: #ff4b4b;'
+    if val == '✅ TARGET': return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
+    if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
+    if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
     return ''
 
 def get_session_status():
@@ -199,11 +200,13 @@ def update_signal_outcomes():
         try:
             ticker = asset_map[row['Asset']]
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
-            
+
             if not data.empty:
                 if isinstance(data.columns, pd.MultiIndex): 
                     data.columns = data.columns.get_level_values(0)
-                
+
+                data.columns = [c.capitalize() for c in data.columns] # Assicura 'Close', 'High', etc.
+                                
                 # Dati prezzi attuali
                 current_high = float(data['High'].iloc[-1])
                 current_low = float(data['Low'].iloc[-1])
@@ -235,21 +238,20 @@ def update_signal_outcomes():
                     updates_made = True
                     play_safe_sound() 
                     send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 20%!")
-
+                
                 # --- CONTROLLO CHIUSURA (TP o SL aggiornato) ---
                 if row['Direzione'] == 'COMPRA':
                     if current_high >= tp_v: 
                         new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX # Guadagno netto
                     elif current_low <= sl_v: 
-                        # Se lo SL era "Garantito", calcoliamo il profitto del 20%
                         if row.get('Stato_Prot') == 'Garantito':
                             new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX # 20% del movimento = approx 40% dell'investimento se RR è 1:2
+                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
                         else:
                             new_status = '❌ STOP LOSS'
-                            risultato_finale = -(investimento + COMMISSIONE_APPROX)
-                        
+                            risultato_finale = -investimento # Perdi l'investimento
+                            
                 elif row['Direzione'] == 'VENDI':
                     if current_low <= tp_v: 
                         new_status = '✅ TARGET'
@@ -260,7 +262,7 @@ def update_signal_outcomes():
                             risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
                         else:
                             new_status = '❌ STOP LOSS'
-                            risultato_finale = -(investimento + COMMISSIONE_APPROX)
+                            risultato_finale = -investimento
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
