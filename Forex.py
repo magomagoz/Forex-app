@@ -820,8 +820,8 @@ if not st.session_state['signal_history'].empty:
             use_container_width=True # Lo rende grande e facile da cliccare
         )
 
-        else:
-            st.info("Nessun segnale registrato.")        
-            except Exception as e:
-                # Se lo stile fallisce, mostra la tabella semplice invece di crashare
-                st.dataframe(display_df, use_container_width=True, hide_index=True)
+    else:
+        st.info("Nessun segnale registrato.")        
+        except Exception as e:
+            # Se lo stile fallisce, mostra la tabella semplice invece di crashare
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
