@@ -632,7 +632,7 @@ for _, trade in active_trades.iterrows():
             # Trasformiamo la perc in un valore da 0 a 100 per il CSS
             # -1% -> 0%, 0% -> 50%, +1% -> 100%
             pos_barra = max(0, min(100, (latente_perc + 1) * 50))
-            color = "#339900" if latente_perc >= 0 else "#ff4b4b"
+            color = "#006400" if latente_perc >= 0 else "#ff4b4b"
             
             st.sidebar.markdown(f"""
                 <div style="margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px;">
