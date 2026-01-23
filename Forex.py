@@ -876,7 +876,7 @@ if not st.session_state['signal_history'].empty:
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento', 'Risultato €']
         )
     else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
