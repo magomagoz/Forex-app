@@ -12,6 +12,9 @@ from plotly.subplots import make_subplots
 import requests
 import os
 
+# --- COSTANTI DI MERCATO ---
+SIMULATED_SPREAD = 0.0005  # Rappresenta lo 0,05%
+
 # --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
@@ -55,7 +58,8 @@ def save_history_permanently():
         print(f"Errore salvataggio file: {e}")
 
 def load_history_from_csv():
-    cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
+    # Aggiunta la colonna Costo Spread €
+    cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot', 'Protezione']
     if os.path.exists("permanent_signals_db.csv"):
         try:
             df = pd.read_csv("permanent_signals_db.csv")
@@ -210,20 +214,19 @@ def update_signal_outcomes():
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
-            # PULIZIA CORRETTA:
             if isinstance(data.columns, pd.MultiIndex): 
                 data.columns = data.columns.get_level_values(0)
             data.columns = [c.lower() for c in data.columns]
             
-            # Prezzo attuale (ora 'close' è minuscolo dopo la pulizia)
+            # --- RECUPERO DATI OPERAZIONE ---
             current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
             investimento = float(str(row['Investimento €']).replace(',', '.'))
             direzione = row['Direzione']
             tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
-
-            # 1. Calcolo Gain % Attuale
+            
+            # --- CALCOLO GAIN (Basato su prezzo già "spread-ato") ---
             if direzione == 'COMPRA':
                 percent_gain = ((current_price - entry_v) / entry_v) * 100
             else:
@@ -232,18 +235,16 @@ def update_signal_outcomes():
             new_sl = current_sl
             status_prot = row.get('Stato_Prot', 'Iniziale')
 
-            # 2. LOGICA TRAILING STOP
+            # --- LOGICA TRAILING STOP ---
             if percent_gain >= 5.0 and 'Iniziale' in status_prot:
                 new_sl = entry_v
                 status_prot = 'BE (0%)'
                 play_safe_sound()
                 send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio!")
-
             elif percent_gain >= 10.0 and 'BE' in status_prot:
                 new_sl = entry_v * 1.05 if direzione == 'COMPRA' else entry_v * 0.95
                 status_prot = 'Safe (+5%)'
                 play_safe_sound()
-                send_telegram_msg(f"💰 {row['Asset']}: Profitto Blindato +5%!")
 
             # Aggiornamento fisico SL se cambiato
             if new_sl != current_sl:
@@ -252,14 +253,13 @@ def update_signal_outcomes():
                 df.at[idx, 'Stato_Prot'] = status_prot
                 updates_made = True
 
-            # 3. CONTROLLO CHIUSURA (CORRETTO)
+            # --- CONTROLLO CHIUSURA ---
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
             stop_hit = (direzione == 'COMPRA' and current_price <= new_sl) or (direzione == 'VENDI' and current_price >= new_sl)
 
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 df.at[idx, 'Stato'] = esito
-                # Calcolo profitto monetario reale
                 final_profit = investimento * (percent_gain / 100)
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
                 updates_made = True
@@ -363,40 +363,43 @@ def run_sentinel():
                            recent_signals = True
               
                 if not is_running and not recent_signals:
-    
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_puntata = current_balance * (current_risk / 100) # Es: 20€
-                    
-                    # 1. Definiamo la perdita massima monetaria (es. 10% della puntata)
-                    # In questo caso, se perdi il 10% di 20€, perdi 2€.
+                    investimento_puntata = current_balance * (current_risk / 100)
+                
+                    # APPLICAZIONE SPREAD 0,05%
+                    # Se COMPRI, paghi di più. Se VENDI, incassi di meno.
+                    if s_action == "COMPRA":
+                        entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
+                    else:
+                        entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
+                
+                    # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
                     percentuale_perdita_max = 0.10 
-                    
-                    # 2. Calcolo del prezzo di Stop Loss basato sulla puntata
-                    # Formula: Prezzo * (1 - (Perdita_Capitale / Moltiplicatore_Leva))
-                    # Nota: Se usi IQ Option senza leva esplicita nel calcolo, 
-                    # il prezzo deve muoversi dello 0.10% affinché tu perda il 10% con leva 100.
-                    # Qui usiamo una variazione di prezzo fissa basata sul rischio capitale:
-                    distanza_prezzo_sl = curr_v * (percentuale_perdita_max / 10) # 10 è un divisore di sicurezza per scalping
+                    distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
                 
                     if s_action == "COMPRA":
-                        sl_prezzo = curr_v - distanza_prezzo_sl
-                        tp_prezzo = curr_v * 1.005 # TP resta calcolato dall'algoritmo (es. +0.5%)
+                        sl_prezzo = entry_with_spread - distanza_prezzo_sl
+                        tp_prezzo = entry_with_spread * 1.005 
                     else:
-                        sl_prezzo = curr_v + distanza_prezzo_sl
-                        tp_prezzo = curr_v * 0.995
-                
+                        sl_prezzo = entry_with_spread + distanza_prezzo_sl
+                        tp_prezzo = entry_with_spread * 0.995
+        
+                    # Calcolo del costo dello spread in Euro basato sulla puntata
+                    costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
+                    
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
                         'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(curr_v), 
+                        'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 
                         'SL': p_fmt.format(sl_prezzo), 
                         'Stato': 'In Corso',
                         'Protezione': 'Trailing Step',
                         'Investimento €': f"{investimento_puntata:.2f}",
                         'Risultato €': "0.00",
-                        'Stato_Prot': 'Iniziale (-10%)'
+                        'Costo Spread €': f"{costo_spread_euro:.3f}", # Salviamo il costo spread
+                        'Stato_Prot': 'Iniziale'
                     }
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
@@ -873,13 +876,16 @@ if not st.session_state['signal_history'].empty:
     # Non serve .iloc[::-1]. Se vuoi essere sicuro al 100%, usa:
     display_df = df_filtrato.reset_index(drop=True)
 
+    
     if not display_df.empty:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
+            # Aggiunto 'Costo Spread €' tra Risultato e Stato_Prot
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot', 'Protezione']
         )
+
     else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
 
