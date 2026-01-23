@@ -618,7 +618,7 @@ if not active_trades.empty:
             latente_perc = p_diff * 100
             
             # Colore dinamico
-            color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
+            color = "#006400" if latente_perc >= 0 else "#ff4b4b"
             
             with st.sidebar.container():
                 st.markdown(f"""
