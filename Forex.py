@@ -110,6 +110,19 @@ def style_status(val):
     if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
     return ''
 
+def get_trailing_params(asset_name):
+    """
+    Ritorna: (Step1_BE, Step2_Save, SL_Iniziale_Percent)
+    Forex: Scaglioni stretti per micro-movimenti
+    Crypto: Scaglioni larghi per alta volatilità
+    """
+    if any(x in asset_name for x in ["BTC", "ETH"]):
+        # Parametri Crypto
+        return 5.0, 10.0, -10.0  # +5% -> BE, +10% -> +5%, Inizio -10%
+    else:
+        # Parametri Forex
+        return 0.5, 1.0, -2.0    # +0.5% -> BE, +1.0% -> +0.5%, Inizio -2% (Forex a -10% è troppo lontano)
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -195,74 +208,47 @@ def detect_divergence(df):
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
+    updates = False
     
-    COMMISSIONE_APPROX = 0.02 
-    updates_made = False
-    
-    # Iteriamo solo sui trade aperti
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            ticker = asset_map[row['Asset']]
-            data = yf.download(ticker, period="1d", interval="1m", progress=False)
+            # Recuperiamo i parametri per questo specifico asset
+            st_be, st_save, _ = get_trailing_params(row['Asset'])
+            data = yf.download(asset_map[row['Asset']], period="1d", interval="1m", progress=False)
+            curr_p = float(data['Close'].iloc[-1])
+            entry_v = float(str(row['Prezzo']).replace(',', '.'))
+            
+            # Calcolo Gain %
+            gain = ((curr_p - entry_v) / entry_v * 100) if row['Direzione'] == 'COMPRA' else ((entry_v - curr_p) / entry_v * 100)
+            
+            current_sl = float(str(row['SL']).replace(',', '.'))
+            new_sl = current_sl
+            new_prot = row['Stato_Prot']
 
-            if not data.empty:
-                # Pulizia colonne per evitare MultiIndex error
-                if isinstance(data.columns, pd.MultiIndex): 
-                    data.columns = data.columns.get_level_values(0)
-                data.columns = [c.capitalize() for c in data.columns] # Force: Open, High, Low, Close
-                                
-                current_high = float(data['High'].iloc[-1])
-                current_low = float(data['Low'].iloc[-1])
-                current_close = float(data['Close'].iloc[-1])
-                
-                entry_v = float(str(row['Prezzo']).replace(',', '.'))
-                sl_v = float(str(row['SL']).replace(',', '.')) 
-                tp_v = float(str(row['TP']).replace(',', '.'))
-                investimento = float(str(row['Investimento €']).replace(',', '.'))
-                
-                new_status = None
-                risultato_finale = 0.0
+            # STEP 1: Sposta a Breakeven (0%)
+            if gain >= st_be and 'Iniziale' in row['Stato_Prot']:
+                new_sl = entry_v
+                new_prot = '🛡️ BE (0%)'
+            
+            # STEP 2: Blindatura Profitto (+5% per Crypto o +0.5% per Forex)
+            elif gain >= st_save and 'BE' in row['Stato_Prot']:
+                new_sl = entry_v * (1 + st_be/100) if row['Direzione'] == 'COMPRA' else entry_v * (1 - st_be/100)
+                new_prot = f'💰 SAFE (+{st_be}%)'
 
-                # --- TARGET DINAMICO ---
-                dist_target = abs(tp_v - entry_v)
-                progresso = abs(current_close - entry_v)
-                
-                if progresso >= (dist_target * 0.25) and row.get('Stato_Prot') != 'Garantito':
-                    if row['Direzione'] == 'COMPRA':
-                        nuovo_sl = entry_v + (dist_target * 0.20)
-                    else:
-                        nuovo_sl = entry_v - (dist_target * 0.20)
-                    
-                    df.at[idx, 'SL'] = f"{nuovo_sl:.5f}" if "JPY" not in row['Asset'] else f"{nuovo_sl:.2f}"
-                    df.at[idx, 'Stato_Prot'] = 'Garantito'
-                    updates_made = True
-                    play_safe_sound() 
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 20%!")
-                
-                # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
-                if row['Direzione'] == 'COMPRA':
-                    if current_high >= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_low <= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento 
-                            
-                elif row['Direzione'] == 'VENDI':
-                    if current_low <= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_high >= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento
+            if new_sl != current_sl:
+                df.at[idx, 'SL'] = f"{new_sl:.5f}" if "JPY" not in row['Asset'] else f"{new_sl:.2f}"
+                df.at[idx, 'Stato_Prot'] = new_prot
+                updates = True
+                play_safe_sound()
+                send_telegram_msg(f"🔄 {row['Asset']} aggiornato: {new_prot}")
+
+            # --- CONTROLLO CHIUSURA ---
+            # Se il prezzo attuale tocca il (nuovo) SL, chiudiamo il trade
+            if (row['Direzione'] == 'COMPRA' and curr_p <= new_sl) or (row['Direzione'] == 'VENDI' and curr_p >= new_sl):
+                df.at[idx, 'Stato'] = '🛡️ SL DINAMICO' if 'Iniziale' not in new_prot else '❌ STOP LOSS'
+                df.at[idx, 'Risultato €'] = f"{(gain/100 * float(row['Investimento €'])):+.2f}"
+                updates = True
+                play_close_sound()
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
@@ -368,43 +354,36 @@ def run_sentinel():
                         if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
                            recent_signals = True
 
+
+                
                 if not is_running and not recent_signals:
-                    # --- CALCOLO SIZE E PARAMETRI CON PROTEZIONE 50% ---
-                    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_totale = current_balance * (current_risk / 100)
+                    # --- Dentro run_sentinel() dove crei new_sig ---
+                    st_be, st_save, sl_init_pc = get_trailing_params(label)
+                    p_unit, p_fmt = get_asset_params(label)
                     
-                    # Calcoliamo la distanza massima permessa (50% dell'investimento)
-                    # Nel trading con moltiplicatore, il 50% di perdita corrisponde a metà escursione verso lo SL
-                    distanza_sl = (curr_v * 0.0010) # Distanza base calcolata dall'algoritmo
-                    
-                    # --- LOGICA DI SICUREZZA AGGIUNTA ---
-                    # Se la distanza calcolata è troppo ampia, la forziamo 
-                    # per assicurarci di non perdere mai più del 50% della puntata
-                    max_dist_sicura = curr_v * 0.0045 # Esempio: limite escursione prezzo
-                    distanza_sl = min(distanza_sl, max_dist_sicura)
-                    
+                    # Calcolo SL iniziale (es. -10% per Crypto, -2% per Forex)
                     if s_action == "COMPRA":
-                        sl = curr_v - distanza_sl
-                        tp = curr_v + (distanza_sl * 2.0)
+                        sl_v = curr_v * (1 + (sl_init_pc / 100))
+                        tp_v = curr_v * (1 + (st_save * 2 / 100)) # Target ambizioso
                     else:
-                        sl = curr_v + distanza_sl
-                        tp = curr_v - (distanza_sl * 2.0)
-                 
+                        sl_v = curr_v * (1 - (sl_init_pc / 100))
+                        tp_v = curr_v * (1 - (st_save * 2 / 100))
+                    
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
-                        'Asset': label, 
-                        'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(curr_v), 
-                        'TP': p_fmt.format(tp), 
-                        'SL': p_fmt.format(sl), 
-                        'Protezione': "ATTIVA (50%)" if distanza_sl == max_dist_sicura else "Standard",
-                        'Stato_Prot': 'In Attesa',
+                        'Asset': label,
+                        'Direzione': s_action,
+                        'Prezzo': p_fmt.format(curr_v),
+                        'SL': p_fmt.format(sl_v),
+                        'TP': p_fmt.format(tp_v),
                         'Stato': 'In Corso',
-                        'Investimento €': f"{investimento_totale:.2f}",
-                        'Risultato €': "0.00"
+                        'Investimento €': f"{investimento:.2f}",
+                        'Risultato €': "0.00",
+                        'Stato_Prot': f'Iniziale ({sl_init_pc}%)', # Tracciamo lo step attuale
+                        'Protezione': 'Trailing 2-Step'
                     }
-                    
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig])], ignore_index=True)
+
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
