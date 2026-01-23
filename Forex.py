@@ -189,7 +189,7 @@ def detect_divergence(df):
     return "Neutrale"
     
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
-
+    
 # ... (le altre funzioni save_history, send_telegram rimangono uguali, incolla da qui in giù) ...
 
 def update_signal_outcomes():
