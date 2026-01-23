@@ -804,33 +804,49 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CON FILTRI INCROCIATI) ---
+# --- 9. CRONOLOGIA SEGNALI (FILTRI PULITI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 if not st.session_state['signal_history'].empty:
     full_history = st.session_state['signal_history'].copy()
     
-    # --- UI FILTRI ---
+    # --- UI FILTRI COMPATTI ---
     col_f1, col_f2 = st.columns(2)
     
     with col_f1:
-        stati_disponibili = sorted(full_history['Stato'].unique().tolist())
-        filtro_stato = st.multiselect("Filtra Esito:", stati_disponibili, default=stati_disponibili)
+        # Usiamo una lista vuota come default per non mostrare i "pulsanti"
+        opzioni_stato = sorted(full_history['Stato'].unique().tolist())
+        filtro_stato = st.multiselect(
+            "Filtra Esito (vuoto = tutti):", 
+            options=opzioni_stato, 
+            default=[], 
+            placeholder="Tutti gli esiti"
+        )
     
     with col_f2:
-        asset_disponibili = sorted(full_history['Asset'].unique().tolist())
-        filtro_asset = st.multiselect("Filtra Valuta:", asset_disponibili, default=asset_disponibili)
+        opzioni_asset = sorted(full_history['Asset'].unique().tolist())
+        filtro_asset = st.multiselect(
+            "Filtra Valuta (vuoto = tutte):", 
+            options=opzioni_asset, 
+            default=[], 
+            placeholder="Tutte le valute"
+        )
 
-    # --- APPLICAZIONE FILTRI ---
-    display_df = full_history[
-        (full_history['Stato'].isin(filtro_stato)) & 
-        (full_history['Asset'].isin(filtro_asset))
-    ]
+    # --- LOGICA DI FILTRAGGIO ---
+    # Se la lista è vuota, non filtriamo (mostriamo tutto)
+    df_filtrato = full_history.copy()
     
-    # Ordine cronologico (ultimi segnali in alto)
-    display_df = display_df.iloc[::-1] 
+    if filtro_stato:
+        df_filtrato = df_filtrato[df_filtrato['Stato'].isin(filtro_stato)]
+    
+    if filtro_asset:
+        df_filtrato = df_filtrato[df_filtrato['Asset'].isin(filtro_asset)]
+    
+    # Inversione per vedere i più recenti in alto
+    display_df = df_filtrato.iloc[::-1] 
 
+    # --- VISUALIZZAZIONE ---
     if not display_df.empty:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
@@ -839,16 +855,15 @@ if not st.session_state['signal_history'].empty:
             column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
         )
         
-        # Download dinamico
-        csv_data = display_df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label=f"📥 Esporta vista ({len(display_df)} righe)",
-            data=csv_data,
-            file_name="trading_filtered.csv",
+            label=f"📥 Esporta vista attuale ({len(display_df)} righe)",
+            data=display_df.to_csv(index=False).encode('utf-8'),
+            file_name="cronologia_trading.csv",
             mime="text/csv",
             use_container_width=True
         )
     else:
-        st.warning("Nessun segnale trovato con i filtri correnti.")
+        st.warning("Nessun dato corrispondente ai filtri selezionati.")
+
 else:
-    st.info("Cronologia vuota.")
+    st.info("Nessun segnale registrato.")
