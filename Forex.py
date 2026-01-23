@@ -11,7 +11,18 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 import os
+from iqoptionapi.stable_api import IQ_Option
 
+def login_iq(email, password):
+    I_p = IQ_Option(email, password)
+    check, reason = I_p.connect()
+    if check:
+        I_p.change_balance("PRACTICE") # Forza il conto Practice
+        return I_p
+    else:
+        st.error(f"Errore connessione: {reason}")
+        return None
+        
 # --- COSTANTI DI MERCATO ---
 SIMULATED_SPREAD = 0.0005  # Rappresenta lo 0,05%
 
@@ -423,6 +434,29 @@ def run_sentinel():
                         'Stato_Prot': 'Iniziale'
                     }
 
+
+                    # Sostituisci la parte dell'invio ordine con questa logica:
+                    if st.session_state.get('iq_connected'):
+                        api = st.session_state['iq_api']
+                        
+                        # Parametri: (importo, asset, direzione, timeframe_in_minuti)
+                        # Nota: IQ Option richiede la direzione 'call' o 'put'
+                        direzione_iq = "call" if s_action == "COMPRA" else "put"
+                        
+                        # Per il Forex/Crypto CFD:
+                        check, id = api.buy_order(
+                            instrument_type="crypto" if "BTC" in label else "forex",
+                            instrument_id=label,
+                            side="buy" if s_action == "COMPRA" else "sell",
+                            amount=investimento_puntata,
+                            leverage=1, # Puoi regolare la leva qui
+                            limit_price=None,
+                            stop_lose_kind="percent",
+                            stop_lose_value=10, # Il tuo 10%
+                            take_profit_kind="percent",
+                            take_profit_value=20
+                        )
+
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     
                     st.session_state['last_alert'] = new_sig
@@ -441,7 +475,6 @@ def run_sentinel():
     # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
-# Sostituisci la tua funzione get_win_rate con questa:
 def display_performance_stats():
     if st.session_state['signal_history'].empty:
         return
@@ -926,4 +959,3 @@ if not st.session_state['signal_history'].empty:
 # 4. SE LA CRONOLOGIA È VUOTA
 else:
     st.info(f"📖 **In attesa di un segnale da registrare**")
-
