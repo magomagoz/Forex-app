@@ -679,7 +679,6 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 st.sidebar.markdown("---")
 
 # --- TASTO ESPORTAZIONE DATI ---
-st.sidebar.markdown("---")
 st.sidebar.subheader("💾 Backup Report")
 
 if not st.session_state['signal_history'].empty:
