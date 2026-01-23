@@ -55,19 +55,16 @@ def save_history_permanently():
         print(f"Errore salvataggio file: {e}")
 
 def load_history_from_csv():
+    cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
     if os.path.exists("permanent_signals_db.csv"):
         try:
             df = pd.read_csv("permanent_signals_db.csv")
-            # Lista aggiornata con le nuove colonne monetarie e di protezione
-            expected_cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 
-                             'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
-            for col in expected_cols:
-                if col not in df.columns: 
-                    df[col] = "0.00" if "€" in col else "Standard"
+            for col in cols:
+                if col not in df.columns: df[col] = "0.00"
             return df
         except:
-            return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
-    return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
+            return pd.DataFrame(columns=cols)
+    return pd.DataFrame(columns=cols)
 
 def send_telegram_msg(msg):
     token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10" 
@@ -213,14 +210,19 @@ def update_signal_outcomes():
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
-            # Prezzo attuale e variabili pulite
-            current_price = float(data['Close'].iloc[-1])
+            # PULIZIA CORRETTA:
+            if isinstance(data.columns, pd.MultiIndex): 
+                data.columns = data.columns.get_level_values(0)
+            data.columns = [c.lower() for c in data.columns]
+            
+            # Prezzo attuale (ora 'close' è minuscolo dopo la pulizia)
+            current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
             investimento = float(str(row['Investimento €']).replace(',', '.'))
             direzione = row['Direzione']
             tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
-            
+
             # 1. Calcolo Gain % Attuale
             if direzione == 'COMPRA':
                 percent_gain = ((current_price - entry_v) / entry_v) * 100
@@ -876,7 +878,7 @@ if not st.session_state['signal_history'].empty:
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
         )
     else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
