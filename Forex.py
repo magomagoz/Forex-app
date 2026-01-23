@@ -665,7 +665,23 @@ for s_name, is_open in get_session_status().items():
     status_text = "APERTO" if is_open else "CHIUSO"
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
-   
+
+# --- TASTO ESPORTAZIONE DATI ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("💾 Backup Report")
+
+if not st.session_state['signal_history'].empty:
+    csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button(
+        label="📥 **Salva cronologia**",
+        data=csv_data,
+        file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+else:
+    st.sidebar.info("Nessun dato da esportare")
+
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
@@ -678,20 +694,6 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-# --- TASTO ESPORTAZIONE DATI ---
-st.sidebar.subheader("💾 Backup Report")
-
-if not st.session_state['signal_history'].empty:
-    csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(
-        label="📥 SCARICA CRONOLOGIA CSV",
-        data=csv_data,
-        file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-else:
-    st.sidebar.info("Nessun dato da esportare")
 
 #if st.sidebar.button("TEST ALERT"):
     #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
