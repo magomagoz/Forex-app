@@ -123,15 +123,13 @@ def style_status(val):
 def get_trailing_params(asset_name):
     """
     Ritorna: (Step1_BE, Step2_Save, SL_Iniziale_Percent)
-    Forex: Scaglioni stretti per micro-movimenti
-    Crypto: Scaglioni larghi per alta volatilità
     """
     if any(x in asset_name for x in ["BTC", "ETH"]):
-        # Parametri Crypto
-        return 5.0, 10.0, -10.0  # +5% -> BE, +10% -> +5%, Inizio -10%
+        # Parametri richiesti per CRYPTO
+        return 3.0, 6.0, -10.0  # +3% -> BE, +6% -> +3%, Inizio -10%
     else:
-        # Parametri Forex
-        return 0.5, 1.0, -2.0    # +0.5% -> BE, +1.0% -> +0.5%, Inizio -2% (Forex a -10% è troppo lontano)
+        # Parametri per FOREX (10 volte più piccoli)
+        return 0.3, 0.6, -1.0   # +0.3% -> BE, +0.6% -> +0.3%, Inizio -1%
 
 def get_session_status():
     now_rome = get_now_rome().time()
