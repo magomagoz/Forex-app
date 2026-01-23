@@ -404,9 +404,11 @@ def run_sentinel():
                         'Risultato €': "0.00"
                     }
                     
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    save_history_permanently()
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig])], ignore_index=True)
+                    
                     st.session_state['last_alert'] = new_sig
+                    save_history_permanently()
+
                     
                     telegram_text = (f"🚀 *{s_action}* {label}\n"
                                      f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
