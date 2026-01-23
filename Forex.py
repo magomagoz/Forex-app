@@ -610,9 +610,9 @@ display_performance_stats()
 # --- MONITORAGGIO TRADE ATTIVI NELLA SIDEBAR (OTTIMIZZATO) ---
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
-if not active_trades.empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⚡ Monitor Real-Time")
+#if not active_trades.empty:
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚡ Monitor Real-Time")
     
 for _, trade in active_trades.iterrows():
     try:
