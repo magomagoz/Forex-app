@@ -883,4 +883,5 @@ if not st.session_state['signal_history'].empty:
 
 # 4. SE LA CRONOLOGIA È VUOTA
 else:
-    st.info("in attesa di un segnale da registrare.")
+    st.info(f"📖 **In attesa di un segnale da registrare**")
+
