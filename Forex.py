@@ -211,7 +211,6 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
     
-# --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
@@ -375,8 +374,7 @@ def run_sentinel():
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_puntata = current_balance * (current_risk / 100)
                 
-                    # APPLICAZIONE SPREAD 0,05%
-                    # Se COMPRI, paghi di più. Se VENDI, incassi di meno.
+                    # APPLICAZIONE SPREAD
                     if s_action == "COMPRA":
                         entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
                     else:
@@ -429,7 +427,6 @@ def run_sentinel():
     # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
-# Sostituisci la tua funzione get_win_rate con questa:
 def display_performance_stats():
     if st.session_state['signal_history'].empty:
         return
@@ -442,7 +439,7 @@ def display_performance_stats():
         wr = (vittorie / len(conclusi)) * 100
         st.sidebar.write(f"📊 **Win Rate**: {wr:.1f}% ({vittorie}/{len(conclusi)})")
 
-# --- INIZIALIZZAZIONE STATO (Session State) ---
+# --- 3. INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
     st.session_state['signal_history'] = load_history_from_csv()
 if 'sentinel_logs' not in st.session_state:
@@ -452,7 +449,7 @@ if 'last_alert' not in st.session_state:
 if 'last_scan_status' not in st.session_state:
     st.session_state['last_scan_status'] = "In attesa..."
 
-# --- 3. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
+# --- ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
 # Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
 update_signal_outcomes()
 
@@ -483,8 +480,7 @@ def get_equity_data():
         
     return pd.Series(equity_curve)
 
-# --- 4. ESECUZIONE SENTINEL ---
-# Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
+# --- 5. ESECUZIONE SENTINEL ---
 if 'signal_history' in st.session_state:
     run_sentinel()
 
@@ -492,7 +488,7 @@ if 'signal_history' in st.session_state:
 st.sidebar.header("🛠 Trading Desk (1m)")
 
 # Countdown Testuale e Barra Rossa Animata
-st.sidebar.markdown("⏳ **Prossimo Scan**")
+st.sidebar.subheader("⏳ **Prossimo Scan**")
 
 # CSS per la barra che si riempie in 60 secondi
 st.sidebar.markdown("""
@@ -652,7 +648,7 @@ for _, trade in active_trades.iterrows():
 # Dettagli operazione selezionata (se presente)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 if not active_trades.empty:
-    st.sidebar.warning("⚡ Ultima Operazione Attiva")
+    st.sidebar.success("⚡ Ultima Operazione Attiva")
     last_t = active_trades.iloc[0]
     st.sidebar.write(f"Asset: **{last_t['Asset']}**")
     st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
@@ -687,13 +683,12 @@ st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
     st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
 
-    if st.button("SÌ, CANCELLA ORA"):
+    if st.button("🔥 SÌ, CANCELLA ORA 🔥"):
         st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
         save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
         st.rerun()
 
 st.sidebar.markdown("---")
-
 
 #if st.sidebar.button("TEST ALERT"):
     #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
@@ -732,12 +727,6 @@ if st.session_state.get('last_alert'):
     
     st.divider()
 
-# --- LOGICA DI PULIZIA AUTOMATICA ---
-# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
-#if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
-        # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
-        # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
-
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
 banner_path = "banner1.png"
@@ -750,7 +739,6 @@ st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_ma
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
 st.markdown("---")
-#st.subheader("📈 Grafico in tempo reale")
 st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
 
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
