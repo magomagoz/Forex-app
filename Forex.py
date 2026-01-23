@@ -286,6 +286,11 @@ def run_sentinel():
         if len(st.session_state['signal_history']) > 50:
             st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
             save_history_permanently()
+
+    # Azzera i popup aperti all'inizio di ogni nuovo ciclo di scansione
+    st.session_state['last_alert'] = None
+    if 'alert_notified' in st.session_state: 
+        del st.session_state['alert_notified']
     
     #"""Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
@@ -636,25 +641,12 @@ st.sidebar.markdown("---")
 
 #st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (LOGICA REFRESH INTEGRATA) ---
+# --- 6. POPUP ALERT (SINCRONIZZATO CON REFRESH 60s) ---
 if st.session_state.get('last_alert'):
-    # Disabilita il refresh lento e attiva quello veloce (1s)
-    # Usiamo una chiave diversa per forzare il ricalcolo immediato
-    st_autorefresh(interval=1000, key="active_alert_counter")
-    
-    if 'alert_start_time' not in st.session_state:
-        st.session_state['alert_start_time'] = time_lib.time()
+    # Suona solo la prima volta che appare l'alert
+    if 'alert_notified' not in st.session_state:
         play_notification_sound()
-
-    elapsed = time_lib.time() - st.session_state['alert_start_time']
-    countdown = max(0, int(60 - elapsed))
-    
-    # Auto-chiusura allo scadere dei 60 secondi
-    if elapsed >= 60:
-        st.session_state['last_alert'] = None
-        if 'alert_start_time' in st.session_state: 
-            del st.session_state['alert_start_time']
-        st.rerun()
+        st.session_state['alert_notified'] = True
 
     alert = st.session_state['last_alert']
     hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
@@ -662,22 +654,28 @@ if st.session_state.get('last_alert'):
     # Box Alert Grafico
     st.markdown(f"""
         <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE RILEVATO: {alert['Asset']}</h2>
             <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-            <div style="background-color: #222; border-radius: 10px; padding: 5px; display: inline-block; min-width: 150px; border: 1px solid #444;">
-                <span style="color: #ffcc00; font-weight: bold; font-size: 1.3em;">⏳ Chiusura alert in 60s</span>
+            <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']}</p>
+            <div style="margin-top: 10px; font-size: 0.8em; color: #555;">
+                Questo alert scomparirà automaticamente al prossimo aggiornamento della sentinella.
             </div>
-            <p style="color: #888; margin-top: 10px; font-size: 0.9em;">TP: {alert['TP']} | SL: {alert['SL']}</p>
         </div>
     """, unsafe_allow_html=True)
     
-    if st.button("✅ CONFERMA E CHIUDI", key="close_manual", use_container_width=True):
+    # Tasto per chiusura manuale immediata
+    if st.button("✅ CHIUDI ALERT ORA", use_container_width=True):
         st.session_state['last_alert'] = None
-        if 'alert_start_time' in st.session_state: 
-            del st.session_state['alert_start_time']
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
         st.rerun()
     
     st.divider()
+
+# --- LOGICA DI PULIZIA AUTOMATICA ---
+# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
+if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
+    # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
+    # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
