@@ -397,12 +397,12 @@ def run_sentinel():
                     distanza_sl = min(distanza_sl, max_dist_sicura)
                     
                     if s_action == "COMPRA":
-                        sl = curr_v - distanza_sl
-                        tp = curr_v + (distanza_sl * 2.0)
+                        sl = curr_v * 0.90
+                        tp = curr_v * 1.20
                     else:
-                        sl = curr_v + distanza_sl
-                        tp = curr_v - (distanza_sl * 2.0)
-                 
+                        sl = curr_v * 1.10
+                        tp = curr_v * 0.80
+
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -410,8 +410,8 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(curr_v), 
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
-                        'Protezione': "ATTIVA (50%)" if distanza_sl == max_dist_sicura else "Standard",
-                        'Stato_Prot': 'In Attesa',
+                        'Protezione': 'Trailing Step',
+                        'Stato_Prot': 'Iniziale (-10%)',
                         'Stato': 'In Corso',
                         'Investimento €': f"{investimento_totale:.2f}",
                         'Risultato €': "0.00"
