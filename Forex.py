@@ -880,3 +880,7 @@ if not st.session_state['signal_history'].empty:
         )
     else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
+
+# 4. SE LA CRONOLOGIA È VUOTA
+else:
+    st.info("in attesa di un segnale da registrare.")
