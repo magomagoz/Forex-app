@@ -614,41 +614,40 @@ if not active_trades.empty:
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚡ Monitor Real-Time")
     
-    for _, trade in active_trades.iterrows():
-        try:
-            # Recupero rapido dell'ultimo prezzo dal database o download leggero
-            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
-            # Usiamo un periodo brevissimo per non sovraccaricare
-            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+for _, trade in active_trades.iterrows():
+    try:
+        t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+        t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+        
+        if not t_data.empty:
+            curr_p = float(t_data['Close'].iloc[-1])
+            entry_p = float(str(trade['Prezzo']).replace(',', '.'))
+            inv = float(str(trade['Investimento €']).replace(',', '.'))
             
-            if not t_data.empty:
-                curr_p = float(t_data['Close'].iloc[-1])
-                entry_p = float(str(trade['Prezzo']).replace(',', '.'))
-                inv = float(str(trade['Investimento €']).replace(',', '.'))
-                
-                # Calcolo profitto/perdita attuale
-                if trade['Direzione'] == 'COMPRA':
-                    p_diff = (curr_p - entry_p) / entry_p
-                else:
-                    p_diff = (entry_p - curr_p) / entry_p
-                
-                latente_euro = inv * p_diff
-                latente_perc = p_diff * 100
-                
-                # Colore dinamico
-                color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
-                
-                st.sidebar.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
-                        <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
-                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
-                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
-                        </span>
+            # Calcolo profitto/perdita
+            p_diff = ((curr_p - entry_p) / entry_p) if trade['Direzione'] == 'COMPRA' else ((entry_p - curr_p) / entry_p)
+            latente_perc = p_diff * 100
+            
+            # Parametri Barra (Limitiamo visivamente tra -1 e 1 per la scala)
+            # Trasformiamo la perc in un valore da 0 a 100 per il CSS
+            # -1% -> 0%, 0% -> 50%, +1% -> 100%
+            pos_barra = max(0, min(100, (latente_perc + 1) * 50))
+            color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
+            
+            st.sidebar.markdown(f"""
+                <div style="margin-bottom: 15px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.85em;">
+                        <b>{trade['Asset']}</b>
+                        <span style="color:{color}; font-weight:bold;">{latente_perc:+.2f}%</span>
                     </div>
-                """, unsafe_allow_html=True)
-        except:
-            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
-            continue
+                    <div style="width: 100%; background: #333; height: 6px; border-radius: 3px; margin-top: 5px; position: relative;">
+                        <div style="position: absolute; left: 50%; width: 2px; height: 8px; background: white; top: -1px; z-index: 1;"></div>
+                        <div style="width: {pos_barra}%; background: {color}; height: 100%; border-radius: 3px; transition: width 0.5s;"></div>
+                    </div>
+                </div>
+            """, unsafe_allow_html=True)
+    except:
+        continue
 
 # Dettagli operazione selezionata (se presente)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
