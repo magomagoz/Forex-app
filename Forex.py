@@ -361,48 +361,47 @@ def run_sentinel():
                            recent_signals = True
               
                 if not is_running and not recent_signals:
-                    # --- Dentro run_sentinel() dove crei new_sig ---
-                   # --- CALCOLO SIZE E PARAMETRI CON PROTEZIONE 50% ---
+    
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_totale = current_balance * (current_risk / 100)
+                    investimento_puntata = current_balance * (current_risk / 100) # Es: 20€
                     
-                    # Calcoliamo la distanza massima permessa (50% dell'investimento)
-                    # Nel trading con moltiplicatore, il 50% di perdita corrisponde a metà escursione verso lo SL
-                    distanza_sl = (curr_v * 0.0010) # Distanza base calcolata dall'algoritmo
+                    # 1. Definiamo la perdita massima monetaria (es. 10% della puntata)
+                    # In questo caso, se perdi il 10% di 20€, perdi 2€.
+                    percentuale_perdita_max = 0.10 
                     
-                    # --- LOGICA DI SICUREZZA AGGIUNTA ---
-                    # Se la distanza calcolata è troppo ampia, la forziamo 
-                    # per assicurarci di non perdere mai più del 50% della puntata
-                    max_dist_sicura = curr_v * 0.0045 # Esempio: limite escursione prezzo
-                    distanza_sl = min(distanza_sl, max_dist_sicura)
-                    
+                    # 2. Calcolo del prezzo di Stop Loss basato sulla puntata
+                    # Formula: Prezzo * (1 - (Perdita_Capitale / Moltiplicatore_Leva))
+                    # Nota: Se usi IQ Option senza leva esplicita nel calcolo, 
+                    # il prezzo deve muoversi dello 0.10% affinché tu perda il 10% con leva 100.
+                    # Qui usiamo una variazione di prezzo fissa basata sul rischio capitale:
+                    distanza_prezzo_sl = curr_v * (percentuale_perdita_max / 10) # 10 è un divisore di sicurezza per scalping
+                
                     if s_action == "COMPRA":
-                        sl = curr_v * 0.90
-                        tp = curr_v * 1.20
+                        sl_prezzo = curr_v - distanza_prezzo_sl
+                        tp_prezzo = curr_v * 1.005 # TP resta calcolato dall'algoritmo (es. +0.5%)
                     else:
-                        sl = curr_v * 1.10
-                        tp = curr_v * 0.80
-
+                        sl_prezzo = curr_v + distanza_prezzo_sl
+                        tp_prezzo = curr_v * 0.995
+                
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
                         'Direzione': s_action, 
                         'Prezzo': p_fmt.format(curr_v), 
-                        'TP': p_fmt.format(tp), 
-                        'SL': p_fmt.format(sl), 
-                        'Protezione': 'Trailing Step',
-                        'Stato_Prot': 'Iniziale (-10%)',
+                        'TP': p_fmt.format(tp_prezzo), 
+                        'SL': p_fmt.format(sl_prezzo), 
                         'Stato': 'In Corso',
-                        'Investimento €': f"{investimento_totale:.2f}",
-                        'Risultato €': "0.00"
+                        'Protezione': 'Trailing Step',
+                        'Investimento €': f"{investimento_puntata:.2f}",
+                        'Risultato €': "0.00",
+                        'Stato_Prot': 'Iniziale (-10%)'
                     }
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
-
-                    
+  
                     telegram_text = (f"🚀 *{s_action}* {label}\n"
                                      f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
                     send_telegram_msg(telegram_text)
