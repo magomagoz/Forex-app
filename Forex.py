@@ -886,7 +886,7 @@ if not st.session_state['signal_history'].empty:
         df_filtrato = df_filtrato[df_filtrato['Asset'].isin(filtro_asset)]
     
     # Inversione per vedere i più recenti in alto
-    display_df = df_filtrato.iloc[::-1] 
+    #display_df = df_filtrato.iloc[::-1] 
 
     # --- VISUALIZZAZIONE ---
     if not display_df.empty:
