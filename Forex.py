@@ -594,33 +594,48 @@ st.sidebar.metric(
 
 display_performance_stats()
 
-# --- MONITORAGGIO LIVE SIDEBAR ---
+# --- MONITORAGGIO TRADE ATTIVI NELLA SIDEBAR ---
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+
 if not active_trades.empty:
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚡ Monitor Real-Time")
+    
     for _, trade in active_trades.iterrows():
         try:
+            # Recupero dati rapidi per il calcolo latente
             t_data = yf.download(asset_map[trade['Asset']], period="1d", interval="1m", progress=False)
-            cp = t_data['Close'].iloc[-1]
-            ev = float(str(trade['Prezzo']).replace(',', '.'))
+            curr_p = float(t_data['Close'].iloc[-1])
+            entry_p = float(str(trade['Prezzo']).replace(',', '.'))
             inv = float(str(trade['Investimento €']).replace(',', '.'))
             
-            p_pct = ((cp - ev)/ev*100) if trade['Direzione'] == 'COMPRA' else ((ev - cp)/ev*100)
-            color = "#00ffcc" if p_pct >= 0 else "#ff4b4b"
+            # Calcolo profitto/perdita attuale
+            if trade['Direzione'] == 'COMPRA':
+                p_diff = (curr_p - entry_p) / entry_p
+            else:
+                p_diff = (entry_p - curr_p) / entry_p
             
-            st.sidebar.markdown(f"**{trade['Asset']}**: <span style='color:{color}'>{p_pct:+.2f}% ({inv*(p_pct/100):+.2f}€)</span>", unsafe_allow_html=True)
-            # Barra di progresso dinamica
-            progress_val = min(max((p_pct + 10) / 20, 0.0), 1.0)
-            st.sidebar.progress(progress_val)
+            latente_euro = inv * p_diff
+            latente_perc = p_diff * 100
+            
+            # Colore dinamico
+            color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
+            
+            with st.sidebar.container():
+                st.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px;">
+                        <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
+                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # Barra visiva del profitto
+                progress_val = min(max((latente_perc + 10) / 20, 0.0), 1.0) # Range mappato tra -10% e +10%
+                st.sidebar.progress(progress_val)
         except:
             continue
-
-# Grafico Equity (Piccolo e pulito)
-#fig_equity = go.Figure()
-#fig_equity.add_trace(go.Scatter(y=equity_series, mode='lines', fill='tozeroy', line=dict(color='#00ffcc')))
-#fig_equity.update_layout(height=100, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-#st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
 
 # Dettagli operazione selezionata (se presente)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
