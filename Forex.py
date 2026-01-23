@@ -108,7 +108,15 @@ def play_safe_sound():
 def style_status(val):
     if val == '✅ TARGET': return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
     if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
-    if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
+    if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
+    
+    # Se il valore è numerico e positivo/negativo (per la colonna Risultato)
+    try:
+        num = float(str(val).replace('+', ''))
+        if num > 0: return 'color: #00ffcc; font-weight: bold;'
+        if num < 0: return 'color: #ff4b4b; font-weight: bold;'
+    except:
+        pass
     return ''
 
 def get_trailing_params(asset_name):
@@ -670,6 +678,22 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
+# --- TASTO ESPORTAZIONE DATI ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("💾 Backup Report")
+
+if not st.session_state['signal_history'].empty:
+    csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button(
+        label="📥 SCARICA CRONOLOGIA CSV",
+        data=csv_data,
+        file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+else:
+    st.sidebar.info("Nessun dato da esportare")
+
 #if st.sidebar.button("TEST ALERT"):
     #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
     #if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
@@ -879,11 +903,10 @@ if not st.session_state['signal_history'].empty:
     
     if not display_df.empty:
         st.dataframe(
-            display_df.style.map(style_status, subset=['Stato']),
+            display_df.style.map(style_status, subset=['Stato', 'Risultato €']), # Aggiunto Risultato €
             use_container_width=True,
             hide_index=True,
-            # Aggiunto 'Costo Spread €' tra Risultato e Stato_Prot
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot', 'Protezione']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
         )
 
     else:
