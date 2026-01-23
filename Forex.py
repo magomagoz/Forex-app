@@ -287,7 +287,7 @@ def run_sentinel():
             st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
             save_history_permanently()
     
-    """Scansiona tutti gli asset e popola il Debug Monitor"""
+    #"""Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
     current_risk = st.session_state.get('risk_val', 1.0)
     
@@ -826,7 +826,7 @@ if not st.session_state['signal_history'].empty:
         # Usiamo una lista vuota come default per non mostrare i "pulsanti"
         opzioni_stato = sorted(full_history['Stato'].unique().tolist())
         filtro_stato = st.multiselect(
-            "Filtra Esito (vuoto = tutti):", 
+            "Filtra Esito:", 
             options=opzioni_stato, 
             default=[], 
             placeholder="Tutti gli esiti"
@@ -835,7 +835,7 @@ if not st.session_state['signal_history'].empty:
     with col_f2:
         opzioni_asset = sorted(full_history['Asset'].unique().tolist())
         filtro_asset = st.multiselect(
-            "Filtra Valuta (vuoto = tutte):", 
+            "Filtra Valuta:", 
             options=opzioni_asset, 
             default=[], 
             placeholder="Tutte le valute"
