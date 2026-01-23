@@ -280,6 +280,13 @@ def update_signal_outcomes():
         save_history_permanently()
 
 def run_sentinel():
+    # --- AUTO-PULIZIA CRONOLOGIA (Gestione Memoria) ---
+    if not st.session_state['signal_history'].empty:
+        # Se superiamo i 50 record, teniamo solo i 50 più recenti
+        if len(st.session_state['signal_history']) > 50:
+            st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
+            save_history_permanently()
+    
     """Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
     current_risk = st.session_state.get('risk_val', 1.0)
@@ -409,19 +416,18 @@ def run_sentinel():
     # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
-def get_win_rate():
+# Sostituisci la tua funzione get_win_rate con questa:
+def display_performance_stats():
     if st.session_state['signal_history'].empty:
-        return "Nessun dato"
+        return
+    
     df = st.session_state['signal_history']
-    # Consideriamo conclusi solo quelli che non sono "In Corso"
-    closed_trades = df[df['Stato'] != 'In Corso']
-    total = len(closed_trades)
+    conclusi = df[df['Stato'].str.contains('TARGET|STOP|DINAMICO', na=False)]
     
-    if total == 0: return "In attesa di chiusure..."
-    
-    wins = len(closed_trades[closed_trades['Stato'] == '✅ TARGET'])
-    wr = (wins / total) * 100
-    return f"Win Rate: {wr:.1f}% ({wins}/{total})"
+    if not conclusi.empty:
+        vittorie = len(conclusi[conclusi['Stato'] == '✅ TARGET'])
+        wr = (vittorie / len(conclusi)) * 100
+        st.sidebar.write(f"📊 **Win Rate**: {wr:.1f}% ({vittorie}/{len(conclusi)})")
 
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
@@ -585,6 +591,8 @@ st.sidebar.metric(
     delta="OTTIMO" if abs(dd) <= 10 else "ATTENZIONE" if abs(dd) > 20 else "",
     delta_color=dd_color
 )
+
+display_performance_stats()
 
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
