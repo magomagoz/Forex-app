@@ -400,10 +400,10 @@ def run_sentinel():
                     
                     if s_action == "COMPRA":
                         sl_prezzo = entry_with_spread - distanza_sl # <-- USA distanza_sl, NON distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 1.05 # Target più ampio per far correre il trailing
+                        tp_prezzo = entry_with_spread * 1.20 # Target più ampio per far correre il trailing
                     else:
                         sl_prezzo = entry_with_spread + distanza_sl # <-- USA distanza_sl
-                        tp_prezzo = entry_with_spread * 0.95
+                        tp_prezzo = entry_with_spread * 0.80
         
                     # Calcolo del costo dello spread in Euro basato sulla puntata
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
