@@ -636,46 +636,48 @@ st.sidebar.markdown("---")
 
 #st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (VERSIONE NATIVA - NON BLOCCA SIDEBAR) ---
+# --- 6. POPUP ALERT (LOGICA REFRESH INTEGRATA) ---
 if st.session_state.get('last_alert'):
-    # Inizializzazione Timer
-    st_autorefresh(interval=1000, key="countdown_refresh")
+    # Disabilita il refresh lento e attiva quello veloce (1s)
+    # Usiamo una chiave diversa per forzare il ricalcolo immediato
+    st_autorefresh(interval=1000, key="active_alert_counter")
     
     if 'alert_start_time' not in st.session_state:
         st.session_state['alert_start_time'] = time_lib.time()
         play_notification_sound()
 
     elapsed = time_lib.time() - st.session_state['alert_start_time']
-    countdown = max(0, int(30 - elapsed))
+    countdown = max(0, int(60 - elapsed))
     
-    # Auto-chiusura
-    if elapsed > 30:
+    # Auto-chiusura allo scadere dei 60 secondi
+    if elapsed >= 60:
         st.session_state['last_alert'] = None
-        if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+        if 'alert_start_time' in st.session_state: 
+            del st.session_state['alert_start_time']
         st.rerun()
 
-    if st.session_state.get('last_alert'):
-        alert = st.session_state['last_alert']
-        color = "success" if alert['Direzione'] == 'COMPRA' else "error"
-        hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+    alert = st.session_state['last_alert']
+    hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-        # Creiamo un contenitore in cima alla pagina
-        with st.container():
-            st.markdown(f"""
-            <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-                <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
-                <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-                <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']} | Auto-chiusura in 30s</p>
+    # Box Alert Grafico
+    st.markdown(f"""
+        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+            <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+            <div style="background-color: #222; border-radius: 10px; padding: 5px; display: inline-block; min-width: 150px; border: 1px solid #444;">
+                <span style="color: #ffcc00; font-weight: bold; font-size: 1.3em;">⏳ Chiusura alert in 60s</span>
             </div>
-        """, unsafe_allow_html=True)
-            
-            # Tasto CHIUDI nativo di Streamlit
-            if st.button("✅ HO VISTO, CHIUDI ALERT", key="close_manual", use_container_width=True):
-                st.session_state['last_alert'] = None
-                if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-                st.rerun()
-        
-        st.divider() # Separa l'alert dal resto del grafico
+            <p style="color: #888; margin-top: 10px; font-size: 0.9em;">TP: {alert['TP']} | SL: {alert['SL']}</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("✅ CONFERMA E CHIUDI", key="close_manual", use_container_width=True):
+        st.session_state['last_alert'] = None
+        if 'alert_start_time' in st.session_state: 
+            del st.session_state['alert_start_time']
+        st.rerun()
+    
+    st.divider()
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
