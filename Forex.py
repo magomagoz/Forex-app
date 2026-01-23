@@ -677,26 +677,26 @@ if st.session_state.get('last_alert'):
         # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
         # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
 
-# --- 7. BODY PRINCIPALE ---
-# Banner logic
-banner_path = "banner1.png"
-if os.path.exists(banner_path):
-    st.image(banner_path, use_container_width=True)
-else:
-    st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
-
-st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 Forex e 2 Crypto) in tempo reale (1m).")
-st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
-
-st.markdown("---")
-#st.subheader("📈 Grafico in tempo reale")
-st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
-
-p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
-df_rt = get_realtime_data(pair) 
-df_d = yf.download(pair, period="1y", interval="1d", progress=False)
-
-if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
+    # --- 7. BODY PRINCIPALE ---
+    # Banner logic
+    banner_path = "banner1.png"
+    if os.path.exists(banner_path):
+        st.image(banner_path, use_container_width=True)
+    else:
+        st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
+    
+    st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 Forex e 2 Crypto) in tempo reale (1m).")
+    st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+    
+    st.markdown("---")
+    #st.subheader("📈 Grafico in tempo reale")
+    st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
+    
+    p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
+    df_rt = get_realtime_data(pair) 
+    df_d = yf.download(pair, period="1y", interval="1d", progress=False)
+    
+    if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
     
     # Pulizia dati
     if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
