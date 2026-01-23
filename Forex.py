@@ -514,7 +514,7 @@ st.sidebar.markdown("""
     <div class="container-bar"><div class="red-bar"></div></div>
 """, unsafe_allow_html=True)
 
-with st.sidebar.expander("🔍 Live Sentinel Data", expanded=True):
+with st.sidebar.expander("🔍 **Live Sentinel Data**", expanded=True):
     if 'sentinel_logs' in st.session_state and st.session_state['sentinel_logs']:
         for log in st.session_state['sentinel_logs']:
             st.caption(log)
