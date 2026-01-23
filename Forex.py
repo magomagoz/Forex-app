@@ -668,7 +668,7 @@ unsafe_allow_html=True)
 
 # --- TASTO ESPORTAZIONE DATI ---
 st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Backup Report")
+#st.sidebar.subheader("💾 Backup Report")
 
 if not st.session_state['signal_history'].empty:
     csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
