@@ -503,7 +503,7 @@ st.sidebar.markdown("""
         }
         .container-bar {
             width: 100%; background-color: #222; border-radius: 5px;
-            height: 12px; margin-bottom: 25px; border: 1px solid #555; overflow: hidden;
+            height: 12px; margin-bottom: 25px; border: 1px solid #444; overflow: hidden;
         }
         .red-bar {
             height: 100%; background-color: #ff4b4b; width: 0%;
