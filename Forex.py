@@ -375,7 +375,7 @@ def run_sentinel():
                     # --- LOGICA DI SICUREZZA AGGIUNTA ---
                     # Se la distanza calcolata è troppo ampia, la forziamo 
                     # per assicurarci di non perdere mai più del 50% della puntata
-                    max_dist_sicura = curr_v * 0.0050 # Esempio: limite escursione prezzo
+                    max_dist_sicura = curr_v * 0.0045 # Esempio: limite escursione prezzo
                     distanza_sl = min(distanza_sl, max_dist_sicura)
                     
                     if s_action == "COMPRA":
