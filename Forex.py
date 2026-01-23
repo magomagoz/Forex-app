@@ -662,17 +662,12 @@ if st.session_state.get('last_alert'):
         # Creiamo un contenitore in cima alla pagina
         with st.container():
             st.markdown(f"""
-                <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-                    <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
-                    <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-                    <div style="background-color: #222; border-radius: 10px; padding: 5px; display: inline-block; min-width: 200px;">
-                        <p style="color: #ffcc00; font-weight: bold; font-size: 1.2em; margin: 0;">
-                            ⏳ Scompare tra: {countdown}s
-                        </p>
-                    </div>
-                    <p style="color: #888; margin-top: 5px;">TP: {alert['TP']} | SL: {alert['SL']}</p>
-                </div>
-            """, unsafe_allow_html=True)
+            <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+                <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+                <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+                <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']} | Auto-chiusura in 30s</p>
+            </div>
+        """, unsafe_allow_html=True)
             
             # Tasto CHIUDI nativo di Streamlit
             if st.button("✅ HO VISTO, CHIUDI ALERT", key="close_manual", use_container_width=True):
