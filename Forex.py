@@ -58,16 +58,17 @@ def save_history_permanently():
         print(f"Errore salvataggio file: {e}")
 
 def load_history_from_csv():
-    # Aggiunta la colonna Costo Spread €
     cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot', 'Protezione']
     if os.path.exists("permanent_signals_db.csv"):
         try:
             df = pd.read_csv("permanent_signals_db.csv")
+            # Forza la presenza di tutte le colonne necessarie
             for col in cols:
                 if col not in df.columns: df[col] = "0.00"
             return df
         except:
             return pd.DataFrame(columns=cols)
+    # Se il file non esiste, crea un DataFrame vuoto con le colonne giuste
     return pd.DataFrame(columns=cols)
 
 def send_telegram_msg(msg):
