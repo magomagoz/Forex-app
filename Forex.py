@@ -503,7 +503,7 @@ st.sidebar.markdown("""
         }
         .container-bar {
             width: 100%; background-color: #222; border-radius: 5px;
-            height: 12px; margin-bottom: 25px; border: 1px solid #444; overflow: hidden;
+            height: 12px; margin-bottom: 25px; border: 1px solid #555; overflow: hidden;
         }
         .red-bar {
             height: 100%; background-color: #ff4b4b; width: 0%;
@@ -514,7 +514,7 @@ st.sidebar.markdown("""
     <div class="container-bar"><div class="red-bar"></div></div>
 """, unsafe_allow_html=True)
 
-with st.sidebar.expander("🔍 **Live Sentinel Data**", expanded=True):
+with st.sidebar.expander("🔍 Live Sentinel Data", expanded=True):
     if 'sentinel_logs' in st.session_state and st.session_state['sentinel_logs']:
         for log in st.session_state['sentinel_logs']:
             st.caption(log)
