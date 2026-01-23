@@ -598,7 +598,7 @@ st.sidebar.metric(
 
 display_performance_stats()
 
-# --- MONITORAGGIO TRADE ATTIVI NELLA SIDEBAR ---
+# --- MONITORAGGIO TRADE ATTIVI NELLA SIDEBAR (OTTIMIZZATO) ---
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
 if not active_trades.empty:
@@ -607,38 +607,38 @@ if not active_trades.empty:
     
     for _, trade in active_trades.iterrows():
         try:
-            # Recupero dati rapidi per il calcolo latente
-            t_data = yf.download(asset_map[trade['Asset']], period="1d", interval="1m", progress=False)
-            curr_p = float(t_data['Close'].iloc[-1])
-            entry_p = float(str(trade['Prezzo']).replace(',', '.'))
-            inv = float(str(trade['Investimento €']).replace(',', '.'))
+            # Recupero rapido dell'ultimo prezzo dal database o download leggero
+            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+            # Usiamo un periodo brevissimo per non sovraccaricare
+            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
             
-            # Calcolo profitto/perdita attuale
-            if trade['Direzione'] == 'COMPRA':
-                p_diff = (curr_p - entry_p) / entry_p
-            else:
-                p_diff = (entry_p - curr_p) / entry_p
-            
-            latente_euro = inv * p_diff
-            latente_perc = p_diff * 100
-            
-            # Colore dinamico
-            color = "#006400" if latente_perc >= 0 else "#ff4b4b"
-            
-            with st.sidebar.container():
-                st.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px;">
+            if not t_data.empty:
+                curr_p = float(t_data['Close'].iloc[-1])
+                entry_p = float(str(trade['Prezzo']).replace(',', '.'))
+                inv = float(str(trade['Investimento €']).replace(',', '.'))
+                
+                # Calcolo profitto/perdita attuale
+                if trade['Direzione'] == 'COMPRA':
+                    p_diff = (curr_p - entry_p) / entry_p
+                else:
+                    p_diff = (entry_p - curr_p) / entry_p
+                
+                latente_euro = inv * p_diff
+                latente_perc = p_diff * 100
+                
+                # Colore dinamico
+                color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
+                
+                st.sidebar.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
                         <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
                         <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
                             {latente_perc:+.2f}% ({latente_euro:+.2f}€)
                         </span>
                     </div>
                 """, unsafe_allow_html=True)
-                
-                # Barra visiva del profitto
-                progress_val = min(max((latente_perc + 10) / 20, 0.0), 1.0) # Range mappato tra -10% e +10%
-                st.sidebar.progress(progress_val)
         except:
+            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
             continue
 
 # Dettagli operazione selezionata (se presente)
