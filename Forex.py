@@ -294,10 +294,13 @@ def run_sentinel():
     st.session_state['last_alert'] = None
     if 'alert_notified' in st.session_state: 
         del st.session_state['alert_notified']
+
+    # Prendi i valori DIRETTAMENTE dai widget della sidebar usando le chiavi
+    # Se il widget non è ancora renderizzato, usa i default
+    current_balance = st.session_state.balance_val if 'balance_val' in st.session_state else 1000
+    current_risk = st.session_state.risk_val if 'risk_val' in st.session_state else 2.0
     
-    #"""Scansiona tutti gli asset e popola il Debug Monitor"""
-    current_balance = st.session_state.get('balance_val', 1000)
-    current_risk = st.session_state.get('risk_val', 1.0)
+    investimento_puntata = current_balance * (current_risk / 100)
     
     # Lista per il monitoraggio live nella sidebar
     debug_list = []
@@ -666,18 +669,6 @@ for s_name, is_open in get_session_status().items():
     status_text = "APERTO" if is_open else "CHIUSO"
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
-   
-# Reset Sidebar
-st.sidebar.markdown("---")
-with st.sidebar.popover("🗑️ **Reset Cronologia**"):
-    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
-
-    if st.button("SÌ, CANCELLA ORA"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-        save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
-        st.rerun()
-
-st.sidebar.markdown("---")
 
 # --- TASTO ESPORTAZIONE DATI ---
 st.sidebar.markdown("---")
@@ -694,6 +685,16 @@ if not st.session_state['signal_history'].empty:
     )
 else:
     st.sidebar.info("Nessun dato da esportare")
+
+# Reset Sidebar
+st.sidebar.markdown("---")
+with st.sidebar.popover("🗑️ **Reset Cronologia**"):
+    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
+
+    if st.button("SÌ, CANCELLA ORA"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+        save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
+        st.rerun()
 
 #if st.sidebar.button("TEST ALERT"):
     #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
