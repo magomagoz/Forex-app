@@ -684,30 +684,30 @@ if os.path.exists(banner_path):
     st.image(banner_path, use_container_width=True)
 else:
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
-    
+
 st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 Forex e 2 Crypto) in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
-    
+
 st.markdown("---")
 #st.subheader("📈 Grafico in tempo reale")
 st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
-    
+
 p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
-    
+
 if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
     
-# Pulizia dati
-if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
-df_d.columns = [c.lower() for c in df_d.columns]
+    # Pulizia dati
+    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
+    df_d.columns = [c.lower() for c in df_d.columns]
     
-# Calcolo indicatori
-bb = ta.bbands(df_rt['close'], length=20, std=2)
-df_rt = pd.concat([df_rt, bb], axis=1)
-df_rt['rsi'] = ta.rsi(df_rt['close'], length=14)
-df_d['rsi'] = ta.rsi(df_d['close'], length=14)
-df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
+    # Calcolo indicatori
+    bb = ta.bbands(df_rt['close'], length=20, std=2)
+    df_rt = pd.concat([df_rt, bb], axis=1)
+    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14)
+    df_d['rsi'] = ta.rsi(df_d['close'], length=14)
+    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
           
     c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
     c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
