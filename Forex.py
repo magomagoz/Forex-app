@@ -536,6 +536,32 @@ if 'signal_history' in st.session_state:
 # --- 5. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (1m)")
 
+# --- SEZIONE LOGIN IQ OPTION NELLA SIDEBAR ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔌 Connessione Broker")
+
+if 'iq_connected' not in st.session_state:
+    st.session_state['iq_connected'] = False
+
+with st.sidebar.expander("Configura IQ Option", expanded=not st.session_state['iq_connected']):
+    iq_email = st.text_input("Email IQ", placeholder="tua@email.com")
+    iq_pass = st.text_input("Password IQ", type="password")
+    
+    if st.button("CONNETTI ACCOUNT PRACTICE"):
+        with st.spinner("Accesso in corso..."):
+            api = login_iq(iq_email, iq_pass)
+            if api:
+                st.session_state['iq_api'] = api
+                st.session_state['iq_connected'] = True
+                st.success("Connesso al conto Practice!")
+                st.rerun()
+
+if st.session_state['iq_connected']:
+    if st.sidebar.button("🔴 DISCONNETTI"):
+        st.session_state['iq_connected'] = False
+        st.session_state['iq_api'] = None
+        st.rerun()
+
 # Countdown Testuale e Barra Rossa Animata
 st.sidebar.markdown("⏳ **Prossimo Scan**")
 
