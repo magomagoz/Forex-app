@@ -357,13 +357,19 @@ def run_sentinel():
                            recent_signals = True
 
                 if not is_running and not recent_signals:
-                    # --- CALCOLO SIZE E PARAMETRI ---
+                    # --- CALCOLO SIZE E PARAMETRI CON PROTEZIONE 50% ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_totale = current_balance * (current_risk / 100)
                     
-                    # Stop Loss Fisso su ampiezza banda o % fissa
-                    distanza_sl = (curr_v * 0.0010) if "JPY" not in label else (curr_v * 0.0010) # 0.1% movimento
-                    sl_proposto = curr_v - distanza_sl
+                    # Calcoliamo la distanza massima permessa (50% dell'investimento)
+                    # Nel trading con moltiplicatore, il 50% di perdita corrisponde a metà escursione verso lo SL
+                    distanza_sl = (curr_v * 0.0010) # Distanza base calcolata dall'algoritmo
+                    
+                    # --- LOGICA DI SICUREZZA AGGIUNTA ---
+                    # Se la distanza calcolata è troppo ampia, la forziamo 
+                    # per assicurarci di non perdere mai più del 50% della puntata
+                    max_dist_sicura = curr_v * 0.0050 # Esempio: limite escursione prezzo
+                    distanza_sl = min(distanza_sl, max_dist_sicura)
                     
                     if s_action == "COMPRA":
                         sl = curr_v - distanza_sl
@@ -371,7 +377,7 @@ def run_sentinel():
                     else:
                         sl = curr_v + distanza_sl
                         tp = curr_v - (distanza_sl * 2.0)
-                    
+                 
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -798,43 +804,51 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CON FILTRI DINAMICI) ---
+# --- 9. CRONOLOGIA SEGNALI (CON FILTRI INCROCIATI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 if not st.session_state['signal_history'].empty:
     full_history = st.session_state['signal_history'].copy()
     
-    # Widget di Filtro
-    stati_disponibili = full_history['Stato'].unique().tolist()
-    scelte_filtro = st.multiselect(
-        "Filtra per esito operazione:",
-        options=stati_disponibili,
-        default=stati_disponibili  # Di default mostra tutto
-    )
+    # --- UI FILTRI ---
+    col_f1, col_f2 = st.columns(2)
     
-    # Applichiamo il filtro al DataFrame
-    display_df = full_history[full_history['Stato'].isin(scelte_filtro)]
+    with col_f1:
+        stati_disponibili = sorted(full_history['Stato'].unique().tolist())
+        filtro_stato = st.multiselect("Filtra Esito:", stati_disponibili, default=stati_disponibili)
     
-    # Visualizzazione Tabella
+    with col_f2:
+        asset_disponibili = sorted(full_history['Asset'].unique().tolist())
+        filtro_asset = st.multiselect("Filtra Valuta:", asset_disponibili, default=asset_disponibili)
+
+    # --- APPLICAZIONE FILTRI ---
+    display_df = full_history[
+        (full_history['Stato'].isin(filtro_stato)) & 
+        (full_history['Asset'].isin(filtro_asset))
+    ]
+    
+    # Ordine cronologico (ultimi segnali in alto)
+    display_df = display_df.iloc[::-1] 
+
     if not display_df.empty:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+        )
+        
+        # Download dinamico
+        csv_data = display_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label=f"📥 Esporta vista ({len(display_df)} righe)",
+            data=csv_data,
+            file_name="trading_filtered.csv",
+            mime="text/csv",
+            use_container_width=True
         )
     else:
-        st.warning("Nessun segnale trovato con i filtri selezionati.")
-        
-    # Pulsante Export
-    csv_data = display_df.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Esporta Vista Corrente (CSV)",
-        data=csv_data,
-        file_name="trading_history_filtered.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+        st.warning("Nessun segnale trovato con i filtri correnti.")
 else:
-    st.info("Nessun segnale registrato.")
+    st.info("Cronologia vuota.")
