@@ -242,15 +242,23 @@ def update_signal_outcomes():
             new_sl = current_sl
             status_prot = row.get('Stato_Prot', 'Iniziale')
 
-            # --- LOGICA TRAILING STOP ---
-            if percent_gain >= 5.0 and 'Iniziale' in status_prot:
+            # Recupera i parametri in base all'asset
+            step_be, step_save, sl_inizio = get_trailing_params(row['Asset'])
+            
+            # --- LOGICA TRAILING STOP PERSONALIZZATA ---
+            # 1. Se il profitto arriva al 3% (o 0.3% Forex) -> Sposta a Pareggio (0%)
+            if percent_gain >= step_be and 'Iniziale' in status_prot:
                 new_sl = entry_v
-                status_prot = 'BE (0%)'
+                status_prot = f'BE (0%)'
                 play_safe_sound()
                 send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio!")
-            elif percent_gain >= 10.0 and 'BE' in status_prot:
-                new_sl = entry_v * 1.05 if direzione == 'COMPRA' else entry_v * 0.95
-                status_prot = 'Safe (+5%)'
+            
+            # 2. Se il profitto arriva al 6% (o 0.6% Forex) -> Blocca il 3% (o 0.3% Forex)
+            elif percent_gain >= step_save and 'BE' in status_prot:
+                # Calcola il prezzo che corrisponde al +3% (o +0.3%)
+                offset = step_be / 100
+                new_sl = entry_v * (1 + offset) if direzione == 'COMPRA' else entry_v * (1 - offset)
+                status_prot = f'Safe (+{step_be}%)'
                 play_safe_sound()
 
             # Aggiornamento fisico SL se cambiato
@@ -384,15 +392,18 @@ def run_sentinel():
                         entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
                 
                     # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
-                    percentuale_perdita_max = 0.10 
-                    distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
-                
+                    percentuale_perdita_max = 0.10
+                    # --- CODICE DA CORREGGERE ---
+                    # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
+                    _, _, sl_percent_init = get_trailing_params(label) 
+                    distanza_sl = entry_with_spread * (abs(sl_percent_init) / 100) # Questa è corretta
+                    
                     if s_action == "COMPRA":
-                        sl_prezzo = entry_with_spread - distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 1.005 
+                        sl_prezzo = entry_with_spread - distanza_sl # <-- USA distanza_sl, NON distanza_prezzo_sl
+                        tp_prezzo = entry_with_spread * 1.05 # Target più ampio per far correre il trailing
                     else:
-                        sl_prezzo = entry_with_spread + distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 0.995
+                        sl_prezzo = entry_with_spread + distanza_sl # <-- USA distanza_sl
+                        tp_prezzo = entry_with_spread * 0.95
         
                     # Calcolo del costo dello spread in Euro basato sulla puntata
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
