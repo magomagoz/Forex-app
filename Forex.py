@@ -671,9 +671,9 @@ if st.session_state.get('last_alert'):
     
     st.divider()
 
-    # --- LOGICA DI PULIZIA AUTOMATICA ---
-    # Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
-    if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
+# --- LOGICA DI PULIZIA AUTOMATICA ---
+# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
+if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
         # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
         # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
 
