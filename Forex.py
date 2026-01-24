@@ -410,12 +410,6 @@ def run_sentinel():
                         sl_prezzo = entry_with_spread + distanza_prezzo_sl
                         tp_prezzo = entry_with_spread * 0.995
 
-
-                    
-                    
-                    
-                    # ... (codice precedente per calcolo SL/TP) ...
-                    
                     # Calcolo del costo dello spread
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
                     
@@ -433,6 +427,19 @@ def run_sentinel():
                         res_effettivo = "0.00"
                         prot_status = 'Iniziale'
 
+
+
+
+                    # ... (codice precedente: calcolo inv_effettivo, etc.) ...
+
+                    # 1. Definiamo la riga di stato per Telegram
+                    if mercato_aperto:
+                        icona_stato = "✅"
+                        txt_validita = "SEGNALE VALIDO (Market Open)"
+                    else:
+                        icona_stato = "⛔"
+                        txt_validita = "NON OPERARE (Market Closed)"
+
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -440,23 +447,35 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 
                         'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': stato_iniziale,          # Qui cambia lo stato
+                        'Stato': stato_iniziale,
                         'Protezione': 'Trailing Step',
-                        'Investimento €': inv_effettivo,  # Investimento a 0 se chiuso
+                        'Investimento €': inv_effettivo,
                         'Risultato €': res_effettivo,
                         'Costo Spread €': f"{costo_spread_euro:.3f}",
                         'Stato_Prot': prot_status
                     }
-                    
-                    # Salvataggio e Alert (Solo se aperto inviamo Telegram, opzionale)
+
+                    # Salvataggio Cronologia
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
   
-                    if mercato_aperto:
-                        telegram_text = (f"🚀 *{s_action}* {label}\n"
-                                         f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
-                        send_telegram_msg(telegram_text)
+                    # 2. Costruzione Messaggio Telegram con riga validità
+                    telegram_text = (
+                        f"{icona_stato} *{s_action}* {label}\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']}\n"
+                        f"SL: {new_sig['SL']}\n"
+                        f"------------------\n"
+                        f"ℹ️ *{txt_validita}*"
+                    )
+                    
+                    # 3. Invio Messaggio (Invia SEMPRE, così vedi anche i test nel weekend)
+                    send_telegram_msg(telegram_text)
+                    
+                    # Se preferisci inviare SOLO se valido, commenta la riga sopra e usa:
+                    # if mercato_aperto:
+                    #     send_telegram_msg(telegram_text)
 
             st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
