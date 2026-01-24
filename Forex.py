@@ -86,6 +86,24 @@ def send_telegram_msg(msg):
 def get_now_rome():
     return datetime.now(rome_tz)
 
+def is_market_open(asset_name):
+    """
+    Restituisce True se il mercato è aperto, False se è chiuso.
+    Crypto (BTC/ETH): Sempre aperte (24/7).
+    Forex: Chiuso Sabato (5) e Domenica (6).
+    """
+    if "BTC" in asset_name or "ETH" in asset_name:
+        return True
+    
+    # Ottiene il giorno della settimana (0=Lun, 6=Dom)
+    today = get_now_rome().weekday()
+    
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso (o in OTC per IQOption)
+    if today >= 5:
+        return False
+        
+    return True
+
 def play_notification_sound():
     audio_html = """
         <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
@@ -391,10 +409,30 @@ def run_sentinel():
                     else:
                         sl_prezzo = entry_with_spread + distanza_prezzo_sl
                         tp_prezzo = entry_with_spread * 0.995
-        
-                    # Calcolo del costo dello spread in Euro basato sulla puntata
+
+
+                    
+                    
+                    
+                    # ... (codice precedente per calcolo SL/TP) ...
+                    
+                    # Calcolo del costo dello spread
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
                     
+                    # --- CONTROLLO MERCATO CHIUSO ---
+                    mercato_aperto = is_market_open(label)
+                    
+                    if not mercato_aperto:
+                        stato_iniziale = '⛔ CHIUSO'
+                        inv_effettivo = "0.00" # Non investiamo soldi veri nel calcolo
+                        res_effettivo = "0.00"
+                        prot_status = 'Non Attiva'
+                    else:
+                        stato_iniziale = 'In Corso'
+                        inv_effettivo = f"{investimento_puntata:.2f}"
+                        res_effettivo = "0.00"
+                        prot_status = 'Iniziale'
+
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -402,22 +440,23 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 
                         'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': 'In Corso',
+                        'Stato': stato_iniziale,          # Qui cambia lo stato
                         'Protezione': 'Trailing Step',
-                        'Investimento €': f"{investimento_puntata:.2f}",
-                        'Risultato €': "0.00",
-                        'Costo Spread €': f"{costo_spread_euro:.3f}", # Salviamo il costo spread
-                        'Stato_Prot': 'Iniziale'
+                        'Investimento €': inv_effettivo,  # Investimento a 0 se chiuso
+                        'Risultato €': res_effettivo,
+                        'Costo Spread €': f"{costo_spread_euro:.3f}",
+                        'Stato_Prot': prot_status
                     }
-
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     
+                    # Salvataggio e Alert (Solo se aperto inviamo Telegram, opzionale)
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
   
-                    telegram_text = (f"🚀 *{s_action}* {label}\n"
-                                     f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
-                    send_telegram_msg(telegram_text)
+                    if mercato_aperto:
+                        telegram_text = (f"🚀 *{s_action}* {label}\n"
+                                         f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
+                        send_telegram_msg(telegram_text)
 
             st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
