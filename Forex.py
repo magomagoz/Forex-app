@@ -237,6 +237,7 @@ def update_signal_outcomes():
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
+            # Scarichiamo dati freschi a 1m
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
@@ -244,55 +245,63 @@ def update_signal_outcomes():
                 data.columns = data.columns.get_level_values(0)
             data.columns = [c.lower() for c in data.columns]
             
-            # --- RECUPERO DATI OPERAZIONE ---
+            # --- CONVERSIONE SICURA DEI DATI (Fix per il bug dei 20€) ---
             current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
-            investimento = float(str(row['Investimento €']).replace(',', '.'))
-            direzione = row['Direzione']
             tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
-            
-            # --- CALCOLO GAIN (Basato su prezzo già "spread-ato") ---
+            investimento = float(str(row['Investimento €']).replace(',', '.'))
+            direzione = row['Direzione']
+            status_prot = row.get('Stato_Prot', 'Iniziale')
+
+            # --- CALCOLO PERCENTUALE ATTUALE ---
             if direzione == 'COMPRA':
                 percent_gain = ((current_price - entry_v) / entry_v) * 100
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
+            # --- LOGICA TRAILING STOP (SPOSTAMENTO SL) ---
             new_sl = current_sl
-            status_prot = row.get('Stato_Prot', 'Iniziale')
-
-            # --- LOGICA TRAILING STOP ---
-            if percent_gain >= 5.0 and 'Iniziale' in status_prot:
+            # Step 1: Sposta a Pareggio (BE) se profitto > 0.5% (Adatto a Forex)
+            if percent_gain >= 0.5 and 'Iniziale' in status_prot:
                 new_sl = entry_v
                 status_prot = 'BE (0%)'
                 play_safe_sound()
-                send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio!")
-            elif percent_gain >= 10.0 and 'BE' in status_prot:
-                new_sl = entry_v * 1.05 if direzione == 'COMPRA' else entry_v * 0.95
-                status_prot = 'Safe (+5%)'
+                send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Break Even)!")
+            
+            # Step 2: Metti in sicurezza se profitto > 1.0%
+            elif percent_gain >= 1.0 and 'BE' in status_prot:
+                new_sl = entry_v * 1.005 if direzione == 'COMPRA' else entry_v * 0.995
+                status_prot = 'Safe (+0.5%)'
                 play_safe_sound()
 
-            # Aggiornamento fisico SL se cambiato
-            if new_sl != current_sl:
-                _, p_fmt, _, _ = get_asset_params(row['Asset'])
-                df.at[idx, 'SL'] = p_fmt.format(new_sl)
-                df.at[idx, 'Stato_Prot'] = status_prot
-                updates_made = True
-
-            # --- CONTROLLO CHIUSURA ---
+            # --- CONTROLLO CHIUSURA (STOP LOSS O TARGET) ---
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
             stop_hit = (direzione == 'COMPRA' and current_price <= new_sl) or (direzione == 'VENDI' and current_price >= new_sl)
 
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
-                df.at[idx, 'Stato'] = esito
+                
+                # Calcolo profitto finale reale alla chiusura
                 final_profit = investimento * (percent_gain / 100)
+                
+                # Aggiornamento riga nel DataFrame
+                df.at[idx, 'Stato'] = esito
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
                 updates_made = True
+                
                 play_close_sound()
-                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€")
+                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nProfitto: {final_profit:+.2f}€")
+            
+            elif new_sl != current_sl:
+                # Se non ha chiuso ma lo SL è cambiato (Trailing), aggiorna il valore
+                _, p_fmt, _, _ = get_asset_params(row['Asset'])
+                df.at[idx, 'SL'] = p_fmt.format(new_sl)
+                df.at[idx, 'Stato_Prot'] = status_prot
+                updates_made = True
                     
         except Exception as e:
+            print(f"Errore monitoraggio {row['Asset']}: {e}")
             continue 
         
     if updates_made:
