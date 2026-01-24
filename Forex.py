@@ -360,9 +360,10 @@ def run_sentinel():
             up_bb = float(bb_s[c_up].iloc[-1])
             
             rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            
+
+            # Calcolo ADX (14 periodi)
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
-            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
+            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0            
 
             # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
             # --- FILTRI AVANZATI (VOLUME + RSI + ADX) ---
@@ -372,7 +373,8 @@ def run_sentinel():
             
             # Calcolo RSI veloce (5 periodi) per il momentum
             rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
-            
+
+            # Logica di attivazione con filtro ADX < 30 (Mercato laterale o trend debole)        
             s_action = None
             
             # CONDIZIONE COMPRA (LONG):
@@ -394,6 +396,45 @@ def run_sentinel():
                 if rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
                     if curr_adx < 30: # Evitiamo di vendere se c'è un trend rialzista troppo forte
             s_action = "VENDI"
+
+
+
+# ... dentro run_sentinel, dopo aver stabilito s_action ...
+
+if s_action:
+    # 1. Recuperi i parametri dell'asset (Pezzo 3)
+    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
+    
+    # 2. Definisci i prezzi teorici
+    if s_action == "COMPRA":
+        entry = curr_v * (1 + SIMULATED_SPREAD)
+        distanza_sl_assoluta = entry * 0.002 # Esempio: SL allo 0.2%
+        sl_prezzo = entry - distanza_sl_assoluta
+        tp_prezzo = entry + (distanza_sl_assoluta * 1.5)
+    else:
+        entry = curr_v * (1 - SIMULATED_SPREAD)
+        distanza_sl_assoluta = entry * 0.002
+        sl_prezzo = entry + distanza_sl_assoluta
+        tp_prezzo = entry - (distanza_sl_assoluta * 1.5)
+
+    # --- QUI INSERISCI IL PEZZO 2 ---
+    curr_bal = st.session_state.get('balance_val', 1000)
+    risk_pct = st.session_state.get('risk_val', 2.0)
+    rischio_euro = curr_bal * (risk_pct / 100) 
+
+    distanza_sl_percentuale = distanza_sl_assoluta / entry
+    inv_effettivo_calcolato = rischio_euro / distanza_sl_percentuale
+    costo_spread_euro = inv_effettivo_calcolato * SIMULATED_SPREAD
+    # -------------------------------
+
+
+
+            
+
+
+
+
+            
 
             if s_action:
                 hist = st.session_state['signal_history']
@@ -427,7 +468,12 @@ def run_sentinel():
                         distanza_sl = entry_with_spread * 0.002
                         sl_prezzo = entry_with_spread + distanza_sl
                         tp_prezzo = entry_with_spread - (distanza_sl * 1.5)
-                    
+
+                    # Parametri dal Session State
+                    curr_bal = st.session_state.get('balance_val', 1000)
+                    risk_pct = st.session_state.get('risk_val', 2.0)
+                    rischio_euro = curr_bal * (risk_pct / 100) # La somma che accetti di perdere
+
                     # Il calcolo dell'investimento effettivo: 
                     # Se lo SL viene colpito, devi perdere esattamente 'rischio_euro'
                     # Formula: Investimento = Rischio / % Distanza SL
@@ -451,11 +497,6 @@ def run_sentinel():
                         res_effettivo = "0.00"
                         prot_status = 'Iniziale'
 
-
-
-
-                    # ... (codice precedente: calcolo inv_effettivo, etc.) ...
-
                     # 1. Definiamo la riga di stato per Telegram
                     if mercato_aperto:
                         icona_stato = "✅"
@@ -471,7 +512,8 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 
                         'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': stato_iniziale,
+                        'Stato': 'In Corso' if is_market_open(label) else '⛔ CHIUSO',
+                        #'Stato': stato_iniziale,
                         'Protezione': 'Trailing Step',
                         'Investimento €': inv_effettivo,
                         'Risultato €': res_effettivo,
