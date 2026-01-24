@@ -309,37 +309,48 @@ def update_signal_outcomes():
         save_history_permanently()
 
 def run_sentinel():
-    # --- AUTO-PULIZIA CRONOLOGIA ---
+    # --- AUTO-PULIZIA CRONOLOGIA (Gestione Memoria) ---
     if not st.session_state['signal_history'].empty:
+        # Se superiamo i 50 record, teniamo solo i 50 più recenti
         if len(st.session_state['signal_history']) > 50:
             st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
             save_history_permanently()
 
+    # Azzera i popup aperti all'inizio di ogni nuovo ciclo di scansione
     st.session_state['last_alert'] = None
     if 'alert_notified' in st.session_state: 
         del st.session_state['alert_notified']
     
-    debug_list = []
-    assets = list(asset_map.items())
+    #"""Scansiona tutti gli asset e popola il Debug Monitor"""
+    current_balance = st.session_state.get('balance_val', 1000)
+    current_risk = st.session_state.get('risk_val', 2.0)
+    investimento_puntata = current_balance * (current_risk / 100)
 
+    # Lista per il monitoraggio live nella sidebar
+    debug_list = []
+    
+    assets = list(asset_map.items())
     for label, ticker in assets:
         try:
-            # 1. SCARICO DATI
-            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False, timeout=10)
-            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False, timeout=10)
+            # 1. SCARICO DATI (Maggiore tolleranza errori)
+            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
+            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             
             if df_rt_s.empty or df_d_s.empty: 
                 debug_list.append(f"🔴 {label}: No Data")
                 continue
             
+            # Pulizia Colonne ROBUSTA
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
+            
+            # Rinominiamo esplicitamente per pandas_ta
             df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
             df_d_s.columns = [c.lower() for c in df_d_s.columns]
 
-            # 2. INDICATORI
+            # 2. CALCOLO INDICATORI
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
-            if bb_s is None: continue
+            if bb_s is None: continue # Skip se errore calcolo
 
             c_low = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_up = [c for c in bb_s.columns if "BBU" in c.upper()][0]
@@ -349,80 +360,143 @@ def run_sentinel():
             up_bb = float(bb_s[c_up].iloc[-1])
             
             rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
+            
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
+
+            # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
+            # --- FILTRI AVANZATI (VOLUME + RSI + ADX) ---
+            # Calcolo Volume Medio (ultime 20 candele)
             avg_volume = df_rt_s['volume'].rolling(window=20).mean().iloc[-1]
             curr_volume = df_rt_s['volume'].iloc[-1]
-
-            # --- SINTESI ADX (Pezzo 1) ---
-            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
-            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0            
-
-            # 3. LOGICA DI INGRESSO
-            s_action = None
-            if curr_v < low_bb and rsi_d < 60 and rsi_fast < 25 and curr_volume > (avg_volume * 0.8):
-                if curr_adx < 30: # Filtro ADX
-                    s_action = "COMPRA"
             
-            elif curr_v > up_bb and rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
-                if curr_adx < 30: # Filtro ADX
-                    s_action = "VENDI"
+            # Calcolo RSI veloce (5 periodi) per il momentum
+            rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
+            
+            s_action = None
+            
+            # CONDIZIONE COMPRA (LONG):
+            # 1. Prezzo sotto la Banda Bassa
+            # 2. RSI Daily non è in ipercomprato (>60)
+            # 3. RSI veloce (5m) è in ipervenduto (<25) -> Indica un "rimbalzo" imminente
+            # 4. Volume superiore alla media -> Conferma che il movimento è reale
+            if curr_v < low_bb:
+                if rsi_d < 60 and rsi_fast < 25 and curr_volume > (avg_volume * 0.8):
+                    if curr_adx < 30: # Evitiamo di comprare se c'è un trend ribassista troppo forte
+                        s_action = "COMPRA"
+            
+            # CONDIZIONE VENDI (SHORT):
+            # 1. Prezzo sopra la Banda Alta
+            # 2. RSI Daily non è in ipervenduto (<40)
+            # 3. RSI veloce (5m) è in ipercomprato (>75)
+            # 4. Volume superiore alla media
+            elif curr_v > up_bb:
+                if rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
+                    if curr_adx < 30: # Evitiamo di vendere se c'è un trend rialzista troppo forte
+            s_action = "VENDI"
 
-            # 4. ESECUZIONE SEGNALE
             if s_action:
                 hist = st.session_state['signal_history']
+                # Controllo Duplicati / Trade in corso
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-                if not is_running:
-                    # --- COMPATIBILITÀ JPY (Pezzo 3) ---
+                # Controllo Tempo (30 min)
+                recent_signals = False
+                if not hist.empty:
+                    asset_hist = hist[hist['Asset'] == label]
+                    if not asset_hist.empty:
+                        last_sig = asset_hist.iloc[0]['DataOra']
+                        # Semplice check temporale stringa se stesso giorno
+                        if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
+                           recent_signals = True
+              
+                if not is_running and not recent_signals:
+                    # --- LOGICA MONEY MANAGEMENT AVANZATA ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-
-                    # Definizione Prezzi ed Entrata con Spread
+                    rischio_euro = current_balance * (current_risk / 100) # Es: 20€
+                    
+                    # APPLICAZIONE SPREAD ALL'ENTRATA
                     if s_action == "COMPRA":
-                        entry = curr_v * (1 + SIMULATED_SPREAD)
-                        dist_sl = entry * 0.002 # 0.2% per Forex
-                        sl_prezzo = entry - dist_sl
-                        tp_prezzo = entry + (dist_sl * 1.5)
+                        entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
+                        # SL impostato sotto l'ultimo minimo o a una % fissa (es. 0.2% per scalping)
+                        distanza_sl = entry_with_spread * 0.002 
+                        sl_prezzo = entry_with_spread - distanza_sl
+                        tp_prezzo = entry_with_spread + (distanza_sl * 1.5) # Rischio/Rendimento 1:1.5
                     else:
-                        entry = curr_v * (1 - SIMULATED_SPREAD)
-                        dist_sl = entry * 0.002
-                        sl_prezzo = entry + dist_sl
-                        tp_prezzo = entry - (dist_sl * 1.5)
+                        entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
+                        distanza_sl = entry_with_spread * 0.002
+                        sl_prezzo = entry_with_spread + distanza_sl
+                        tp_prezzo = entry_with_spread - (distanza_sl * 1.5)
+                    
+                    # Il calcolo dell'investimento effettivo: 
+                    # Se lo SL viene colpito, devi perdere esattamente 'rischio_euro'
+                    # Formula: Investimento = Rischio / % Distanza SL
+                    percentuale_distanza_sl = (distanza_sl / entry_with_spread)
+                    inv_effettivo_calcolato = rischio_euro / percentuale_distanza_sl
 
-                    # --- CALCOLO INVESTIMENTO REALE (Pezzo 2) ---
-                    curr_bal = st.session_state.get('balance_val', 1000)
-                    risk_pct = st.session_state.get('risk_val', 2.0)
-                    rischio_euro = curr_bal * (risk_pct / 100) 
-
-                    distanza_sl_percentuale = dist_sl / entry
-                    inv_effettivo = rischio_euro / distanza_sl_percentuale
-                    costo_spread_euro = inv_effettivo * SIMULATED_SPREAD
-
-                    # --- CREAZIONE SEGNALE ---
+                    # Calcolo del costo dello spread
+                    costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
+                    
+                    # --- CONTROLLO MERCATO CHIUSO ---
                     mercato_aperto = is_market_open(label)
                     
+                    if not mercato_aperto:
+                        stato_iniziale = '⛔ CHIUSO'
+                        inv_effettivo = "0.00" # Non investiamo soldi veri nel calcolo
+                        res_effettivo = "0.00"
+                        prot_status = 'Non Attiva'
+                    else:
+                        stato_iniziale = 'In Corso'
+                        inv_effettivo = f"{investimento_puntata:.2f}"
+                        res_effettivo = "0.00"
+                        prot_status = 'Iniziale'
+
+                    # ... (codice precedente: calcolo inv_effettivo, etc.) ...
+
+                    # 1. Definiamo la riga di stato per Telegram
+                    if mercato_aperto:
+                        icona_stato = "✅"
+                        txt_validita = "SEGNALE VALIDO (Market Open)"
+                    else:
+                        icona_stato = "⛔"
+                        txt_validita = "NON OPERARE (Market Closed)"
+
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
                         'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(entry), 
+                        'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 
                         'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': 'In Corso' if mercato_aperto else '⛔ CHIUSO',
+                        'Stato': stato_iniziale,
                         'Protezione': 'Trailing Step',
-                        'Investimento €': f"{inv_effettivo:.2f}",
-                        'Risultato €': "0.00",
+                        'Investimento €': inv_effettivo,
+                        'Risultato €': res_effettivo,
                         'Costo Spread €': f"{costo_spread_euro:.3f}",
-                        'Stato_Prot': 'Iniziale' if mercato_aperto else 'Non Attiva'
+                        'Stato_Prot': prot_status
                     }
 
+                    # Salvataggio Cronologia
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
-
-                    # Telegram
-                    icona = "✅" if mercato_aperto else "⛔"
-                    msg = f"{icona} *{s_action}* {label}\nEntry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}\nInv: €{new_sig['Investimento €']}"
-                    send_telegram_msg(msg)
+  
+                    # 2. Costruzione Messaggio Telegram con riga validità
+                    telegram_text = (
+                        f"{icona_stato} *{s_action}* {label}\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']}\n"
+                        f"SL: {new_sig['SL']}\n"
+                        f"------------------\n"
+                        f"i️ *{txt_validita}*"
+                    )
+                    
+                    # 3. Invio Messaggio (Invia SEMPRE, così vedi anche i test nel weekend)
+                    send_telegram_msg(telegram_text)
+                    
+                    # Se preferisci inviare SOLO se valido, commenta la riga sopra e usa:
+                    # if mercato_aperto:
+                    #     send_telegram_msg(telegram_text)
 
             st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
@@ -430,6 +504,7 @@ def run_sentinel():
             debug_list.append(f"❌ {label} Err: {str(e)}")
             continue
     
+    # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
 def display_performance_stats():
