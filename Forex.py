@@ -365,23 +365,35 @@ def run_sentinel():
             curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
 
             # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
+            # --- FILTRI AVANZATI (VOLUME + RSI + ADX) ---
+            # Calcolo Volume Medio (ultime 20 candele)
+            avg_volume = df_rt_s['volume'].rolling(window=20).mean().iloc[-1]
+            curr_volume = df_rt_s['volume'].iloc[-1]
+            
+            # Calcolo RSI veloce (5 periodi) per il momentum
+            rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
+            
             s_action = None
             
-            # Debug Status
-            dist_low = curr_v - low_bb
-            dist_up = up_bb - curr_v
+            # CONDIZIONE COMPRA (LONG):
+            # 1. Prezzo sotto la Banda Bassa
+            # 2. RSI Daily non è in ipercomprato (>60)
+            # 3. RSI veloce (5m) è in ipervenduto (<25) -> Indica un "rimbalzo" imminente
+            # 4. Volume superiore alla media -> Conferma che il movimento è reale
+            if curr_v < low_bb:
+                if rsi_d < 60 and rsi_fast < 25 and curr_volume > (avg_volume * 0.8):
+                    if curr_adx < 30: # Evitiamo di comprare se c'è un trend ribassista troppo forte
+                        s_action = "COMPRA"
             
-            # Logica: Prezzo SOTTO banda bassa o SOPRA banda alta
-            if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
-                s_action = "COMPRA"
-            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
-                s_action = "VENDI"
-
-            # Aggiungiamo info al monitor debug
-            icon = "🟢" if s_action else "⚪"
-            debug_info = f"{label}: {curr_v:.4f} | BB: {low_bb:.4f}/{up_bb:.4f}"
-            if s_action: debug_info += f" -> 🔥 {s_action}"
-            debug_list.append(f"{icon} {debug_info}")
+            # CONDIZIONE VENDI (SHORT):
+            # 1. Prezzo sopra la Banda Alta
+            # 2. RSI Daily non è in ipervenduto (<40)
+            # 3. RSI veloce (5m) è in ipercomprato (>75)
+            # 4. Volume superiore alla media
+            elif curr_v > up_bb:
+                if rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
+                    if curr_adx < 30: # Evitiamo di vendere se c'è un trend rialzista troppo forte
+            s_action = "VENDI"
 
             if s_action:
                 hist = st.session_state['signal_history']
