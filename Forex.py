@@ -296,8 +296,9 @@ def run_sentinel():
     
     #"""Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
-    current_risk = st.session_state.get('risk_val', 1.0)
-    
+    current_risk = st.session_state.get('risk_val', 2.0)
+    investimento_puntata = current_balance * (current_risk / 100)
+
     # Lista per il monitoraggio live nella sidebar
     debug_list = []
     
