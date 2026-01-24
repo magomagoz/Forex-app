@@ -393,6 +393,7 @@ def run_sentinel():
             elif curr_v > up_bb:
                 if rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
                     if curr_adx < 30: # Evitiamo di vendere se c'è un trend rialzista troppo forte
+            
             s_action = "VENDI"
 
             if s_action:
