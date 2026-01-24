@@ -399,25 +399,28 @@ def run_sentinel():
                            recent_signals = True
               
                 if not is_running and not recent_signals:
+                    # --- LOGICA MONEY MANAGEMENT AVANZATA ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_puntata = current_balance * (current_risk / 100)
-                
-                    # APPLICAZIONE SPREAD
+                    rischio_euro = current_balance * (current_risk / 100) # Es: 20€
+                    
+                    # APPLICAZIONE SPREAD ALL'ENTRATA
                     if s_action == "COMPRA":
                         entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
+                        # SL impostato sotto l'ultimo minimo o a una % fissa (es. 0.2% per scalping)
+                        distanza_sl = entry_with_spread * 0.002 
+                        sl_prezzo = entry_with_spread - distanza_sl
+                        tp_prezzo = entry_with_spread + (distanza_sl * 1.5) # Rischio/Rendimento 1:1.5
                     else:
                         entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
-                
-                    # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
-                    percentuale_perdita_max = 0.10 
-                    distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
-                
-                    if s_action == "COMPRA":
-                        sl_prezzo = entry_with_spread - distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 1.005 
-                    else:
-                        sl_prezzo = entry_with_spread + distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 0.995
+                        distanza_sl = entry_with_spread * 0.002
+                        sl_prezzo = entry_with_spread + distanza_sl
+                        tp_prezzo = entry_with_spread - (distanza_sl * 1.5)
+                    
+                    # Il calcolo dell'investimento effettivo: 
+                    # Se lo SL viene colpito, devi perdere esattamente 'rischio_euro'
+                    # Formula: Investimento = Rischio / % Distanza SL
+                    percentuale_distanza_sl = (distanza_sl / entry_with_spread)
+                    inv_effettivo_calcolato = rischio_euro / percentuale_distanza_sl
 
                     # Calcolo del costo dello spread
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
