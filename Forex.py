@@ -327,8 +327,7 @@ def run_sentinel():
     investimento_puntata = current_balance * (current_risk / 100)
 
     # Lista per il monitoraggio live nella sidebar
-    debug_list = []
-    
+    debug_list = []    
     assets = list(asset_map.items())
     for label, ticker in assets:
         try:
@@ -360,19 +359,14 @@ def run_sentinel():
             up_bb = float(bb_s[c_up].iloc[-1])
             
             rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            
-            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
-            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
-
-            # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
-            # --- FILTRI AVANZATI (VOLUME + RSI + ADX) ---
+            rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
             # Calcolo Volume Medio (ultime 20 candele)
             avg_volume = df_rt_s['volume'].rolling(window=20).mean().iloc[-1]
             curr_volume = df_rt_s['volume'].iloc[-1]
             
-            # Calcolo RSI veloce (5 periodi) per il momentum
-            rsi_fast = ta.rsi(df_rt_s['close'], length=5).iloc[-1]
-            
+            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
+
             s_action = None
             
             # CONDIZIONE COMPRA (LONG):
@@ -393,8 +387,7 @@ def run_sentinel():
             elif curr_v > up_bb:
                 if rsi_d > 40 and rsi_fast > 75 and curr_volume > (avg_volume * 0.8):
                     if curr_adx < 30: # Evitiamo di vendere se c'è un trend rialzista troppo forte
-            
-            s_action = "VENDI"
+                        s_action = "VENDI"
 
             if s_action:
                 hist = st.session_state['signal_history']
