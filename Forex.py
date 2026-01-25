@@ -272,15 +272,25 @@ def update_signal_outcomes():
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
-            # Logica Trailing
+            # --- LOGICA TRAILING A 3 LIVELLI ---
             new_sl = current_sl
+            
+            # STEP 1: Raggiunto 0.4% -> Sposta a PAREGGIO (Break Even)
             if percent_gain >= be_level and 'Iniziale' in status_prot:
                 new_sl = entry_v
                 status_prot = f'BE ({be_level}%)'
                 play_safe_sound()
+                
+            # STEP 2: Raggiunto 0.8% -> Proteggi +0.5%
             elif percent_gain >= safe_level and 'BE' in status_prot:
-                new_sl = entry_v * 1.002 if direzione == 'COMPRA' else entry_v * 0.998
-                status_prot = f'Safe (+0.2%)'
+                new_sl = entry_v * 1.005 if direzione == 'COMPRA' else entry_v * 0.995
+                status_prot = 'Safe (+0.5%)'
+                play_safe_sound()
+            
+            # STEP 3: Raggiunto 1.4% -> Proteggi +1.2% (Trailing Aggressivo)
+            elif percent_gain >= 1.4 and 'Safe' in status_prot:
+                new_sl = entry_v * 1.012 if direzione == 'COMPRA' else entry_v * 0.988
+                status_prot = 'Trend (+1.2%)'
                 play_safe_sound()
 
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
