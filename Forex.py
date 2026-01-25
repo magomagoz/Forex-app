@@ -129,9 +129,10 @@ def style_status(val):
     if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
     if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
     
-    # Se il valore è numerico e positivo/negativo (per la colonna Risultato)
+    # Colore dinamico per Risultato €
     try:
-        num = float(str(val).replace('+', ''))
+        clean_val = str(val).replace('€', '').replace('+', '').strip()
+        num = float(clean_val)
         if num > 0: return 'color: #00ffcc; font-weight: bold;'
         if num < 0: return 'color: #ff4b4b; font-weight: bold;'
     except:
@@ -234,10 +235,13 @@ def update_signal_outcomes():
     df = st.session_state['signal_history']
     updates_made = False
     
+    # Recupero valori dai cursori sidebar
+    be_level = st.session_state.get('trailing_be_val', 0.4)
+    safe_level = st.session_state.get('trailing_safe_val', 0.8)
+
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
-            # Scarichiamo dati freschi a 1m
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
@@ -245,68 +249,57 @@ def update_signal_outcomes():
                 data.columns = data.columns.get_level_values(0)
             data.columns = [c.lower() for c in data.columns]
             
-            # --- CONVERSIONE SICURA DEI DATI (Fix per il bug dei 20€) ---
             current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
             tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
             investimento = float(str(row['Investimento €']).replace(',', '.'))
+            
+            # --- CORREZIONE: Recupero valore spread salvato ---
+            costo_spread_euro = float(str(row.get('Costo Spread €', '0.00')).replace(',', '.'))
+            
             direzione = row['Direzione']
             status_prot = row.get('Stato_Prot', 'Iniziale')
 
-            # --- CALCOLO PERCENTUALE ATTUALE ---
             if direzione == 'COMPRA':
                 percent_gain = ((current_price - entry_v) / entry_v) * 100
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
-            # Recuperiamo i parametri dai cursori (o i default se non ancora mossi)
-            be_level = st.session_state.get('trailing_be_val', 0.4)
-            safe_level = st.session_state.get('trailing_safe_val', 0.8)
-
-            # --- LOGICA TRAILING STOP (SPOSTAMENTO SL) ---
+            # Logica Trailing
             new_sl = current_sl
-            # Step 1: Sposta a Pareggio (BE) se profitto > 0.5% (Adatto a Forex)
             if percent_gain >= be_level and 'Iniziale' in status_prot:
                 new_sl = entry_v
                 status_prot = f'BE ({be_level}%)'
                 play_safe_sound()
-                send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Break Even)!")
-            
-            # Step 2: Metti in sicurezza se profitto > 1.0%
             elif percent_gain >= safe_level and 'BE' in status_prot:
-                new_sl = entry_v * 1.005 if direzione == 'COMPRA' else entry_v * 0.995
-                status_prot = 'Safe (+0.5%)'
+                new_sl = entry_v * 1.002 if direzione == 'COMPRA' else entry_v * 0.998
+                status_prot = f'Safe (+0.2%)'
                 play_safe_sound()
 
-            # --- CONTROLLO CHIUSURA (STOP LOSS O TARGET) ---
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
             stop_hit = (direzione == 'COMPRA' and current_price <= new_sl) or (direzione == 'VENDI' and current_price >= new_sl)
 
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 
-                # Calcolo profitto finale reale alla chiusura
-                final_profit = (investimento * (percent_gain / 100)) - costo_spread_euro
+                # --- CALCOLO NETTO: Profitto Lordo - Spread ---
+                profitto_lordo = investimento * (percent_gain / 100)
+                final_net_profit = profitto_lordo - costo_spread_euro
                 
-                # Aggiornamento riga nel DataFrame
                 df.at[idx, 'Stato'] = esito
-                df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
+                df.at[idx, 'Risultato €'] = f"{final_net_profit:+.2f}"
                 updates_made = True
-                
                 play_close_sound()
-                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nProfitto: {final_profit:+.2f}€")
+                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nNetto: {final_net_profit:+.2f}€")
             
             elif new_sl != current_sl:
-                # Se non ha chiuso ma lo SL è cambiato (Trailing), aggiorna il valore
                 _, p_fmt, _, _ = get_asset_params(row['Asset'])
                 df.at[idx, 'SL'] = p_fmt.format(new_sl)
                 df.at[idx, 'Stato_Prot'] = status_prot
                 updates_made = True
                     
-        except Exception as e:
-            print(f"Errore monitoraggio {row['Asset']}: {e}")
-            continue 
+        except Exception: continue 
         
     if updates_made:
         st.session_state['signal_history'] = df
@@ -433,8 +426,8 @@ def run_sentinel():
                     inv_effettivo_calcolato = rischio_euro / percentuale_distanza_sl
 
                     # Calcolo del costo dello spread
-                    costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
-                    
+                    costo_spread_apertura = inv_effettivo_calcolato * SIMULATED_SPREAD
+
                     # --- CONTROLLO MERCATO CHIUSO ---
                     mercato_aperto = is_market_open(label)
                     
@@ -468,12 +461,12 @@ def run_sentinel():
                         'SL': p_fmt.format(sl_prezzo), 
                         'Stato': stato_iniziale,
                         'Protezione': 'Trailing Step',
-                        'Investimento €': inv_effettivo,
+                        'Investimento €': f"{inv_effettivo_calcolato:.2f}",
                         'Risultato €': res_effettivo,
-                        'Costo Spread €': f"{costo_spread_euro:.3f}",
+                        'Costo Spread €': f"{costo_spread_apertura:.3f}", # Salviamo lo spread calcolato
                         'Stato_Prot': prot_status
                     }
-
+                    
                     # Salvataggio Cronologia
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
