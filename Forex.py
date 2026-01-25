@@ -620,7 +620,7 @@ risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 2.0, step=0.5, key="
 st.sidebar.subheader("🛡️ Gestione Protezione")
 trailing_be = st.sidebar.slider("Livello Pareggio (BE) %", 0.1, 1.0, 0.4, step=0.1)
 trailing_safe = st.sidebar.slider("Livello Sicurezza %", 0.5, 2.0, 0.8, step=0.1)
-trailing_trend = st.sidebar.slider("Livello Trend %", 1.0, 5.0, 1.5, step=0.1) # Nuovo Cursore
+trailing_trend = st.sidebar.slider("Livello Trend %", 1.0, 5.0, 1.4, step=0.1) # Nuovo Cursore
 
 # Colleghiamo i valori al session_state
 st.session_state['trailing_be_val'] = trailing_be
