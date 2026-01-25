@@ -525,35 +525,27 @@ if 'last_scan_status' not in st.session_state:
 update_signal_outcomes()
 
 def get_equity_data():
-    """Calcola l'andamento del saldo applicando il rischio scelto ai trade chiusi"""
-    initial_balance = balance 
+    initial_balance = st.session_state.get('balance_val', 1000)
     equity_curve = [initial_balance]
     
     if st.session_state['signal_history'].empty:
         return pd.Series(equity_curve)
     
-    # Ordiniamo dal più vecchio al più recente per la curva temporale
-    df_sorted = st.session_state['signal_history'].iloc[::-1]
-    current_bal = initial_balance
+    # Prendi solo i trade conclusi e ordinali dal più vecchio
+    df_conclusi = st.session_state['signal_history'][st.session_state['signal_history']['Stato'].str.contains('TARGET|STOP|DINAMICO', na=False)]
+    df_sorted = df_conclusi.iloc[::-1]
     
+    current_bal = initial_balance
     for _, row in df_sorted.iterrows():
-        # Applichiamo il rischio scelto sulla barra al saldo attuale
-        risk_amount = current_bal * (risk_pc / 100)
-        
-        if row['Stato'] == '✅ TARGET':
-            # Simuliamo un profitto con Reward Ratio 1:2
-            current_bal += (risk_amount * 2) 
-        elif row['Stato'] == '❌ STOP LOSS':
-            # Perdita fissa della quota rischio
-            current_bal -= risk_amount
+        try:
+            # Recupera il valore netto calcolato dalla tabella
+            net_profit = float(str(row['Risultato €']).replace(',', '.'))
+            current_bal += net_profit
+            equity_curve.append(current_bal)
+        except:
+            continue
             
-        equity_curve.append(current_bal)
-        
     return pd.Series(equity_curve)
-
-# --- 5. ESECUZIONE SENTINEL ---
-if 'signal_history' in st.session_state:
-    run_sentinel()
 
 # --- 5. SIDEBAR ---
 st.sidebar.header("🛠 Trading Desk (1m)")
@@ -777,6 +769,10 @@ st.sidebar.markdown("---")
 
 #st.sidebar.markdown("---")
 
+# --- 5. ESECUZIONE SENTINEL ---
+if 'signal_history' in st.session_state:
+    run_sentinel()
+
 # --- 6. POPUP ALERT (SINCRONIZZATO CON REFRESH 60s) ---
 if st.session_state.get('last_alert'):
     # Suona solo la prima volta che appare l'alert
@@ -968,7 +964,6 @@ if not st.session_state['signal_history'].empty:
     # ORDINE: Poiché usiamo concat(new, old), l'indice 0 è già il più recente.
     # Non serve .iloc[::-1]. Se vuoi essere sicuro al 100%, usa:
     display_df = df_filtrato.reset_index(drop=True)
-
     
     if not display_df.empty:
         st.dataframe(
