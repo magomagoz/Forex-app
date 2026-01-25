@@ -153,13 +153,19 @@ def get_trailing_params(asset_name):
         return 0.5, 1.0, -2.0    # +0.5% -> BE, +1.0% -> +0.5%, Inizio -2% (Forex a -10% è troppo lontano)
 
 def get_session_status():
-    now_rome = get_now_rome().time()
+    now_rome_dt = get_now_rome()
+    now_time = now_rome_dt.time()
+    is_weekend = now_rome_dt.weekday() >= 5 # 5=Sabato, 6=Domenica
+
+    if is_weekend:
+        return {"Tokyo 🇯🇵": False, "Londra 🇬🇧": False, "New York 🇺🇸": False}
+
     sessions = {
         "Tokyo 🇯🇵": (time(0,0), time(9,0)), 
         "Londra 🇬🇧": (time(9,0), time(18,0)), 
         "New York 🇺🇸": (time(14,0), time(23,0))
     }
-    return {name: start <= now_rome <= end for name, (start, end) in sessions.items()}
+    return {name: start <= now_time <= end for name, (start, end) in sessions.items()}
 
 @st.cache_data(ttl=60)
 def get_realtime_data(ticker):
