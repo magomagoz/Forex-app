@@ -260,17 +260,21 @@ def update_signal_outcomes():
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
+            # Recuperiamo i parametri dai cursori (o i default se non ancora mossi)
+            be_level = st.session_state.get('trailing_be_val', 0.4)
+            safe_level = st.session_state.get('trailing_safe_val', 0.8)
+
             # --- LOGICA TRAILING STOP (SPOSTAMENTO SL) ---
             new_sl = current_sl
             # Step 1: Sposta a Pareggio (BE) se profitto > 0.5% (Adatto a Forex)
-            if percent_gain >= 0.5 and 'Iniziale' in status_prot:
+            if percent_gain >= be_level and 'Iniziale' in status_prot:
                 new_sl = entry_v
-                status_prot = 'BE (0%)'
+                status_prot = f'BE ({be_level}%)'
                 play_safe_sound()
                 send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Break Even)!")
             
             # Step 2: Metti in sicurezza se profitto > 1.0%
-            elif percent_gain >= 1.0 and 'BE' in status_prot:
+            elif percent_gain >= safe_level and 'BE' in status_prot:
                 new_sl = entry_v * 1.005 if direzione == 'COMPRA' else entry_v * 0.995
                 status_prot = 'Safe (+0.5%)'
                 play_safe_sound()
@@ -283,7 +287,7 @@ def update_signal_outcomes():
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 
                 # Calcolo profitto finale reale alla chiusura
-                final_profit = investimento * (percent_gain / 100)
+                final_profit = (investimento * (percent_gain / 100)) - costo_spread_euro
                 
                 # Aggiornamento riga nel DataFrame
                 df.at[idx, 'Stato'] = esito
@@ -441,7 +445,7 @@ def run_sentinel():
                         prot_status = 'Non Attiva'
                     else:
                         stato_iniziale = 'In Corso'
-                        inv_effettivo = f"{investimento_puntata:.2f}"
+                        inv_effettivo = f"{inv_effettivo_calcolato:.2f}"
                         res_effettivo = "0.00"
                         prot_status = 'Iniziale'
 
@@ -607,6 +611,15 @@ selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
 risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 2.0, step=0.5, key="risk_val")
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("🛡️ Gestione Protezione")
+trailing_be = st.sidebar.slider("Livello Pareggio (BE) %", 0.1, 1.0, 0.4, step=0.1)
+trailing_safe = st.sidebar.slider("Livello Sicurezza %", 0.5, 2.0, 0.8, step=0.1)
+
+# Fondamentale per farli leggere alla funzione di aggiornamento
+st.session_state['trailing_be_val'] = trailing_be
+st.session_state['trailing_safe_val'] = trailing_safe
 
 # --- Sotto il widget risk_pc ---
 st.sidebar.markdown(
