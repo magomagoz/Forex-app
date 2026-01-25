@@ -240,10 +240,6 @@ def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     updates_made = False
-    
-    # Recupero valori dai cursori sidebar
-    be_level = st.session_state.get('trailing_be_val', 0.4)
-    safe_level = st.session_state.get('trailing_safe_val', 0.8)
 
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
@@ -275,22 +271,30 @@ def update_signal_outcomes():
             # --- LOGICA TRAILING A 3 LIVELLI ---
             new_sl = current_sl
             
-            # STEP 1: Raggiunto 0.4% -> Sposta a PAREGGIO (Break Even)
+            # Recupero valori dai cursori sidebar (con valori di backup se non trovati)
+            be_level = st.session_state.get('trailing_be_val', 0.4)
+            safe_level = st.session_state.get('trailing_safe_val', 0.8)
+            trend_level = st.session_state.get('trailing_trend_val', 1.4)
+        
+            # --- LOGICA TRAILING DINAMICA ---
+            new_sl = current_sl
+            
+            # STEP 1: Raggiunto BE (Pareggio)
             if percent_gain >= be_level and 'Iniziale' in status_prot:
                 new_sl = entry_v
                 status_prot = f'BE ({be_level}%)'
                 play_safe_sound()
                 
-            # STEP 2: Raggiunto 0.8% -> Proteggi +0.5%
-            elif percent_gain >= safe_level and 'BE' in status_prot:
+            # STEP 2: Raggiunto Sicurezza (+0.5%)
+            elif percent_gain >= safe_level and ('Iniziale' in status_prot or 'BE' in status_prot):
                 new_sl = entry_v * 1.005 if direzione == 'COMPRA' else entry_v * 0.995
                 status_prot = 'Safe (+0.5%)'
                 play_safe_sound()
             
-            # STEP 3: Raggiunto 1.4% -> Proteggi +1.2% (Trailing Aggressivo)
-            elif percent_gain >= 1.4 and 'Safe' in status_prot:
+            # STEP 3: Raggiunto Trend (+1.2%)
+            elif percent_gain >= trend_level and 'Safe' in status_prot:
                 new_sl = entry_v * 1.012 if direzione == 'COMPRA' else entry_v * 0.988
-                status_prot = 'Trend (+1.2%)'
+                status_prot = 'Trend (+1.0%)'
                 play_safe_sound()
 
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
@@ -613,10 +617,15 @@ pair = asset_map[selected_label]
 balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
 risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 2.0, step=0.5, key="risk_val")
 
-st.sidebar.markdown("---")
 st.sidebar.subheader("🛡️ Gestione Protezione")
 trailing_be = st.sidebar.slider("Livello Pareggio (BE) %", 0.1, 1.0, 0.4, step=0.1)
 trailing_safe = st.sidebar.slider("Livello Sicurezza %", 0.5, 2.0, 0.8, step=0.1)
+trailing_trend = st.sidebar.slider("Livello Trend %", 1.0, 5.0, 1.5, step=0.1) # Nuovo Cursore
+
+# Colleghiamo i valori al session_state
+st.session_state['trailing_be_val'] = trailing_be
+st.session_state['trailing_safe_val'] = trailing_safe
+st.session_state['trailing_trend_val'] = trailing_trend
 
 # Fondamentale per farli leggere alla funzione di aggiornamento
 st.session_state['trailing_be_val'] = trailing_be
