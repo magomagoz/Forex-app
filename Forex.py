@@ -585,7 +585,7 @@ st.sidebar.markdown("""
             height: 12px; margin-bottom: 25px; border: 1px solid #444; overflow: hidden;
         }
         .red-bar {
-            height: 100%; background-color: #ff4b4b; width: 0%;
+            height: 100%; background-color: #00f2ff; width: 0%;
             animation: progressFill 60s linear infinite;
             box-shadow: 0 0 10px #ff4b4b;
         }
