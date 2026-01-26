@@ -636,7 +636,7 @@ if not active_trades.empty:
                 latente_perc = p_diff * 100
                 
                 # Colore dinamico
-                color = "#00ffcc" if latente_perc >= 0 else "#ff4b4b"
+                color = "#006400" if latente_perc >= 0 else "#ff4b4b"
                 
                 st.sidebar.markdown(f"""
                     <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
@@ -677,7 +677,7 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
         save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
         st.rerun()
 
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 
 # --- TASTO ESPORTAZIONE DATI ---
 st.sidebar.markdown("---")
