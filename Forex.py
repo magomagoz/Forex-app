@@ -86,6 +86,20 @@ def send_telegram_msg(msg):
 def get_now_rome():
     return datetime.now(rome_tz)
 
+def is_market_open(asset_name):
+    """
+    Restituisce True se il mercato è aperto.
+    """
+    if "BTC" in asset_name or "ETH" in asset_name:
+        return True
+    
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False
+        
+    return True
+
 def play_notification_sound():
     audio_html = """
         <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
