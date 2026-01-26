@@ -421,7 +421,7 @@ def run_sentinel():
                         'Protezione': 'Trailing Step',
                         'Investimento €': f"{investimento_puntata:.2f}",
                         'Risultato €': "0.00",
-                        'Costo Spread €': f"{costo_spread_euro:.3f}", # Salviamo il costo spread
+                        'Costo Spread €': f"{costo_spread_euro:.2f}", # Salviamo il costo spread
                         'Stato_Prot': 'Iniziale'
                     }
 
