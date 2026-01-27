@@ -742,7 +742,7 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
         save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
         st.rerun()
 
-#st.sidebar.markdown("---")
+st.sidebar.markdown("---")
 
 # --- 6. POPUP ALERT (OTTIMIZZATO) ---
 if st.session_state.get('last_alert'):
