@@ -756,34 +756,45 @@ else:
 
 # --- TASTO TEST TELEGRAM ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🧪 TEST TELEGRAM"):
+if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
     test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
     send_telegram_msg(test_msg)
     st.sidebar.success("Segnale di test inviato!")
 
-# --- TASTO TEST COMPLETO (VISIVO + SONORO) ---
+# --- TASTO TEST TOTALE (ALERT + TABELLA) ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
-    # 1. Impostiamo i dati finti dell'alert
-    st.session_state['last_alert'] = {
+if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
+    # 1. Dati del finto segnale
+    test_data = {
+        'DataOra': get_now_rome().strftime("%H:%M:%S"),
         'Asset': 'TEST/EUR', 
-        'Direzione': 'COMPRA', 
-        'Prezzo': '1.0000', 
-        'TP': '1.0100', 
-        'SL': '0.9900', 
-        'Protezione': 'Standard'
+        'Direzione': 'VENDI', 
+        'Prezzo': '1.0950', 
+        'TP': '1.0900', 
+        'SL': '1.0980', 
+        'Stato': 'In Corso',
+        'Investimento €': '100.00',
+        'Risultato €': '0.00',
+        'Costo Spread €': '0.05',
+        'Stato_Prot': 'Iniziale',
+        'Protezione': 'Trailing 3/6%'
     }
     
-    # 2. Resettiamo il flag di notifica per forzare il suono
-    if 'alert_notified' in st.session_state: 
-        del st.session_state['alert_notified']
+    # 2. Aggiorniamo la Storia (Tabella)
+    st.session_state['signal_history'] = pd.concat(
+        [pd.DataFrame([test_data]), st.session_state['signal_history']], 
+        ignore_index=True
+    )
     
+    # 3. Attiviamo l'Alert (Popup + Suono)
+    st.session_state['last_alert'] = test_data
+    if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+
     # 3. Opzionale: Puliamo anche il timer se lo usi
     if 'alert_start_time' in st.session_state: 
         del st.session_state['alert_start_time']
     
     st.rerun()
-
 
 # Reset Sidebar
 st.sidebar.markdown("---")
