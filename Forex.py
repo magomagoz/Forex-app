@@ -999,8 +999,8 @@ if not st.session_state['signal_history'].empty:
         )
     
         st.download_button(
-            label=f"📥 Esporta vista attuale ({len(display_df)} righe)",
-            data=display_df.to_csv(index=False).encode('utf-8'),
+            label=f"📥 Esporta vista attuale ({len(df_visualizzazione)} righe)",
+            data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
             file_name="cronologia_trading.csv",
             mime="text/csv",
             use_container_width=True
