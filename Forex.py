@@ -968,44 +968,50 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CORRETTA) ---
+# --- 9. CRONOLOGIA SEGNALI (VERSIONE FIXATA) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 if not st.session_state['signal_history'].empty:
-    full_history = st.session_state['signal_history'].copy()
+    # Creiamo una copia per non sporcare i dati originali durante il filtraggio
+    df_visualizzazione = st.session_state['signal_history'].copy()
     
+    # Assicuriamoci che tutte le colonne richieste esistano (previene crash)
+    cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
+    for col in cols_necessarie:
+        if col not in df_visualizzazione.columns:
+            df_visualizzazione[col] = "-"
+
+    # Interfaccia Filtri
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        opzioni_stato = sorted(full_history['Stato'].unique().tolist())
-        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato, default=[], placeholder="Tutti gli esiti")
+        opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
+        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato, placeholder="Tutti gli esiti")
     with col_f2:
-        opzioni_asset = sorted(full_history['Asset'].unique().tolist())
-        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset, default=[], placeholder="Tutte le valute")
+        opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
+        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset, placeholder="Tutte le valute")
 
-    # Applichiamo i filtri
-    df_filtrato = full_history.copy()
+    # Applicazione Filtri
     if filtro_stato:
-        df_filtrato = df_filtrato[df_filtrato['Stato'].isin(filtro_stato)]
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
     if filtro_asset:
-        df_filtrato = df_filtrato[df_filtrato['Asset'].isin(filtro_asset)]
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
     
-    # ORDINE: Poiché usiamo concat(new, old), l'indice 0 è già il più recente.
-    # Non serve .iloc[::-1]. Se vuoi essere sicuro al 100%, usa:
-    display_df = df_filtrato.reset_index(drop=True)
+    if not df_visualizzazione.empty:
+        # Usiamo applymap per massima compatibilità con le versioni di Pandas
+        try:
+            styled_df = df_visualizzazione.style.applymap(style_status, subset=['Stato', 'Risultato €'])
+        except:
+            # Fallback se la versione di pandas è la 2.1+
+            styled_df = df_visualizzazione.style.map(style_status, subset=['Stato', 'Risultato €'])
 
-    
-    if not display_df.empty:
         st.dataframe(
-            display_df.style.map(style_status, subset=['Stato', 'Risultato €']), # Aggiunto Risultato €
+            styled_df,
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
+            column_order=cols_necessarie
         )
-
     else:
-        st.warning("Nessun dato corrispondente ai filtri selezionati.")
-
-# 4. SE LA CRONOLOGIA È VUOTA
+        st.warning("🔍 Nessun segnale trovato con i filtri selezionati.")
 else:
-    st.info(f"📖 **In attesa di un segnale da registrare**")
+    st.info("📖 **In attesa del primo segnale...** La sentinella sta scansionando i mercati.")
