@@ -346,7 +346,7 @@ def run_sentinel():
             save_history_permanently()
 
     # Azzera i popup aperti all'inizio di ogni nuovo ciclo di scansione
-    st.session_state['last_alert'] = None
+    #st.session_state['last_alert'] = None
     if 'alert_notified' in st.session_state: 
         del st.session_state['alert_notified']
     
