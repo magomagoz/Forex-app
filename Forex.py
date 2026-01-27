@@ -42,6 +42,9 @@ st.markdown("""
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X"}
 
+# --- CONFIGURAZIONE TRADING ---
+SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
+
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
