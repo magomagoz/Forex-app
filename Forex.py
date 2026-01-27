@@ -763,7 +763,7 @@ if st.sidebar.button("🧪 TEST TELEGRAM"):
 
 # --- TASTO TEST COMPLETO (VISIVO + SONORO) ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🔊 TEST ALERT & SUONO"):
+if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
     # 1. Impostiamo i dati finti dell'alert
     st.session_state['last_alert'] = {
         'Asset': 'TEST/EUR', 
