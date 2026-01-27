@@ -590,8 +590,8 @@ st.sidebar.markdown(
 )
 
 # --- CALCOLO INVESTIMENTO SIMULATO ---
-investimento_simulato = (balance * (risk_pc / 100), 2.0)
-saldo_residuo = (balance - investimento_simulato, 2.0)
+investimento_simulato = balance * (risk_pc / 100)
+saldo_residuo = balance - investimento_simulato
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
