@@ -406,12 +406,18 @@ def run_sentinel():
                     sl_prezzo = entry_with_spread - sl_dist if s_action == "COMPRA" else entry_with_spread + sl_dist
                     tp_prezzo = entry_with_spread * 1.012 if s_action == "COMPRA" else entry_with_spread * 0.988
 
+
+                    # All'interno del ciclo for di run_sentinel, quando viene generato new_sig:
+                    bal_attule = st.session_state.get('balance_val', 1000)
+                    risk_attual = st.session_state.get('risk_val', 2.0)
+                    investimento_calcolato = bal_attule * (risk_attual / 100)
+                    
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 'Direzione': s_action, 
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': 'In Corso', 'Investimento €': f"{investimento_puntata:.2f}",
+                        'Stato': 'In Corso', 'Investimento €': f"{investimento_calcolato:.2f}",
                         'Risultato €': "0.00", 'Costo Spread €': f"{(investimento_puntata * SIMULATED_SPREAD):.2f}",
                         'Stato_Prot': 'Iniziale', 'Protezione': 'Trailing 3/6%'
                     }
@@ -697,10 +703,13 @@ if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
     send_telegram_msg(test_msg)
     st.sidebar.success("Segnale di test inviato!")
 
-# --- TASTO TEST TOTALE (ALERT + TABELLA) ---
-st.sidebar.markdown("---")
+# --- TASTO TEST DINAMICO ---
 if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
-    # 1. Dati del finto segnale
+    # Calcolo dinamico basato sui tuoi cursori attuali
+    current_bal = st.session_state.get('balance_val', 1000)
+    current_r = st.session_state.get('risk_val', 2.0)
+    inv_test = current_bal * (current_r / 100)
+    
     test_data = {
         'DataOra': get_now_rome().strftime("%H:%M:%S"),
         'Asset': 'TEST/EUR', 
@@ -709,27 +718,19 @@ if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
         'TP': '1.0900', 
         'SL': '1.0980', 
         'Stato': 'In Corso',
-        'Investimento €': '100.00',
-        'Risultato €': '0.00',
-        'Costo Spread €': '0.05',
+        'Investimento €': f"{inv_test:.2f}", # Ora legge il 2% di 1000 = 20.00
+        'Risultato €': "0.00",
+        'Costo Spread €': f"{(inv_test * SIMULATED_SPREAD):.2f}",
         'Stato_Prot': 'Iniziale',
         'Protezione': 'Trailing 3/6%'
     }
     
-    # 2. Aggiorniamo la Storia (Tabella)
     st.session_state['signal_history'] = pd.concat(
         [pd.DataFrame([test_data]), st.session_state['signal_history']], 
         ignore_index=True
     )
-    
-    # 3. Attiviamo l'Alert (Popup + Suono)
     st.session_state['last_alert'] = test_data
     if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
-
-    # 3. Opzionale: Puliamo anche il timer se lo usi
-    if 'alert_start_time' in st.session_state: 
-        del st.session_state['alert_start_time']
-    
     st.rerun()
 
 # Reset Sidebar
