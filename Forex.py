@@ -260,7 +260,9 @@ def update_signal_outcomes():
                     new_sl = entry_v
                     status_prot = 'BE (0%)'
                     play_safe_sound()
-                    send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Gain +3%)")
+                    #send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Gain +3%)")
+                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 3%!")
+
                 
                 # Step 2: Al +6% garantiamo il +5% di profitto
                 elif percent_gain >= 6.0 and 'BE' in status_prot:
@@ -456,8 +458,16 @@ def run_sentinel():
                     save_history_permanently()
                     
                     # Notifica Telegram
-                    icon = "🟢" if s_action == "COMPRA" else "🔴"
-                    send_telegram_msg(f"{icon} *{s_action}* {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']} | SL: {new_sig['SL']}")
+                    icona = "🟢" if s_action == "COMPRA" else "🔴"
+                    telegram_text = (
+                        f"{icona} *{s_action}* {label}\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
+                        f"Size: € {new_sig['Investimento €']}"
+                    )
+                    send_telegram_msg(telegram_text)
+
+            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
