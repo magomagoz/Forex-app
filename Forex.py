@@ -257,19 +257,34 @@ def update_signal_outcomes():
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
+            # --- LOGICA TRAILING STOP FOREX (3% -> BE, 6% -> 5%) ---
             new_sl = current_sl
             status_prot = row.get('Stato_Prot', 'Iniziale')
 
-            # --- LOGICA TRAILING STOP ---
-            if percent_gain >= 5.0 and 'Iniziale' in status_prot:
-                new_sl = entry_v
-                status_prot = 'BE (0%)'
-                play_safe_sound()
-                send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio!")
-            elif percent_gain >= 10.0 and 'BE' in status_prot:
-                new_sl = entry_v * 1.05 if direzione == 'COMPRA' else entry_v * 0.95
-                status_prot = 'Safe (+5%)'
-                play_safe_sound()
+            # Solo per asset Forex (escludiamo Crypto dalla logica stretta)
+            if "BTC" not in row['Asset'] and "ETH" not in row['Asset']:
+                # Step 1: Al +3% portiamo a Pareggio (BE)
+                if percent_gain >= 3.0 and 'Iniziale' in status_prot:
+                    new_sl = entry_v
+                    status_prot = 'BE (0%)'
+                    play_safe_sound()
+                    send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Gain +3%)")
+                
+                # Step 2: Al +6% garantiamo il +5% di profitto
+                elif percent_gain >= 6.0 and 'BE' in status_prot:
+                    if direzione == 'COMPRA':
+                        new_sl = entry_v * 1.05
+                    else:
+                        new_sl = entry_v * 0.95
+                    status_prot = 'Safe (+5%)'
+                    play_safe_sound()
+                    send_telegram_msg(f"💰 {row['Asset']}: SL Garantito +5% (Gain +6%)")
+            
+            # Logica separata per Crypto (se presente)
+            else:
+                if percent_gain >= 10.0 and 'Iniziale' in status_prot:
+                    new_sl = entry_v
+                    status_prot = 'BE (0%)'
 
             # Aggiornamento fisico SL se cambiato
             if new_sl != current_sl:
@@ -285,12 +300,14 @@ def update_signal_outcomes():
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 df.at[idx, 'Stato'] = esito
+                
+                # Calcolo profitto netto
                 final_profit = round(investimento * (percent_gain / 100), 2)
-                #final_net_profit = round(profitto_lordo - costo_spread_euro, 2)
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
+                
                 updates_made = True
                 play_close_sound()
-                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€\n🛡️ {row['Asset']}: SL a Pareggio!")
+                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€")
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
@@ -440,16 +457,20 @@ def run_sentinel():
                         entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
                 
                     # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
-                    percentuale_perdita_max = 0.10 
-                    distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
-                
+                    percentuale_perdita_max = 0.30 
+                    #distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
+
+                    # --- NUOVO CALCOLO SL/TP DINAMICO ---
+                    # Calcoliamo lo Stop Loss basato sul -30% del valore della posizione (circa 0.3% del prezzo asset)
+                    distanza_prezzo_sl = entry_with_spread * 0.003 
+                    
                     if s_action == "COMPRA":
                         sl_prezzo = entry_with_spread - distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 1.005 
+                        tp_prezzo = entry_with_spread * 1.012  # TP alzato all'1.2% per dare spazio al trailing
                     else:
                         sl_prezzo = entry_with_spread + distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 0.995
-        
+                        tp_prezzo = entry_with_spread * 0.988
+
                     # Calcolo del costo dello spread in Euro basato sulla puntata
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
 
