@@ -485,6 +485,12 @@ def get_equity_data():
     for _, row in df_sorted.iterrows():
         # Applichiamo il rischio scelto sulla barra al saldo attuale
         risk_amount = current_bal * (risk_pc / 100)
+
+        distanza_sl = entry_with_spread * 0.002 
+        
+        # Applichiamo il round qui per evitare cifre infinite
+        inv_effettivo_calcolato = round(rischio_euro / (distanza_sl / entry_with_spread), 2)
+
         
         if row['Stato'] == '✅ TARGET':
             # Simuliamo un profitto con Reward Ratio 1:2
