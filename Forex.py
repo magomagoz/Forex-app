@@ -744,7 +744,14 @@ for s_name, is_open in get_session_status().items():
     status_text = "APERTO" if is_open else "CHIUSO"
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
-   
+
+# --- TASTO TEST TELEGRAM ---
+st.sidebar.markdown("---")
+if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
+    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
+    send_telegram_msg(test_msg)
+    st.sidebar.success("Segnale di test inviato!")
+
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
