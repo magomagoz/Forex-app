@@ -738,25 +738,6 @@ for s_name, is_open in get_session_status().items():
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
 
-# --- TASTO TEST TELEGRAM ---
-st.sidebar.markdown("---")
-if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
-    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
-    send_telegram_msg(test_msg)
-    st.sidebar.success("Segnale di test inviato!")
-
-# Reset Sidebar
-st.sidebar.markdown("---")
-with st.sidebar.popover("🗑️ **Reset Cronologia**"):
-    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
-
-    if st.button("SÌ, CANCELLA ORA"):
-        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
-        save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
-        st.rerun()
-
-#st.sidebar.markdown("---")
-
 # --- TASTO ESPORTAZIONE DATI ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("💾 Backup Report")
@@ -773,48 +754,65 @@ if not st.session_state['signal_history'].empty:
 else:
     st.sidebar.info("Nessun dato da esportare")
 
-#if st.sidebar.button("TEST ALERT"):
-    #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
-    #if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-    #st.rerun()
+# --- TASTO TEST TELEGRAM ---
+st.sidebar.markdown("---")
+if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
+    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
+    send_telegram_msg(test_msg)
+    st.sidebar.success("Segnale di test inviato!")
+
+st.sidebar.markdown("---")
+if st.sidebar.button("TEST ALERT"):
+    st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
+    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+    st.rerun()
+
+
+# Reset Sidebar
+st.sidebar.markdown("---")
+with st.sidebar.popover("🗑️ **Reset Cronologia**"):
+    st.warning("Sei sicuro? Questa azione cancellerà tutti i segnali salvati.")
+
+    if st.button("SÌ, CANCELLA ORA"):
+        st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
+        save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
+        st.rerun()
 
 #st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (SINCRONIZZATO CON REFRESH 60s) ---
+# --- 6. POPUP ALERT (OTTIMIZZATO) ---
 if st.session_state.get('last_alert'):
-    # Suona solo la prima volta che appare l'alert
+    alert = st.session_state['last_alert']
+    
+    # Suona solo la prima volta
     if 'alert_notified' not in st.session_state:
         play_notification_sound()
         st.session_state['alert_notified'] = True
+        # Registriamo quando è apparso l'alert
+        st.session_state['alert_time'] = time_lib.time()
 
-    alert = st.session_state['last_alert']
     hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-    # Box Alert Grafico
     st.markdown(f"""
-        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE RILEVATO: {alert['Asset']}</h2>
+        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
             <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-            <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']}</p>
-            <div style="margin-top: 10px; font-size: 0.8em; color: #555;">
-                Questo alert scomparirà automaticamente al prossimo aggiornamento della sentinella.
-            </div>
+            <p style="color: #888;">TP: {alert['TP']} | SL: {alert['SL']} | Protezione: {alert.get('Protezione', 'Standard')}</p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Tasto per chiusura manuale immediata
-    if st.button("✅ CHIUDI ALERT ORA", use_container_width=True):
+    # Tasto di chiusura
+    if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
         st.rerun()
+
+    # Autorefresh specifico per il popup (opzionale: lo chiude dopo 5 minuti se non cliccato)
+    if time_lib.time() - st.session_state.get('alert_time', 0) > 300: # 5 minuti
+        st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
     
     st.divider()
-
-# --- LOGICA DI PULIZIA AUTOMATICA ---
-# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
-#if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
-        # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
-        # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
