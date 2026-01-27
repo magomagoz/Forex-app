@@ -43,7 +43,7 @@ st.markdown("""
 
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X"}
 
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -87,12 +87,6 @@ def get_now_rome():
     return datetime.now(rome_tz)
 
 def is_market_open(asset_name):
-    """
-    Restituisce True se il mercato è aperto.
-    """
-    if "BTC" in asset_name or "ETH" in asset_name:
-        return True
-    
     today = get_now_rome().weekday()
     # Se è Sabato (5) o Domenica (6), il Forex è chiuso
     if today >= 5:
@@ -170,8 +164,7 @@ def get_realtime_data(ticker):
 def get_currency_strength():
     try:
         forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
-        crypto = ["BTC-USD", "ETH-USD"]
-        data = yf.download(forex + crypto, period="5d", interval="1d", progress=False, timeout=15)
+        data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
             return pd.Series(dtype=float)
@@ -194,9 +187,9 @@ def get_currency_strength():
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
-            "BTC ₿": returns.get("BTC-USD", 0),
-            "ETH 💎": returns.get("ETH-USD", 0)
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0)
+            #"BTC ₿": returns.get("BTC-USD", 0),
+            #"ETH 💎": returns.get("ETH-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
     except Exception:
@@ -831,7 +824,7 @@ if os.path.exists(banner_path):
 else:
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
-st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 Forex e 2 Crypto) in tempo reale (1m).")
+st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset Forex in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
 st.markdown("---")
