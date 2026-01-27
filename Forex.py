@@ -40,7 +40,7 @@ st.markdown("""
 
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD"}
 
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -84,6 +84,14 @@ def send_telegram_msg(msg):
 def get_now_rome():
     return datetime.now(rome_tz)
 
+def is_market_open(asset_name):
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False
+        
+    return True
+
 def play_notification_sound():
     audio_html = """
         <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
@@ -107,7 +115,16 @@ def play_safe_sound():
 def style_status(val):
     if val == '✅ TARGET': return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
     if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
-    if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
+    if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
+    
+    try:
+        # Rimuove il simbolo € e forza il float per il controllo colore
+        clean_val = str(val).replace('€', '').replace('+', '').strip()
+        num = float(clean_val)
+        if num > 0: return 'color: #00ffcc; font-weight: bold;'
+        if num < 0: return 'color: #ff4b4b; font-weight: bold;'
+    except:
+        pass
     return ''
 
 def get_trailing_params(asset_name):
