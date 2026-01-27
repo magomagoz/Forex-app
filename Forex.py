@@ -997,10 +997,6 @@ if not st.session_state['signal_history'].empty:
             hide_index=True,
             column_order=cols_necessarie
         )
-    else:
-        st.warning("🔍 Nessun segnale trovato con i filtri selezionati.")
-else:
-    st.info("📖 **In attesa del primo segnale...** La sentinella sta scansionando i mercati.")
     
         st.download_button(
             label=f"📥 Esporta vista attuale ({len(display_df)} righe)",
@@ -1013,4 +1009,4 @@ else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
 
 else:
-    st.info("Nessun segnale registrato.")
+    st.info("📖 **In attesa del primo segnale...** La sentinella sta scansionando i mercati.")
