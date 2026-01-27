@@ -745,7 +745,7 @@ if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
         'Stato': 'In Corso',
         'Investimento €': f"{inv_test:.2f}", # Ora legge il 2% di 1000 = 20.00
         'Risultato €': "0.00",
-        'Costo Spread €': f"{(inv_test * SIMULATED_SPREAD):.2f}",
+        'Costo Spread €': f"{(inv_test):.2f}",
         'Stato_Prot': 'Iniziale',
         'Protezione': 'Trailing 3/6%'
     }
