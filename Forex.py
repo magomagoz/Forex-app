@@ -336,11 +336,6 @@ def run_sentinel():
         if len(st.session_state['signal_history']) > 50:
             st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
             save_history_permanently()
-
-    # Azzera i popup aperti all'inizio di ogni nuovo ciclo di scansione
-    st.session_state['last_alert'] = None
-    if 'alert_notified' in st.session_state: 
-        del st.session_state['alert_notified']
     
     #"""Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
