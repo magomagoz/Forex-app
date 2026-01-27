@@ -489,8 +489,8 @@ if 'last_scan_status' not in st.session_state:
 update_signal_outcomes()
 
 def get_equity_data():
-    """Calcola l'andamento del saldo applicando il rischio scelto ai trade chiusi"""
     initial_balance = balance 
+    risk_pc = st.session_state.get('risk_val', 2.0)
     equity_curve = [initial_balance]
     
     if st.session_state['signal_history'].empty:
@@ -535,7 +535,7 @@ st.sidebar.markdown("""
         }
         .container-bar {
             width: 100%; background-color: #222; border-radius: 5px;
-            height: 12px; margin-bottom: 25px; border: 1px solid #444; overflow: hidden;
+            height: 12px; margin-bottom: 25px; border: 1px solid #995; overflow: hidden;
         }
         .red-bar {
             height: 100%; background-color: #ff4b4b; width: 0%;
@@ -590,8 +590,8 @@ st.sidebar.markdown(
 )
 
 # --- CALCOLO INVESTIMENTO SIMULATO ---
-investimento_simulato = balance * (risk_pc / 100)
-saldo_residuo = balance - investimento_simulato
+investimento_simulato = (balance * (risk_pc / 100), 2.0)
+saldo_residuo = (balance - investimento_simulato, 2.0)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Gestione Capitale")
@@ -646,6 +646,49 @@ display_performance_stats()
 #st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
 
 # Dettagli operazione selezionata (se presente)
+
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+
+if not active_trades.empty:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚡ Monitor Real-Time")
+    
+    for _, trade in active_trades.iterrows():
+        try:
+            # Recupero rapido dell'ultimo prezzo dal database o download leggero
+            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+            # Usiamo un periodo brevissimo per non sovraccaricare
+            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+            
+            if not t_data.empty:
+                curr_p = float(t_data['Close'].iloc[-1])
+                entry_p = float(str(trade['Prezzo']).replace(',', '.'))
+                inv = float(str(trade['Investimento €']).replace(',', '.'))
+                
+                # Calcolo profitto/perdita attuale
+                if trade['Direzione'] == 'COMPRA':
+                    p_diff = (curr_p - entry_p) / entry_p
+                else:
+                    p_diff = (entry_p - curr_p) / entry_p
+                
+                latente_euro = inv * p_diff
+                latente_perc = p_diff * 100
+                
+                # Colore dinamico
+                color = "#006400" if latente_perc >= 0 else "#ff4b4b"
+                
+                st.sidebar.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
+                        <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
+                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+        except:
+            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+            continue
+
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
@@ -661,7 +704,60 @@ for s_name, is_open in get_session_status().items():
     status_text = "APERTO" if is_open else "CHIUSO"
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
-   
+
+# --- TASTO ESPORTAZIONE DATI ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("💾 Backup Report")
+
+if not st.session_state['signal_history'].empty:
+    csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+    st.sidebar.download_button(
+        label="📥 SCARICA CRONOLOGIA CSV",
+        data=csv_data,
+        file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+else:
+    st.sidebar.info("Nessun dato da esportare")
+
+# --- TASTO TEST TELEGRAM ---
+st.sidebar.markdown("---")
+if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
+    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
+    send_telegram_msg(test_msg)
+    st.sidebar.success("Segnale di test inviato!")
+
+# --- TASTO TEST DINAMICO ---
+if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
+    # Calcolo dinamico basato sui tuoi cursori attuali
+    current_bal = st.session_state.get('balance_val', 1000)
+    current_r = st.session_state.get('risk_val', 2.0)
+    inv_test = current_bal * (current_r / 100)
+    
+    test_data = {
+        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+        'Asset': 'TEST/EUR', 
+        'Direzione': 'VENDI', 
+        'Prezzo': '1.0950', 
+        'TP': '1.0900', 
+        'SL': '1.0980', 
+        'Stato': 'In Corso',
+        'Investimento €': f"{inv_test:.2f}", # Ora legge il 2% di 1000 = 20.00
+        'Risultato €': "0.00",
+        'Costo Spread €': f"{(inv_test * SIMULATED_SPREAD):.2f}",
+        'Stato_Prot': 'Iniziale',
+        'Protezione': 'Trailing 3/6%'
+    }
+    
+    st.session_state['signal_history'] = pd.concat(
+        [pd.DataFrame([test_data]), st.session_state['signal_history']], 
+        ignore_index=True
+    )
+    st.session_state['last_alert'] = test_data
+    if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+    st.rerun()
+
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
@@ -681,33 +777,37 @@ st.sidebar.markdown("---")
 
 #st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (SINCRONIZZATO CON REFRESH 60s) ---
+# --- 6. POPUP ALERT (OTTIMIZZATO) ---
 if st.session_state.get('last_alert'):
-    # Suona solo la prima volta che appare l'alert
+    alert = st.session_state['last_alert']
+    
+    # Suona solo la prima volta
     if 'alert_notified' not in st.session_state:
         play_notification_sound()
         st.session_state['alert_notified'] = True
+        # Registriamo quando è apparso l'alert
+        st.session_state['alert_time'] = time_lib.time()
 
-    alert = st.session_state['last_alert']
     hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
 
-    # Box Alert Grafico
     st.markdown(f"""
-        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE RILEVATO: {alert['Asset']}</h2>
+        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
             <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-            <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']}</p>
-            <div style="margin-top: 10px; font-size: 0.8em; color: #555;">
-                Questo alert scomparirà automaticamente al prossimo aggiornamento della sentinella.
-            </div>
+            <p style="color: #888;">TP: {alert['TP']} | SL: {alert['SL']} | Protezione: {alert.get('Protezione', 'Standard')}</p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Tasto per chiusura manuale immediata
-    if st.button("✅ CHIUDI ALERT ORA", use_container_width=True):
+    # Tasto di chiusura
+    if st.button("✅ CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
         st.rerun()
+
+    # Autorefresh specifico per il popup (opzionale: lo chiude dopo 5 minuti se non cliccato)
+    if time_lib.time() - st.session_state.get('alert_time', 0) > 300: # 5 minuti
+        st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
     
     st.divider()
 
@@ -725,7 +825,7 @@ if os.path.exists(banner_path):
 else:
     st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
 
-st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset (7 Forex e 2 Crypto) in tempo reale (1m).")
+st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset Forex in tempo reale (1m).")
 st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
 
 st.markdown("---")
@@ -854,57 +954,54 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (FILTRI PULITI) ---
+# --- 9. CRONOLOGIA SEGNALI (VERSIONE FIXATA) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 if not st.session_state['signal_history'].empty:
-    full_history = st.session_state['signal_history'].copy()
+    # Creiamo una copia per non sporcare i dati originali durante il filtraggio
+    df_visualizzazione = st.session_state['signal_history'].copy()
     
-    # --- UI FILTRI COMPATTI ---
+    # Assicuriamoci che tutte le colonne richieste esistano (previene crash)
+    cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
+    for col in cols_necessarie:
+        if col not in df_visualizzazione.columns:
+            df_visualizzazione[col] = "-"
+
+    # Interfaccia Filtri
     col_f1, col_f2 = st.columns(2)
-    
     with col_f1:
-        # Usiamo una lista vuota come default per non mostrare i "pulsanti"
-        opzioni_stato = sorted(full_history['Stato'].unique().tolist())
-        filtro_stato = st.multiselect(
-            "Filtra Esito:", 
-            options=opzioni_stato, 
-            default=[], 
-            placeholder="Tutti gli esiti"
-        )
-    
+        opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
+        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato, placeholder="Tutti gli esiti")
     with col_f2:
-        opzioni_asset = sorted(full_history['Asset'].unique().tolist())
-        filtro_asset = st.multiselect(
-            "Filtra Valuta:", 
-            options=opzioni_asset, 
-            default=[], 
-            placeholder="Tutte le valute"
-        )
+        opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
+        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset, placeholder="Tutte le valute")
 
-    # --- LOGICA DI FILTRAGGIO ---
-    # Se la lista è vuota, non filtriamo (mostriamo tutto)
-    df_filtrato = full_history.copy()
-    
+    # Applicazione Filtri
     if filtro_stato:
-        df_filtrato = df_filtrato[df_filtrato['Stato'].isin(filtro_stato)]
-    
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
     if filtro_asset:
-        df_filtrato = df_filtrato[df_filtrato['Asset'].isin(filtro_asset)]
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
     
-    # Inversione per vedere i più recenti in alto
-    display_df = df_filtrato.iloc[::-1] 
+    if not df_visualizzazione.empty:
+        # Usiamo applymap per massima compatibilità con le versioni di Pandas
+        try:
+            styled_df = df_visualizzazione.style.applymap(style_status, subset=['Stato', 'Risultato €'])
+        except:
+            # Fallback se la versione di pandas è la 2.1+
+            styled_df = df_visualizzazione.style.map(style_status, subset=['Stato', 'Risultato €'])
 
-    # --- VISUALIZZAZIONE ---
-    if not display_df.empty:
         st.dataframe(
-            display_df.style.map(style_status, subset=['Stato']),
+            styled_df,
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+            column_order=cols_necessarie
         )
-        
+    else:
+        st.warning("🔍 Nessun segnale trovato con i filtri selezionati.")
+else:
+    st.info("📖 **In attesa del primo segnale...** La sentinella sta scansionando i mercati.")
+    
         st.download_button(
             label=f"📥 Esporta vista attuale ({len(display_df)} righe)",
             data=display_df.to_csv(index=False).encode('utf-8'),
