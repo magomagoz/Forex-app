@@ -781,68 +781,45 @@ st.sidebar.markdown("---")
 
 #st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (OTTIMIZZATO - STILE MODALE) ---
+# --- 6. POPUP ALERT (OTTIMIZZATO) ---
 if st.session_state.get('last_alert'):
     alert = st.session_state['last_alert']
     
-    # Gestione Timer (Chiude da solo dopo 5 minuti)
-    if 'alert_time' not in st.session_state:
-        st.session_state['alert_time'] = time_lib.time()
-    
-    if time_lib.time() - st.session_state.get('alert_time', 0) > 300: # 5 minuti timeout
-        st.session_state['last_alert'] = None
-        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
-        st.rerun()
-
     # Suona solo la prima volta
     if 'alert_notified' not in st.session_state:
         play_notification_sound()
         st.session_state['alert_notified'] = True
+        # Registriamo quando è apparso l'alert
+        st.session_state['alert_time'] = time_lib.time()
 
     hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
-    bg_color = "rgba(0, 50, 0, 0.95)" if alert['Direzione'] == 'COMPRA' else "rgba(50, 0, 0, 0.95)"
 
-    # CSS per renderlo flottante al centro schermo (Modal)
     st.markdown(f"""
-        <div style="
-            position: fixed; 
-            top: 50%; left: 50%; 
-            transform: translate(-50%, -50%); 
-            z-index: 9999; 
-            background-color: {bg_color}; 
-            border: 4px solid {hex_color}; 
-            padding: 30px; 
-            border-radius: 20px; 
-            text-align: center; 
-            width: 50%;
-            min-width: 300px;
-            box-shadow: 0 0 50px {hex_color}88;
-            backdrop-filter: blur(10px);">
-            
-            <h2 style="color: white; margin: 0; text-transform: uppercase; font-size: 1.5rem;">🚀 NUOVO SEGNALE</h2>
-            <h1 style="color: {hex_color}; margin: 15px 0; font-size: 3rem; font-weight: 800;">{alert['Asset']}</h1>
-            <h2 style="color: {hex_color}; margin: 5px 0; font-size: 2rem;">{alert['Direzione']} @ {alert['Prezzo']}</h2>
-            <hr style="border-color: {hex_color}; opacity: 0.5;">
-            <div style="display: flex; justify-content: space-around; margin-top: 15px; color: #fff; font-size: 1.2rem;">
-                <span>🎯 TP: <b>{alert['TP']}</b></span>
-                <span>🛑 SL: <b>{alert['SL']}</b></span>
-            </div>
-            <p style="color: #ccc; margin-top: 15px; font-size: 0.9rem;">Protezione: {alert.get('Protezione', 'Standard')}</p>
+        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+            <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+            <p style="color: #888;">TP: {alert['TP']} | SL: {alert['SL']} | Protezione: {alert.get('Protezione', 'Standard')}</p>
         </div>
     """, unsafe_allow_html=True)
     
-    # Tasto di chiusura (Usiamo colonne per centrarlo sotto il modale HTML visivamente)
-    # Nota: Streamlit non permette bottoni dentro l'HTML, quindi lo mettiamo subito dopo
-    # Usiamo un "hack" per distanziarlo o renderlo visibile
-    
-    col_close_1, col_close_2, col_close_3 = st.columns([1, 2, 1])
-    with col_close_2:
-        if st.button("✅ PRESO VISIONE - CHIUDI POPUP", use_container_width=True, type="primary"):
-            st.session_state['last_alert'] = None
-            if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
-            st.rerun()
+    # Tasto di chiusura
+    if st.button("✅ CHIUDI", use_container_width=True):
+        st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+        st.rerun()
 
+    # Autorefresh specifico per il popup (opzionale: lo chiude dopo 5 minuti se non cliccato)
+    if time_lib.time() - st.session_state.get('alert_time', 0) > 300: # 5 minuti
+        st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+    
     st.divider()
+
+# --- LOGICA DI PULIZIA AUTOMATICA ---
+# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
+#if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
+        # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
+        # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
