@@ -290,10 +290,35 @@ def update_signal_outcomes():
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
                 updates_made = True
                 play_close_sound()
-                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€")
-                    
+                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€\n🛡️ {row['Asset']}: SL a Pareggio!")
+                
+                if new_status:
+                    df.at[idx, 'Stato'] = new_status
+                    df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
+                    updates_made = True
+                    play_close_sound()
+
+                    # Notifica Telegram
+                    icona = "🟢" if s_action == "COMPRA" else "🔴"
+                    telegram_text = (
+                        f"{icona} *{s_action}* {label}\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
+                        f"Size: € {new_sig['Investimento €']}"
+                    )
+                    send_telegram_msg(telegram_text)
+
+            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+
         except Exception as e:
-            continue 
+            debug_list.append(f"❌ {label} Err: {str(e)}")
+            continue
+                    
+                    #msg = f"🔔 **CHIUSURA TRADE**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
+                    #send_telegram_msg(msg)
+        
+        #except Exception as e:
+            #continue 
         
     if updates_made:
         st.session_state['signal_history'] = df
