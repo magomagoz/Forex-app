@@ -279,11 +279,12 @@ def update_signal_outcomes():
             # --- CONTROLLO CHIUSURA ---
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
             stop_hit = (direzione == 'COMPRA' and current_price <= new_sl) or (direzione == 'VENDI' and current_price >= new_sl)
-
+            
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 df.at[idx, 'Stato'] = esito
-                final_profit = investimento * (percent_gain / 100)
+                final_profit = round(investimento * (percent_gain / 100), 2)
+                #final_net_profit = round(profitto_lordo - costo_spread_euro, 2)
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
                 updates_made = True
                 play_close_sound()
