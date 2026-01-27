@@ -462,8 +462,10 @@ def run_sentinel():
                     telegram_text = (
                         f"{icona} *{s_action}* {label}\n"
                         f"Entry: {new_sig['Prezzo']}\n"
-                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
-                        f"Size: € {new_sig['Investimento €']}"
+                        f"TP: {new_sig['TP']}\n"
+                        f"SL: {new_sig['SL']}\n"
+                        f"--------\n"
+                        f"€€€: € {new_sig['Investimento €']}"
                     )
                     send_telegram_msg(telegram_text)
 
@@ -819,7 +821,7 @@ if st.session_state.get('last_alert'):
         st.rerun()
 
     # Autorefresh specifico per il popup (opzionale: lo chiude dopo 5 minuti se non cliccato)
-    if time_lib.time() - st.session_state.get('alert_time', 0) > 300: # 5 minuti
+    if time_lib.time() - st.session_state.get('alert_time', 0) > 180: # 3 minuti
         st.session_state['last_alert'] = None
         if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
     
