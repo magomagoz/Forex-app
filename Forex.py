@@ -301,13 +301,16 @@ def update_signal_outcomes():
                 esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
                 df.at[idx, 'Stato'] = esito
                 
-                # Calcolo profitto netto
+                # Calcolo profitto netto basato sulla variazione percentuale
                 final_profit = round(investimento * (percent_gain / 100), 2)
                 df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
                 
                 updates_made = True
                 play_close_sound()
-                send_telegram_msg(f"🏁 CHIUSO: {row['Asset']}\nEsito: {esito}\nNetto: {final_profit:+.2f}€")
+                
+                # Notifica Telegram Chiusura
+                msg_chiusura = f"🏁 *CHIUSO*: {row['Asset']}\nEsito: {esito}\nProfitto: {final_profit:+.2f}€"
+                send_telegram_msg(msg_chiusura)
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
@@ -442,62 +445,48 @@ def run_sentinel():
                                     recent_signals = True
                             except Exception as e:
                                 # Se c'è un errore nel formato (es. cella vuota), permettiamo il segnale
-                                recent_signals = False
-                # --- FINE BLOCCO SOSTITUTIVO ---
-              
-                if not is_running and not recent_signals:
-                    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_puntata = current_balance * (current_risk / 100)
+                                recent_signals = False # Inizializzazione obbligatoria
+                                # ... (codice controllo duplicati esistente) ...
                 
-                    # APPLICAZIONE SPREAD 0,05%
-                    # Se COMPRI, paghi di più. Se VENDI, incassi di meno.
-                    if s_action == "COMPRA":
-                        entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
-                    else:
-                        entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
+                                if not is_running and not recent_signals:
+                                    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
+                                    investimento_puntata = current_balance * (current_risk / 100)
+                                
+                                    if s_action == "COMPRA":
+                                        entry_with_spread = curr_v * (1 + SIMULATED_SPREAD)
+                                    else:
+                                        entry_with_spread = curr_v * (1 - SIMULATED_SPREAD)
+                                
+                                    distanza_prezzo_sl = entry_with_spread * 0.003 # SL al -30% della puntata (0.3% prezzo)
+                                    
+                                    if s_action == "COMPRA":
+                                        sl_prezzo = entry_with_spread - distanza_prezzo_sl
+                                        tp_prezzo = entry_with_spread * 1.012 
+                                    else:
+                                        sl_prezzo = entry_with_spread + distanza_prezzo_sl
+                                        tp_prezzo = entry_with_spread * 0.988
                 
-                    # Calcolo SL e TP basati sul prezzo penalizzato dallo spread
-                    percentuale_perdita_max = 0.30 
-                    #distanza_prezzo_sl = entry_with_spread * (percentuale_perdita_max / 10)
-
-                    # --- NUOVO CALCOLO SL/TP DINAMICO ---
-                    # Calcoliamo lo Stop Loss basato sul -30% del valore della posizione (circa 0.3% del prezzo asset)
-                    distanza_prezzo_sl = entry_with_spread * 0.003 
-                    
-                    if s_action == "COMPRA":
-                        sl_prezzo = entry_with_spread - distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 1.012  # TP alzato all'1.2% per dare spazio al trailing
-                    else:
-                        sl_prezzo = entry_with_spread + distanza_prezzo_sl
-                        tp_prezzo = entry_with_spread * 0.988
-
-                    # Calcolo del costo dello spread in Euro basato sulla puntata
-                    costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
-
-                    # All'interno di get_equity_data o run_sentinel
-                    inv_effettivo_calcolato = round(investimento_puntata, 2) 
-                    # E per la visualizzazione in tabella:
-                    new_sig['Investimento €'] = f"{inv_effettivo_calcolato:.2f}"
-                    
-                    new_sig = {
-                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
-                        'Asset': label, 
-                        'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(entry_with_spread), 
-                        'TP': p_fmt.format(tp_prezzo), 
-                        'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': 'In Corso',
-                        'Protezione': 'Trailing Step',
-                        'Investimento €': f"{investimento_puntata:.2f}",
-                        'Risultato €': "0.00",
-                        'Costo Spread €': f"{costo_spread_euro:.2f}", # Salviamo il costo spread
-                        'Stato_Prot': 'Iniziale'
-                    }
-
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    
-                    st.session_state['last_alert'] = new_sig
-                    save_history_permanently()
+                                    costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
+                
+                                    # CREAZIONE DIZIONARIO (Ora l'ordine è corretto)
+                                    new_sig = {
+                                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+                                        'Asset': label, 
+                                        'Direzione': s_action, 
+                                        'Prezzo': p_fmt.format(entry_with_spread), 
+                                        'TP': p_fmt.format(tp_prezzo), 
+                                        'SL': p_fmt.format(sl_prezzo), 
+                                        'Stato': 'In Corso',
+                                        'Protezione': 'Trailing 3/6%',
+                                        'Investimento €': f"{investimento_puntata:.2f}",
+                                        'Risultato €': "0.00",
+                                        'Costo Spread €': f"{costo_spread_euro:.2f}",
+                                        'Stato_Prot': 'Iniziale'
+                                    }
+                
+                                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
+                                    st.session_state['last_alert'] = new_sig
+                                    save_history_permanently()
   
                     telegram_text = (f"🚀 *{s_action}* {label}\n"
                                      f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
