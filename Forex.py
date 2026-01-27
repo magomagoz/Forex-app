@@ -125,9 +125,10 @@ def style_status(val):
     if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
     if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
     
-    # Se il valore è numerico e positivo/negativo (per la colonna Risultato)
     try:
-        num = float(str(val).replace('+', ''))
+        # Rimuove il simbolo € e forza il float per il controllo colore
+        clean_val = str(val).replace('€', '').replace('+', '').strip()
+        num = float(clean_val)
         if num > 0: return 'color: #00ffcc; font-weight: bold;'
         if num < 0: return 'color: #ff4b4b; font-weight: bold;'
     except:
@@ -236,11 +237,12 @@ def update_signal_outcomes():
             ticker = asset_map[row['Asset']]
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
-            
-            if isinstance(data.columns, pd.MultiIndex): 
+
+            # Sostituisci la riga data.columns = [c.lower() for c in data.columns] con:
+            if isinstance(data.columns, pd.MultiIndex):
                 data.columns = data.columns.get_level_values(0)
-            data.columns = [c.lower() for c in data.columns]
-            
+            data.columns = [str(c).lower() for c in data.columns]
+
             # --- RECUPERO DATI OPERAZIONE ---
             current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
@@ -376,15 +378,30 @@ def run_sentinel():
                 # Controllo Duplicati / Trade in corso
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-                # Controllo Tempo (30 min)
-                recent_signals = False
-                if not hist.empty:
-                    asset_hist = hist[hist['Asset'] == label]
-                    if not asset_hist.empty:
-                        last_sig = asset_hist.iloc[0]['DataOra']
-                        # Semplice check temporale stringa se stesso giorno
-                        if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
-                           recent_signals = True
+                # --- SOSTITUISCI IL VECCHIO BLOCCO CON QUESTO ---
+                if not is_running and not recent_signals:
+                    if not hist.empty:
+                        asset_hist = hist[hist['Asset'] == label]
+                        if not asset_hist.empty:
+                            # Recuperiamo l'orario dell'ultimo segnale (stringa HH:MM:SS)
+                            last_sig_str = asset_hist.iloc[0]['DataOra']
+                            
+                            try:
+                                # Trasformiamo la stringa in un oggetto temporale per il calcolo
+                                from datetime import datetime, timedelta
+                                last_sig_time = datetime.strptime(last_sig_str, "%H:%M:%S")
+                                
+                                # Calcoliamo la soglia di 30 minuti fa
+                                now_rome = get_now_rome()
+                                soglia_30_min = now_rome - timedelta(minutes=30)
+                                
+                                # Confrontiamo solo la parte oraria
+                                if last_sig_str > soglia_30_min.strftime("%H:%M:%S"):
+                                    recent_signals = True
+                            except Exception as e:
+                                # Se c'è un errore nel formato (es. cella vuota), permettiamo il segnale
+                                recent_signals = False
+                # --- FINE BLOCCO SOSTITUTIVO ---
               
                 if not is_running and not recent_signals:
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
@@ -410,6 +427,11 @@ def run_sentinel():
         
                     # Calcolo del costo dello spread in Euro basato sulla puntata
                     costo_spread_euro = investimento_puntata * SIMULATED_SPREAD
+
+                    # All'interno di get_equity_data o run_sentinel
+                    inv_effettivo_calcolato = round(investimento_puntata, 2) 
+                    # E per la visualizzazione in tabella:
+                    new_sig['Investimento €'] = f"{inv_effettivo_calcolato:.2f}"
                     
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
