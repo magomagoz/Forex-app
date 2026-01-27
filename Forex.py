@@ -705,30 +705,30 @@ for s_name, is_open in get_session_status().items():
 unsafe_allow_html=True)
 
 # --- TASTO ESPORTAZIONE DATI ---
-st.sidebar.markdown("---")
-st.sidebar.subheader("💾 Backup Report")
+#st.sidebar.markdown("---")
+#st.sidebar.subheader("💾 Backup Report")
 
-if not st.session_state['signal_history'].empty:
-    csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
-    st.sidebar.download_button(
-        label="📥 SCARICA CRONOLOGIA CSV",
-        data=csv_data,
-        file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
-else:
-    st.sidebar.info("Nessun dato da esportare")
+#if not st.session_state['signal_history'].empty:
+    #csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+    #st.sidebar.download_button(
+        #label="📥 SCARICA CRONOLOGIA CSV",
+        #data=csv_data,
+        #file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
+        #mime="text/csv",
+        #use_container_width=True
+    #)
+#else:
+    #st.sidebar.info("Nessun dato da esportare")
 
 # --- TASTO TEST TELEGRAM ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
+if st.sidebar.button("✈️ TEST NOTIFICA TELEGRAM"):
     test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
     send_telegram_msg(test_msg)
     st.sidebar.success("Segnale di test inviato!")
 
 # --- TASTO TEST DINAMICO ---
-if st.sidebar.button("🧪🔊 TEST ALERT COMPLETO"):
+if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
     # Calcolo dinamico basato sui tuoi cursori attuali
     current_bal = st.session_state.get('balance_val', 1000)
     current_r = st.session_state.get('risk_val', 2.0)
