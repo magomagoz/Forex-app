@@ -819,7 +819,7 @@ if st.session_state.get('last_alert'):
     """, unsafe_allow_html=True)
     
     # Tasto di chiusura
-    if st.button("✅ PRENDI NOTA E CHIUDI", use_container_width=True):
+    if st.button("✅ CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
         if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
         st.rerun()
