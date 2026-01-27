@@ -756,15 +756,32 @@ else:
 
 # --- TASTO TEST TELEGRAM ---
 st.sidebar.markdown("---")
-if st.sidebar.button("🧪 TEST NOTIFICA TELEGRAM"):
+if st.sidebar.button("🧪 TEST TELEGRAM"):
     test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
     send_telegram_msg(test_msg)
     st.sidebar.success("Segnale di test inviato!")
 
+# --- TASTO TEST COMPLETO (VISIVO + SONORO) ---
 st.sidebar.markdown("---")
-if st.sidebar.button("TEST ALERT"):
-    st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
-    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+if st.sidebar.button("🔊 TEST ALERT & SUONO"):
+    # 1. Impostiamo i dati finti dell'alert
+    st.session_state['last_alert'] = {
+        'Asset': 'TEST/EUR', 
+        'Direzione': 'COMPRA', 
+        'Prezzo': '1.0000', 
+        'TP': '1.0100', 
+        'SL': '0.9900', 
+        'Protezione': 'Standard'
+    }
+    
+    # 2. Resettiamo il flag di notifica per forzare il suono
+    if 'alert_notified' in st.session_state: 
+        del st.session_state['alert_notified']
+    
+    # 3. Opzionale: Puliamo anche il timer se lo usi
+    if 'alert_start_time' in st.session_state: 
+        del st.session_state['alert_start_time']
+    
     st.rerun()
 
 
