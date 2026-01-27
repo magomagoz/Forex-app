@@ -218,7 +218,7 @@ def detect_divergence(df):
     if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DECRESCITA"
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
-    
+
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
@@ -227,19 +227,20 @@ def update_signal_outcomes():
     
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            ticker = asset_map[row['Asset']]
+            ticker = asset_map.get(row['Asset'])
+            if not ticker: continue
+            
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
 
-            # Sostituisci la riga data.columns = [c.lower() for c in data.columns] con:
-            if isinstance(data.columns, pd.MultiIndex):
-                data.columns = data.columns.get_level_values(0)
+            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).lower() for c in data.columns]
 
-            # --- RECUPERO DATI OPERAZIONE ---
             current_price = float(data['close'].iloc[-1])
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
             investimento = float(str(row['Investimento €']).replace(',', '.'))
+            tp_v = float(str(row['TP']).replace(',', '.'))
+            sl_v = float(str(row['SL']).replace(',', '.'))
             direzione = row['Direzione']
             tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
@@ -288,22 +289,20 @@ def update_signal_outcomes():
 
             # --- CONTROLLO CHIUSURA ---
             target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
-            stop_hit = (direzione == 'COMPRA' and current_price <= new_sl) or (direzione == 'VENDI' and current_price >= new_sl)
-            
+            stop_hit = (direzione == 'COMPRA' and current_price <= sl_v) or (direzione == 'VENDI' and current_price >= sl_v)
+
             if target_hit or stop_hit:
-                esito = '✅ TARGET' if target_hit else ('🛡️ SL DINAMICO' if 'Iniziale' not in status_prot else '❌ STOP LOSS')
+                esito = '✅ TARGET' if target_hit else '❌ STOP LOSS'
+                # Calcolo profitto realistico (RR 1:2 o perdita fissa)
+                # Usiamo una logica percentuale semplice per evitare i numeri enormi visti in foto
+                profitto_netto = investimento * 2 if target_hit else -investimento
+                
                 df.at[idx, 'Stato'] = esito
-                
-                # Calcolo profitto netto basato sulla variazione percentuale
-                final_profit = round(investimento * (percent_gain / 100), 2)
-                df.at[idx, 'Risultato €'] = f"{final_profit:+.2f}"
-                
+                df.at[idx, 'Risultato €'] = f"{profitto_netto:+.2f}"
                 updates_made = True
-                play_close_sound()
                 
-                # Notifica Telegram Chiusura
-                msg_chiusura = f"🏁 *CHIUSO*: {row['Asset']}\nEsito: {esito}\nProfitto: {final_profit:+.2f}€"
-                send_telegram_msg(msg_chiusura)
+                play_close_sound()
+                send_telegram_msg(f"🏁 *CHIUSO*: {row['Asset']}\nEsito: {esito}\nNetto: {profitto_netto:+.2f}€")
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
@@ -326,13 +325,11 @@ def update_signal_outcomes():
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
             continue
-                    
-                    #msg = f"🔔 **CHIUSURA TRADE**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
-                    #send_telegram_msg(msg)
-        
+
         #except Exception as e:
-            #continue 
-        
+            #print(f"Errore aggiornamento {row['Asset']}: {e}")
+            #continue
+    
     if updates_made:
         st.session_state['signal_history'] = df
         save_history_permanently()
@@ -461,33 +458,33 @@ if 'last_scan_status' not in st.session_state:
 update_signal_outcomes()
 
 def get_equity_data():
-    """Calcola l'andamento del saldo applicando il rischio scelto ai trade chiusi"""
-    initial_balance = balance 
+    initial_balance = st.session_state.get('balance_val', 1000)
+    risk_pc = st.session_state.get('risk_val', 2.0)
     equity_curve = [initial_balance]
     
     if st.session_state['signal_history'].empty:
         return pd.Series(equity_curve)
     
-    # Ordiniamo dal più vecchio al più recente per la curva temporale
+    # Invertiamo per ordine temporale (dal più vecchio al più recente)
     df_sorted = st.session_state['signal_history'].iloc[::-1]
     current_bal = initial_balance
     
     for _, row in df_sorted.iterrows():
-        # Applichiamo il rischio scelto sulla barra al saldo attuale
+        # Calcolo del rischio in euro basato sulla percentuale impostata
         risk_amount = current_bal * (risk_pc / 100)
-
-        distanza_sl = entry_with_spread * 0.002 
         
-        # Applichiamo il round qui per evitare cifre infinite
-        inv_effettivo_calcolato = round(rischio_euro / (distanza_sl / entry_with_spread), 2)
-
-        
-        if row['Stato'] == '✅ TARGET':
-            # Simuliamo un profitto con Reward Ratio 1:2
-            current_bal += (risk_amount * 2) 
-        elif row['Stato'] == '❌ STOP LOSS':
-            # Perdita fissa della quota rischio
-            current_bal -= risk_amount
+        try:
+            stato = str(row['Stato'])
+            if 'TARGET' in stato:
+                # Profitto con Reward Ratio 1:2
+                current_bal += (risk_amount * 2)
+            elif 'STOP LOSS' in stato:
+                current_bal -= risk_amount
+            elif 'DINAMICO' in stato:
+                # Profitto parziale (es. +1%)
+                current_bal += (risk_amount * 0.5)
+        except:
+            continue
             
         equity_curve.append(current_bal)
         
