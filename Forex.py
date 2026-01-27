@@ -162,8 +162,7 @@ def get_realtime_data(ticker):
 def get_currency_strength():
     try:
         forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
-        #crypto = ["BTC-USD", "ETH-USD"]
-        data = yf.download(forex + crypto, period="5d", interval="1d", progress=False, timeout=15)
+        data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
             return pd.Series(dtype=float)
@@ -186,9 +185,9 @@ def get_currency_strength():
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
-            "BTC ₿": returns.get("BTC-USD", 0),
-            "ETH 💎": returns.get("ETH-USD", 0)
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0)
+            #"BTC ₿": returns.get("BTC-USD", 0),
+            #"ETH 💎": returns.get("ETH-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
     except Exception:
