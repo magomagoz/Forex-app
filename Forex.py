@@ -162,7 +162,7 @@ def get_realtime_data(ticker):
 def get_currency_strength():
     try:
         forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
-        crypto = ["BTC-USD", "ETH-USD"]
+        #crypto = ["BTC-USD", "ETH-USD"]
         data = yf.download(forex + crypto, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
@@ -195,9 +195,6 @@ def get_currency_strength():
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
-    """
-    Restituisce: (unità_minima, formato_prezzo, moltiplicatore_reale, tipo)
-    """
     if "BTC" in pair or "ETH" in pair:
         # Per Crypto: 1 punto = 1 Dollaro
         return 1.0, "{:.2f}", 1, "CRYPTO"
@@ -219,95 +216,120 @@ def detect_divergence(df):
     return "Neutrale"
     
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
-    
-# ... (le altre funzioni save_history, send_telegram rimangono uguali, incolla da qui in giù) ...
-
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
-    
-    COMMISSIONE_APPROX = 0.03 
     updates_made = False
     
-    # Iteriamo solo sui trade aperti
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
-            ticker = asset_map[row['Asset']]
+            ticker = asset_map.get(row['Asset'])
+            if not ticker: continue
+            
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
+            if data.empty: continue
 
-            if not data.empty:
-                # Pulizia colonne per evitare MultiIndex error
-                if isinstance(data.columns, pd.MultiIndex): 
-                    data.columns = data.columns.get_level_values(0)
-                data.columns = [c.capitalize() for c in data.columns] # Force: Open, High, Low, Close
-                                
-                current_high = float(data['High'].iloc[-1])
-                current_low = float(data['Low'].iloc[-1])
-                current_close = float(data['Close'].iloc[-1])
-                
-                entry_v = float(str(row['Prezzo']).replace(',', '.'))
-                sl_v = float(str(row['SL']).replace(',', '.')) 
-                tp_v = float(str(row['TP']).replace(',', '.'))
-                investimento = float(str(row['Investimento €']).replace(',', '.'))
-                
-                new_status = None
-                risultato_finale = 0.0
+            if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
+            data.columns = [str(c).lower() for c in data.columns]
 
-                # --- TARGET DINAMICO ---
-                dist_target = abs(tp_v - entry_v)
-                progresso = abs(current_close - entry_v)
+            current_price = float(data['close'].iloc[-1])
+            entry_v = float(str(row['Prezzo']).replace(',', '.'))
+            investimento = float(str(row['Investimento €']).replace(',', '.'))
+            tp_v = float(str(row['TP']).replace(',', '.'))
+            sl_v = float(str(row['SL']).replace(',', '.'))
+            direzione = row['Direzione']
+            tp_v = float(str(row['TP']).replace(',', '.'))
+            current_sl = float(str(row['SL']).replace(',', '.'))
+            
+            # --- CALCOLO GAIN (Basato su prezzo già "spread-ato") ---
+            if direzione == 'COMPRA':
+                percent_gain = ((current_price - entry_v) / entry_v) * 100
+            else:
+                percent_gain = ((entry_v - current_price) / entry_v) * 100
+
+            # --- LOGICA TRAILING STOP FOREX (3% -> BE, 6% -> 5%) ---
+            new_sl = current_sl
+            status_prot = row.get('Stato_Prot', 'Iniziale')
+
+            # Solo per asset Forex (escludiamo Crypto dalla logica stretta)
+            if "BTC" not in row['Asset'] and "ETH" not in row['Asset']:
+                # Step 1: Al +3% portiamo a Pareggio (BE)
+                if percent_gain >= 3.0 and 'Iniziale' in status_prot:
+                    new_sl = entry_v
+                    status_prot = 'BE (0%)'
+                    play_safe_sound()
+                    send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Gain +3%)")
                 
-                if progresso >= (dist_target * 0.25) and row.get('Stato_Prot') != 'Garantito':
-                    if row['Direzione'] == 'COMPRA':
-                        nuovo_sl = entry_v + (dist_target * 0.20)
+                # Step 2: Al +6% garantiamo il +5% di profitto
+                elif percent_gain >= 6.0 and 'BE' in status_prot:
+                    if direzione == 'COMPRA':
+                        new_sl = entry_v * 1.05
                     else:
-                        nuovo_sl = entry_v - (dist_target * 0.20)
-                    
-                    df.at[idx, 'SL'] = f"{nuovo_sl:.5f}" if "JPY" not in row['Asset'] else f"{nuovo_sl:.2f}"
-                    df.at[idx, 'Stato_Prot'] = 'Garantito'
-                    updates_made = True
-                    play_safe_sound() 
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 20%!")
+                        new_sl = entry_v * 0.95
+                    status_prot = 'Safe (+5%)'
+                    play_safe_sound()
+                    send_telegram_msg(f"💰 {row['Asset']}: SL Garantito +5% (Gain +6%)")
+            
+            # Logica separata per Crypto (se presente)
+            else:
+                if percent_gain >= 10.0 and 'Iniziale' in status_prot:
+                    new_sl = entry_v
+                    status_prot = 'BE (0%)'
+
+            # Aggiornamento fisico SL se cambiato
+            if new_sl != current_sl:
+                _, p_fmt, _, _ = get_asset_params(row['Asset'])
+                df.at[idx, 'SL'] = p_fmt.format(new_sl)
+                df.at[idx, 'Stato_Prot'] = status_prot
+                updates_made = True
+
+            # --- CONTROLLO CHIUSURA ---
+            target_hit = (direzione == 'COMPRA' and current_price >= tp_v) or (direzione == 'VENDI' and current_price <= tp_v)
+            stop_hit = (direzione == 'COMPRA' and current_price <= sl_v) or (direzione == 'VENDI' and current_price >= sl_v)
+
+            if target_hit or stop_hit:
+                esito = '✅ TARGET' if target_hit else '❌ STOP LOSS'
+                # Calcolo profitto realistico (RR 1:2 o perdita fissa)
+                # Usiamo una logica percentuale semplice per evitare i numeri enormi visti in foto
+                profitto_netto = investimento * 2 if target_hit else -investimento
                 
-                # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
-                if row['Direzione'] == 'COMPRA':
-                    if current_high >= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_low <= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento 
-                            
-                elif row['Direzione'] == 'VENDI':
-                    if current_low <= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_high >= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento
+                df.at[idx, 'Stato'] = esito
+                df.at[idx, 'Risultato €'] = f"{profitto_netto:+.2f}"
+                updates_made = True
+                
+                play_close_sound()
+                send_telegram_msg(f"🏁 *CHIUSO*: {row['Asset']}\nEsito: {esito}\nNetto: {profitto_netto:+.2f}€")
                 
                 if new_status:
                     df.at[idx, 'Stato'] = new_status
                     df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
                     updates_made = True
                     play_close_sound()
-                    msg = f"🔔 **CHIUSURA TRADE**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
-                    send_telegram_msg(msg)
-                    
+
+                    # Notifica Telegram
+                    icona = "🟢" if s_action == "COMPRA" else "🔴"
+                    telegram_text = (
+                        f"{icona} *{s_action}* {label}\n"
+                        f"Entry: {new_sig['Prezzo']}\n"
+                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
+                        f"Size: € {new_sig['Investimento €']}"
+                    )
+                    send_telegram_msg(telegram_text)
+
+            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+
         except Exception as e:
-            continue 
-        
+            debug_list.append(f"❌ {label} Err: {str(e)}")
+            continue
+
+        #except Exception as e:
+            #print(f"Errore aggiornamento {row['Asset']}: {e}")
+            #continue
+    
     if updates_made:
         st.session_state['signal_history'] = df
         save_history_permanently()
+
 def run_sentinel():
     # --- AUTO-PULIZIA CRONOLOGIA (Gestione Memoria) ---
     if not st.session_state['signal_history'].empty:
@@ -398,62 +420,48 @@ def run_sentinel():
                            recent_signals = True
               
                 if not is_running and not recent_signals:
-                    # --- Dentro run_sentinel() dove crei new_sig ---
-                   # --- CALCOLO SIZE E PARAMETRI CON PROTEZIONE 50% ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_totale = current_balance * (current_risk / 100)
+                    investimento_puntata = current_balance * (current_risk / 100)
                     
-                    # Calcoliamo la distanza massima permessa (50% dell'investimento)
-                    # Nel trading con moltiplicatore, il 50% di perdita corrisponde a metà escursione verso lo SL
-                    distanza_sl = (curr_v * 0.0010) # Distanza base calcolata dall'algoritmo
+                    # Calcolo Entry con Spread
+                    entry_with_spread = curr_v * (1 + SIMULATED_SPREAD) if s_action == "COMPRA" else curr_v * (1 - SIMULATED_SPREAD)
                     
-                    # --- LOGICA DI SICUREZZA AGGIUNTA ---
-                    # Se la distanza calcolata è troppo ampia, la forziamo 
-                    # per assicurarci di non perdere mai più del 50% della puntata
-                    max_dist_sicura = curr_v * 0.0045 # Esempio: limite escursione prezzo
-                    distanza_sl = min(distanza_sl, max_dist_sicura)
+                    # SL e TP (Punti basati su asset_params)
+                    sl_dist = entry_with_spread * 0.003
+                    sl_prezzo = entry_with_spread - sl_dist if s_action == "COMPRA" else entry_with_spread + sl_dist
+                    tp_prezzo = entry_with_spread * 1.012 if s_action == "COMPRA" else entry_with_spread * 0.988
+
+
+                    # All'interno del ciclo for di run_sentinel, quando viene generato new_sig:
+                    bal_attule = st.session_state.get('balance_val', 1000)
+                    risk_attual = st.session_state.get('risk_val', 2.0)
+                    investimento_calcolato = bal_attule * (risk_attual / 100)
                     
-                    if s_action == "COMPRA":
-                        sl = curr_v - distanza_sl
-                        tp = curr_v + (distanza_sl * 2.0)
-                    else:
-                        sl = curr_v + distanza_sl
-                        tp = curr_v - (distanza_sl * 2.0)
-                 
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
-                        'Asset': label, 
-                        'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(curr_v), 
-                        'TP': p_fmt.format(tp), 
-                        'SL': p_fmt.format(sl), 
-                        'Protezione': "ATTIVA (50%)" if distanza_sl == max_dist_sicura else "Standard",
-                        'Stato_Prot': 'In Attesa',
-                        'Stato': 'In Corso',
-                        'Investimento €': f"{investimento_totale:.2f}",
-                        'Risultato €': "0.00"
+                        'Asset': label, 'Direzione': s_action, 
+                        'Prezzo': p_fmt.format(entry_with_spread), 
+                        'TP': p_fmt.format(tp_prezzo), 'SL': p_fmt.format(sl_prezzo), 
+                        'Stato': 'In Corso', 'Investimento €': f"{investimento_calcolato:.2f}",
+                        'Risultato €': "0.00", 'Costo Spread €': f"{(investimento_puntata * SIMULATED_SPREAD):.2f}",
+                        'Stato_Prot': 'Iniziale', 'Protezione': 'Trailing 3/6%'
                     }
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    
                     st.session_state['last_alert'] = new_sig
                     save_history_permanently()
-
                     
-                    telegram_text = (f"🚀 *{s_action}* {label}\n"
-                                     f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
-                    send_telegram_msg(telegram_text)
-
-            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+                    # Notifica Telegram
+                    icon = "🟢" if s_action == "COMPRA" else "🔴"
+                    send_telegram_msg(f"{icon} *{s_action}* {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']} | SL: {new_sig['SL']}")
 
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
             continue
     
-    # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
-                    
-# Sostituisci la tua funzione get_win_rate con questa:
+    st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+
 def display_performance_stats():
     if st.session_state['signal_history'].empty:
         return
