@@ -281,8 +281,18 @@ def update_signal_outcomes():
                     df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
                     updates_made = True
                     play_close_sound()
-                    msg = f"🔔 **CHIUSURA TRADE**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
-                    send_telegram_msg(msg)
+                
+                # Notifica Telegram
+                icona = "🟢" if s_action == "COMPRA" else "🔴"
+                telegram_text = (
+                    f"{icona} *{s_action}* {label}\n"
+                    f"Entry: {new_sig['Prezzo']}\n"
+                    f"TP: {new_sig['TP']}\n"
+                    f"SL: {new_sig['SL']}\n"
+                    f"-------------------\n"
+                    f"€€€: € {new_sig['Investimento €']}"
+                )
+                send_telegram_msg(telegram_text)
                     
         except Exception as e:
             continue 
