@@ -885,7 +885,7 @@ st.markdown("---")
 st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
 
 # Nel tuo loop:
-p_tick, p_format, p_prec, p_label = get_asset_params(label)
+p_tick, p_format, p_prec, p_label = get_asset_params(pair)
 
 # La f-string ora funzionerà perfettamente:
 prezzo_formattato = f"{curr_v:.{p_prec}f}" 
