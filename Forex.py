@@ -476,7 +476,7 @@ def run_sentinel():
                         f"{icona} *{s_action}* {label}\n"
                         f"Entry: {new_sig['Prezzo']}\n"
                         f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
-                        f"--------\n"
+                        f"--------------------\n"
                         f"€€€: € {new_sig['Investimento €']}"
                     )
                     send_telegram_msg(telegram_text)
