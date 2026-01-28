@@ -587,12 +587,14 @@ st.sidebar.markdown("""
     <div class="container-bar"><div class="red-bar"></div></div>
 """, unsafe_allow_html=True)
 
-with st.sidebar.expander("🔍 Live Sentinel Data", expanded=True):
-    if 'sentinel_logs' in st.session_state and st.session_state['sentinel_logs']:
-        for log in st.session_state['sentinel_logs']:
-            st.caption(log)
-    else:
-        st.caption("In attesa del primo scan...")
+# Status Sentinel
+logs = st.session_state.get('sentinel_logs', [])
+status = st.session_state.get('last_scan_status', "Init...")
+if "❌" in str(logs): st.sidebar.warning("Alcuni dati mancanti")
+else: st.sidebar.success(status)
+
+with st.sidebar.expander("🔍 Log Dettagliato"):
+    for l in logs: st.caption(l)
 
 st.sidebar.subheader("📡 Sentinel Status")
 status = st.session_state.get('last_scan_status', 'In attesa...')
