@@ -41,7 +41,7 @@ st.markdown("""
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X",
-            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X}
+            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X"}
 
 # --- CONFIGURAZIONE TRADING ---
 SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
