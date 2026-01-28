@@ -195,7 +195,8 @@ def get_currency_strength():
             "RUB 🇷🇺": -returns.get("RUB=X", 0),
             "COP 🇨🇴": -returns.get("COP=X", 0),
             "ARS 🇦🇷": -returns.get("ARS=X", 0),
-            "BRL 🇧🇷": -returns.get("BRL=X", 0)
+            "BRL 🇧🇷": -returns.get("BRL=X", 0),
+            "MXN 🇲🇽": -returns.get("MXN=X", 0)
             #"BTC ₿": returns.get("BTC-USD", 0),
             #"ETH 💎": returns.get("ETH-USD", 0)
         }
@@ -940,24 +941,43 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-# --- 8. CURRENCY STRENGTH ---
+
+# --- 8. CURRENCY STRENGTH (ORDINATO 7x2) ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
 
 if not s_data.empty:
-    cols = st.columns(len(s_data))
-    for i, (curr, val) in enumerate(s_data.items()):
-        bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
-        txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
-        cols[i].markdown(
-            f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'>"
-            f"<b style='color:white; font-size:0.8em;'>{curr}</b><br>"
-            f"<span style='color:{txt_c};'>{val:.2f}%</span></div>", 
-            unsafe_allow_html=True
-        )
+    items = list(s_data.items())
+    # Divisione in due blocchi da 7
+    riga1 = items[:7]
+    riga2 = items[7:14]
+
+    for riga in [riga1, riga2]:
+        cols = st.columns(7)
+        for i, (curr, val) in enumerate(riga):
+            # Colori dinamici basati sulla forza
+            if val > 0.20:
+                bg, border = "rgba(0, 255, 204, 0.15)", "#00ffcc" # Molto forte
+            elif val < -0.20:
+                bg, border = "rgba(255, 75, 75, 0.15)", "#ff4b4b"  # Molto debole
+            else:
+                bg, border = "rgba(255, 255, 255, 0.05)", "#444"   # Neutra
+
+            with cols[i]:
+                st.markdown(
+                    f"""
+                    <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
+                                border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
+                        <div style='font-size:0.8em; color:#bbb; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
+                        <b style='color:white; font-size:0.9em;'>{curr}</b><br>
+                        <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
 else:
-    st.info("⏳ Caricamento dati macro in corso...")
+    st.info("⏳ Analisi macro-volatilità in corso...")
 
 # --- 9. CRONOLOGIA SEGNALI (OTTIMIZZATA) ---
 st.markdown("---")
