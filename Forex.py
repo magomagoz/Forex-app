@@ -408,25 +408,53 @@ def run_sentinel():
             if s_action: debug_info += f" -> 🔥 {s_action}"
             debug_list.append(f"{icon} {debug_info}")
 
-            if s_action:
-                hist = st.session_state['signal_history']
-                # Controllo Duplicati / Trade in corso
-                is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
+    # Se c'è un segnale (s_action non è None)
+    if s_action: 
+        # --- CORREZIONE FONDAMENTALE ---
+        # Recuperiamo i parametri dell'asset (Ticker, Decimali, Moltiplicatore)
+        row_params = get_asset_params(label) 
+        # -------------------------------
 
-                recent_signals = False
-                if not hist.empty:
-                    asset_hist = hist[hist['Asset'] == label] # label è ad es. "EURUSD"
-                    if not asset_hist.empty:
-                        # Recupera l'ultimo orario
-                        ultima_data_str = asset_hist.iloc[0]['DataOra']
-                        try:
-                            # Usa il formato che abbiamo impostato prima
-                            ultima_data = datetime.strptime(ultima_data_str, "%d/%m/%Y %H:%M:%S")
-                            differenza = (datetime.now() - ultima_data).total_seconds() / 60
-                            if differenza < 30:
-                                recent_signals = True
-                        except Exception as e:
-                            recent_signals = False
+        # Controllo anti-spam (30 min)
+        recent_signals = False
+        if not hist.empty:
+            asset_hist = hist[hist['Asset'] == label]
+            if not asset_hist.empty:
+                ultima_data_str = asset_hist.iloc[0]['DataOra']
+                try:
+                    ultima_data = datetime.strptime(ultima_data_str, "%d/%m/%Y %H:%M:%S")
+                    if (datetime.now() - ultima_data).total_seconds() / 60 < 30:
+                        recent_signals = True
+                except:
+                    recent_signals = False
+        
+        if not recent_signals:
+            # Calcolo Spread Proporzionale (Investimento 20€ standard)
+            costo_spread_reale = (SIMULATED_SPREAD * row_params[2]) * (20.0 / 10.0)
+
+            new_sig = {
+                'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                'Asset': label,
+                'Direzione': s_action,
+                'Prezzo': curr_price,
+                'TP': round(tp_price, row_params[1]),
+                'SL': round(sl_price, row_params[1]),
+                'Stato': 'APERTO',
+                'Investimento €': 20.00,
+                'Risultato €': 0.00,
+                'Costo Spread €': costo_spread_reale, # Ora row_params è definito e funziona
+                'Stato_Prot': 'Iniziale'
+            }
+            
+            # Aggiunta alla cronologia e salvataggio
+            st.session_state['signal_history'] = pd.concat([
+                pd.DataFrame([new_sig]), 
+                st.session_state['signal_history']
+            ], ignore_index=True)
+            
+            # Aggiorna il set dei segnali inviati
+            st.session_state['sent_signals'].add(label)
+            st.toast(f"🚀 Segnale {label}: {s_action} inviato!", icon="🔥")
             
                 # 3. LOGICA DI INVIO SEGNALE (Solo se non ci sono segnali recenti)
                 if s_action and not recent_signals:
