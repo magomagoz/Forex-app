@@ -11,73 +11,99 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 import os
+from datetime import datetime, timedelta
 
 # --- CONFIGURAZIONE TRADING ---
-SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips
-TOKEN_TELEGRAM = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10"
-CHAT_ID_TELEGRAM = "7191509088"
+SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
 
-# --- 1. CONFIGURAZIONE PAGINA ---
+# --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
 st.markdown("""
     <style>
         .block-container {padding-top: 1rem !important;}
         [data-testid="stSidebar"] > div:first-child {padding-top: 0rem !important;}
-        div.stButton > button {border-radius: 8px !important; font-weight: bold; width: 100%;}
-        [data-testid="stDataFrame"] {border: 1px solid #333;}
+        
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {background-color: rgba(0,0,0,0) !important;} 
+        
+        /* Stile Tasti */
+        div.stButton > button {
+            border-radius: 8px !important;
+            font-weight: bold;
+            width: 100%;
+        }
+        
+        /* Colori Tabella */
+        [data-testid="stDataFrame"] {
+            border: 1px solid #333;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# Fuso Orario Roma
+# Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X",
+            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X", "USDCNY": "USDCNY=X", "USDCOP": "USDCOP=X", "USDARS": "USDARS=X", "USDRUB": "USDRUB=X", "USDBRL": "USDBRL=X"}
 
-# Mappa Asset
-asset_map = {
-    "EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", 
-    "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", 
-    "NZDUSD": "NZDUSD=X", "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", 
-    "EURJPY": "EURJPY=X", "USDCNY": "USDCNY=X", "USDCOP": "USDCOP=X", 
-    "USDARS": "USDARS=X", "USDRUB": "USDRUB=X", "USDBRL": "USDBRL=X"
-}
-
-# Refresh ogni 60 secondi
+# Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
 # --- 2. FUNZIONI DI UTILITÀ ---
-def get_now_rome():
-    return datetime.now(rome_tz)
-
 def save_history_permanently():
-    """Salva su CSV"""
+    """Salva la cronologia attuale su un file fisico CSV"""
     try:
         if 'signal_history' in st.session_state and not st.session_state['signal_history'].empty:
             st.session_state['signal_history'].to_csv("permanent_signals_db.csv", index=False)
     except Exception as e:
-        print(f"Errore salvataggio: {e}")
+        print(f"Errore salvataggio file: {e}")
 
 def load_history_from_csv():
     if os.path.exists("permanent_signals_db.csv"):
         try:
             df = pd.read_csv("permanent_signals_db.csv")
+            # Lista aggiornata con le nuove colonne monetarie e di protezione
             expected_cols = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 
-                             'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 
-                             'Stato_Prot', 'Protezione']
+                             'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione']
             for col in expected_cols:
                 if col not in df.columns: 
                     df[col] = "0.00" if "€" in col else "Standard"
             return df
         except:
-            return pd.DataFrame()
-    return pd.DataFrame()
+            return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
+    return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
 
 def send_telegram_msg(msg):
+    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10" 
+    chat_id = "7191509088" 
     try:
-        url = f"https://api.telegram.org/bot{TOKEN_TELEGRAM}/sendMessage"
-        params = {"chat_id": CHAT_ID_TELEGRAM, "text": msg, "parse_mode": "Markdown"}
-        requests.get(url, params=params, timeout=5)
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
+        r = requests.get(url, params=params, timeout=5)
+        if r.status_code != 200:
+            st.toast(f"Errore Telegram: {r.status_code}", icon="⚠️")
     except Exception as e:
-        print(f"Errore Telegram: {e}")
+        print(f"Errore: {e}")
+
+def get_now_rome():
+    return datetime.now(rome_tz)
+
+def is_market_open(asset_name):
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False
+        
+    return True
+
+def is_market_open(asset_name):
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False
+        
+    return True
 
 def play_sound(sound_type='notification'):
     urls = {
@@ -93,9 +119,20 @@ def style_status(val):
     if val == 'VINTO': return f'{base} color: #00ffcc;'
     if val == 'PERSO': return f'{base} color: #ff4b4b;'
     if val == 'APERTO': return f'{base} color: #ffaa00;'
-    if val == 'In Corso': return f'{base} color: #ffaa00;'
-    if val == 'CHIUSO MAN.': return f'{base} color: #aaaaaa;'
-    return base
+    if val == 'CHIUSO MAN.': return f'{base} color: #aaaaaa;' # Grigio per chiusura manuale
+    if val == '✅ TARGET': return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
+    if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
+    if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
+    
+    try:
+        # Rimuove il simbolo € e forza il float per il controllo colore
+        clean_val = str(val).replace('€', '').replace('+', '').strip()
+        num = float(clean_val)
+        if num > 0: return 'color: #00ffcc; font-weight: bold;'
+        if num < 0: return 'color: #ff4b4b; font-weight: bold;'
+    except:
+        pass
+    return ''
 
 def get_asset_params(pair):
     """Restituisce: (unit, format_string, multiplier, type)"""
