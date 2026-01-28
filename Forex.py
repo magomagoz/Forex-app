@@ -587,6 +587,24 @@ dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity:.2f}", delta=f"{total_return}%")
 st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 
+
+# --- LOGICA COLORE DRAWDOWN ---
+# Verde se tra 0 e 10%, Rosso se oltre 20%, Grigio/Default tra 10 e 20
+dd_color = "normal" 
+if 0 <= abs(dd) <= 10:
+    dd_color = "normal" # Streamlit usa il verde di default per i delta positivi/normali
+elif abs(dd) > 20:
+    dd_color = "inverse" # Lo rende rosso se considerato come valore negativo
+
+st.sidebar.metric(
+    "Drawdown Massimo", 
+    f"{dd:.2f}%", 
+    delta="OTTIMO" if abs(dd) <= 10 else "ATTENZIONE" if abs(dd) > 20 else "",
+    delta_color=dd_color
+)
+
+display_performance_stats()
+
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
 #fig_equity.add_trace(go.Scatter(y=equity_series, mode='lines', fill='tozeroy', line=dict(color='#00ffcc')))
@@ -595,6 +613,67 @@ st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 
 # Dettagli operazione selezionata (se presente)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+if not active_trades.empty:
+    st.sidebar.warning("⚡ Ultima Operazione Attiva")
+    last_t = active_trades.iloc[0]
+    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
+    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
+
+
+# 1. Recupero trade attivi (Assicurati che lo Stato sia 'In Corso' come da tua immagine)
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+
+if not active_trades.empty:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚡ Monitor Real-Time")
+    
+    for index, trade in active_trades.iterrows():
+        try:
+            # Download dati fresco
+            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+            
+            if not t_data.empty:
+                # --- CORREZIONE VARIABILI ---
+                curr_p = float(t_data['Close'].iloc[-1])
+                # Pulizia stringhe € se presenti
+                entry_p = float(str(trade['Prezzo']).replace('€', '').replace(',', '.').strip())
+                inv = float(str(trade['Investimento €']).replace('€', '').replace(',', '.').strip())
+                
+                # Moltiplicatore pips (Fondamentale per evitare numeri abnormi come +422514%)
+                pips_mult = get_asset_params(trade['Asset'])[2] 
+                
+                # Calcolo differenza basato sulla direzione
+                if trade['Direzione'] == "BUY" or trade['Direzione'] == "COMPRA":
+                    diff_prezzo = curr_p - entry_p
+                else:
+                    diff_prezzo = entry_p - curr_p
+                
+                # Calcolo profitto e percentuale corretti
+                latente_euro = diff_prezzo * pips_mult * (inv / 10)
+                latente_perc = (diff_prezzo / entry_p) * 100
+                
+                color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
+                
+                # --- UI MONITOR ---
+                st.sidebar.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
+                        <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
+                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # TASTO CHIUDI (Opzionale)
+                if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
+                    st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
+                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
+                    st.rerun()
+        except Exception as e:
+            # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
+            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
     last_t = active_trades.iloc[0]
