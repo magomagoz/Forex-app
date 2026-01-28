@@ -1018,7 +1018,7 @@ if not st.session_state['signal_history'].empty:
 
     # Calcola solo sui trade conclusi
     df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
-    tot_conclusi = len(df_conclusi)
+    tot_trade = len(df_conclusi)
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
