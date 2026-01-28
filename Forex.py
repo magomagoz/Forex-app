@@ -461,10 +461,10 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 'SL': p_fmt.format(sl_prezzo), 
                         'Stato': 'In Corso', 'Investimento €': f"{investimento_calcolato:.2f}",
-                        'Risultato €': "0.00", 'Costo Spread €': f"{(investimento_puntata * SIMULATED_SPREAD):.2f}",
+                        'Risultato €': "0.00", 'Costo Spread €': (SIMULATED_SPREAD * row_params[2]) * (investimento / 20),
                         'Stato_Prot': 'Iniziale', 'Protezione': 'Trailing 3/6%'
                     }
-
+                    
                     # --- LOGICA DI CHIUSURA AUTOMATICA ---
                     for index, row in st.session_state['signal_history'].iterrows():
                         if row['Stato'] == 'APERTO':
