@@ -944,48 +944,48 @@ else:
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-    if not df_visualizzazione.empty:
-        # --- FIX DECIMALI ---
-        # 1. Convertiamo le colonne monetarie in numeri puri (float)
-        # Questo risolve il problema delle stringhe miste o dei troppi decimali
-        cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
-        for col in cols_monetarie:
-            if col in df_visualizzazione.columns:
-                # Rimuove € e spazi, converte in numero, mette 0 se errore
-                df_visualizzazione[col] = pd.to_numeric(
-                    df_visualizzazione[col].astype(str).str.replace('€', '').str.replace(',', '.'), 
-                    errors='coerce'
-                ).fillna(0.0)
+if not df_visualizzazione.empty:
+    # --- FIX DECIMALI ---
+    # 1. Convertiamo le colonne monetarie in numeri puri (float)
+    # Questo risolve il problema delle stringhe miste o dei troppi decimali
+    cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
+    for col in cols_monetarie:
+        if col in df_visualizzazione.columns:
+            # Rimuove € e spazi, converte in numero, mette 0 se errore
+            df_visualizzazione[col] = pd.to_numeric(
+                df_visualizzazione[col].astype(str).str.replace('€', '').str.replace(',', '.'), 
+                errors='coerce'
+            ).fillna(0.0)
 
-        # 2. Definiamo come visualizzarli (Format Dictionary)
-        format_dict = {
-            'Investimento €': '€ {:.2f}',    # Es: € 20.00
-            'Risultato €': '€ {:+.2f}',      # Es: € +40.00 o € -20.00
-            'Costo Spread €': '€ {:.2f}'     # Es: € 0.50
-        }
+    # 2. Definiamo come visualizzarli (Format Dictionary)
+    format_dict = {
+        'Investimento €': '€ {:.2f}',    # Es: € 20.00
+        'Risultato €': '€ {:+.2f}',      # Es: € +40.00 o € -20.00
+        'Costo Spread €': '€ {:.2f}'     # Es: € 0.50
+    }
 
-        # 3. Applichiamo lo stile
-        # Usiamo .format() del Pandas Styler che ha la precedenza assoluta
-        try:
-            # Metodo compatibile con Pandas recenti
-            styled_df = df_visualizzazione.style.format(format_dict).map(style_status, subset=['Stato', 'Risultato €'])
-        except:
-            # Fallback per versioni precedenti
-            styled_df = df_visualizzazione.style.format(format_dict).applymap(style_status, subset=['Stato', 'Risultato €'])
+    # 3. Applichiamo lo stile
+    # Usiamo .format() del Pandas Styler che ha la precedenza assoluta
+    try:
+        # Metodo compatibile con Pandas recenti
+        styled_df = df_visualizzazione.style.format(format_dict).map(style_status, subset=['Stato', 'Risultato €'])
+    except:
+        # Fallback per versioni precedenti
+        styled_df = df_visualizzazione.style.format(format_dict).applymap(style_status, subset=['Stato', 'Risultato €'])
 
-        st.dataframe(
-            styled_df,
-            use_container_width=True,
-            hide_index=True,
-            column_order=cols_necessarie
-        )
+    st.dataframe(
+        styled_df,
+        use_container_width=True,
+        hide_index=True,
+        column_order=cols_necessarie
+    )
     
-        st.download_button(
-            label=f"📥 Esporta vista attuale ({len(df_visualizzazione)} righe)",
-            data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
-            file_name="cronologia_trading.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    else:
-        st.warning("Nessun dato corrispondente ai filtri selezionati.")
+    st.download_button(
+        label=f"📥 Esporta vista attuale ({len(df_visualizzazione)} righe)",
+        data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
+        file_name="cronologia_trading.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+else:
+    st.warning("Nessun dato corrispondente ai filtri selezionati.")
