@@ -97,23 +97,6 @@ def is_market_open(asset_name):
         
     return True
 
-def is_market_open(asset_name):
-    today = get_now_rome().weekday()
-    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
-    if today >= 5:
-        return False
-        
-    return True
-
-def play_sound(sound_type='notification'):
-    urls = {
-        'notification': "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-        'cash': "https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3",
-        'safe': "https://assets.mixkit.co/active_storage/sfx/2021/2021-preview.mp3"
-    }
-    src = urls.get(sound_type, urls['notification'])
-    st.markdown(f"""<audio autoplay><source src="{src}" type="audio/mpeg"></audio>""", unsafe_allow_html=True)
-
 def style_status(val):
     base = "font-weight: bold;"
     if val == 'VINTO': return f'{base} color: #00ffcc;'
@@ -152,15 +135,13 @@ def get_realtime_data(ticker):
     except: return None
 
 def detect_divergence(df):
-    if len(df) < 20: return "..."
-    price = df['close'] if 'close' in df else df['Close']
-    rsi_col = df['rsi'] if 'rsi' in df else df['RSI']
-    
+    if len(df) < 20: return "Analisi..."
+    price, rsi_col = df['close'], df['rsi']
     curr_p, curr_r = float(price.iloc[-1]), float(rsi_col.iloc[-1])
-    prev_max_p = price.iloc[-20:-1].max()
-    prev_max_r = rsi_col.iloc[-20:-1].max()
-    
-    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 Bearish Div."
+    prev_max_p, prev_max_r = price.iloc[-20:-1].max(), rsi_col.iloc[-20:-1].max()
+    prev_min_p, prev_min_r = price.iloc[-20:-1].min(), rsi_col.iloc[-20:-1].min()
+    if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DECRESCITA"
+    elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
 
 def get_session_status():
@@ -171,9 +152,107 @@ def get_session_status():
         "New York 🇺🇸": (time(14,0), time(22,0))
     }
 
+def is_market_open(asset_name):
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False
+        
+    return True
+
+@st.cache_data(ttl=60)
+def get_realtime_data(ticker):
+    try:
+        df = yf.download(ticker, period="5d", interval="5m", progress=False, timeout=10)
+        if df is None or df.empty: return None
+        if isinstance(df.columns, pd.MultiIndex): df.columns = df.columns.get_level_values(0)
+        df.columns = [c.lower() for c in df.columns]
+        return df.dropna()
+    except: return None
+
 def get_currency_strength():
-    # Funzione semplificata per evitare blocchi yfinance su troppi ticker
-    return pd.Series(dtype=float) 
+    try:
+        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X", "EURGBP=X", "GBPJPY=X", "EURJPY=X", "CNY=X", "COP=X", "ARS=X", "RUB=X", "BRL=X",]
+        data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
+        
+        if data is None or data.empty: 
+            return pd.Series(dtype=float)
+
+        if isinstance(data.columns, pd.MultiIndex):
+            if 'Close' in data.columns.get_level_values(0): close_data = data['Close']
+            else: close_data = data['Close'] if 'Close' in data else data
+        else:
+            close_data = data['Close'] if 'Close' in data else data
+
+        close_data = close_data.ffill().dropna()
+        if len(close_data) < 2: return pd.Series(dtype=float)
+
+        returns = close_data.pct_change().iloc[-1] * 100
+        
+        strength = {
+            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0) + returns.get("USDCNY=X",0) + returns.get("USDRUB=X",0) + returns.get("USDCOP=X",0) + returns.get("USDARS=X",0) + returns.get("USDBRL=X",0)) / 12,
+            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0) + returns.get("EURGBP=X", 0) + returns.get("EURJPY=X", 0)) / 6,
+            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0) + returns.get("GBPJPY=X", 0)) / 5,
+            "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
+            "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
+            "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
+            "NZD 🇳🇿": returns.get("NZDUSD=X", 0),
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
+            "CNY 🇨🇳": -returns.get("CNY=X", 0),
+            "RUB 🇷🇺": -returns.get("RUB=X", 0),
+            "COP 🇨🇴": -returns.get("COP=X", 0),
+            "ARS 🇦🇷": -returns.get("ARS=X", 0),
+            "BRL 🇧🇷": -returns.get("BRL=X", 0),
+            "MXN 🇲🇽": -returns.get("MXN=X", 0)
+            #"BTC ₿": returns.get("BTC-USD", 0),
+            #"ETH 💎": returns.get("ETH-USD", 0)
+        }
+        return pd.Series(strength).sort_values(ascending=False)
+    except Exception:
+        return pd.Series(dtype=float)
+
+def get_asset_params(pair):
+    if "BTC" in pair or "ETH" in pair:
+        return 1.0, "{:.2f}", 1, "CRYPTO"
+    elif any(x in pair for x in ["COP", "ARS"]):
+        # Peso Colombiano e Argentino (es. 3950.50)
+        return 1.0, "{:.2f}", 1, "FOREX_LATAM"
+    elif any(x in pair for x in ["JPY", "RUB"]):
+        # Yen e Rublo (es. 150.250 o 90.150)
+        return 0.01, "{:.3f}", 100, "FOREX_3DEC"
+    elif "CNY" in pair or "BRL" in pair:
+        # Yuan e Real (es. 7.2345 o 4.9567)
+        return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
+    else:
+        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
+
+def get_equity_data():
+    initial_balance = balance 
+    risk_pc = st.session_state.get('risk_val', 2.0)
+    equity_curve = [initial_balance]
+    
+    if st.session_state['signal_history'].empty:
+        return pd.Series(equity_curve)
+    
+    # Ordiniamo dal più vecchio al più recente per la curva temporale
+    df_sorted = st.session_state['signal_history'].iloc[::-1]
+    current_bal = initial_balance
+    
+    for _, row in df_sorted.iterrows():
+        # Applichiamo il rischio scelto sulla barra al saldo attuale
+        risk_amount = current_bal * (risk_pc / 100)
+        
+        if row['Stato'] == '✅ TARGET':
+            # Simuliamo un profitto con Reward Ratio 1:2
+            current_bal += (risk_amount * 2) 
+        elif row['Stato'] == '❌ STOP LOSS':
+            # Perdita fissa della quota rischio
+            current_bal -= risk_amount
+            
+        equity_curve.append(current_bal)
+        
+    return pd.Series(equity_curve)
+
 
 # --- 3. CORE LOGIC: SENTINEL ENGINE (UNIFICATO) ---
 def run_sentinel():
@@ -341,11 +420,31 @@ def run_sentinel():
     st.session_state['sentinel_logs'] = debug_list
     st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
-# --- 4. INIZIALIZZAZIONE & STATE ---
+def display_performance_stats():
+    if st.session_state['signal_history'].empty:
+        return
+    
+    df = st.session_state['signal_history']
+    conclusi = df[df['Stato'].str.contains('TARGET|STOP|DINAMICO', na=False)]
+    
+    if not conclusi.empty:
+        vittorie = len(conclusi[conclusi['Stato'] == '✅ TARGET'])
+        wr = (vittorie / len(conclusi)) * 100
+        st.sidebar.write(f"📊 **Win Rate**: {wr:.1f}% ({vittorie}/{len(conclusi)})")
+
+# --- 4. INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
     st.session_state['signal_history'] = load_history_from_csv()
-if 'sentinel_logs' not in st.session_state: st.session_state['sentinel_logs'] = []
-if 'last_alert' not in st.session_state: st.session_state['last_alert'] = None
+if 'sentinel_logs' not in st.session_state:
+    st.session_state['sentinel_logs'] = []
+if 'last_alert' not in st.session_state:
+    st.session_state['last_alert'] = None
+if 'last_scan_status' not in st.session_state:
+    st.session_state['last_scan_status'] = "In attesa..."
+
+# --- 5. ESECUZIONE AGGIORNAMENTO DATI (PRIMA DELLA GUI) ---
+# Importante: Aggiorniamo i risultati TP/SL prima di disegnare la sidebar
+#update_signal_outcomes()
 
 # Esecuzione Sentinel
 run_sentinel()
@@ -416,70 +515,292 @@ if not active.empty:
         except:
             st.sidebar.caption(f"Caricamento {row['Asset']}...")
 
-# --- 6. POPUP ALERT ---
-if st.session_state['last_alert']:
+# --- 6. POPUP ALERT (OTTIMIZZATO) ---
+if st.session_state.get('last_alert'):
     alert = st.session_state['last_alert']
-    color = "#00ffcc" if alert['Direzione'] in ['COMPRA', 'BUY'] else "#ff4b4b"
+    
+    # Suona solo la prima volta
+    if 'alert_notified' not in st.session_state:
+        play_notification_sound()
+        st.session_state['alert_notified'] = True
+        # Registriamo quando è apparso l'alert
+        st.session_state['alert_time'] = time_lib.time()
+
+    hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+
     st.markdown(f"""
-    <div style="border: 2px solid {color}; padding: 15px; border-radius: 10px; text-align: center; background: #111;">
-        <h2 style="margin:0; color:{color}">🔥 SEGNALE: {alert['Asset']}</h2>
-        <h3 style="margin:5px;">{alert['Direzione']} @ {alert['Prezzo']}</h3>
-    </div>
+        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+            <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+            <p style="color: #888;">TP: {alert['TP']} | SL: {alert['SL']} | Protezione: {alert.get('Protezione', 'Standard')}</p>
+        </div>
     """, unsafe_allow_html=True)
-    if st.button("Chiudi Alert"):
+    
+    # Tasto di chiusura
+    if st.button("✅ CHIUDI", use_container_width=True):
         st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
         st.rerun()
 
-# --- 7. MAIN DASHBOARD ---
-st.title("📊 Forex Momentum AI")
-st.caption(f"Sessione Attiva: {selected_label} | Aggiornato: {get_now_rome().strftime('%H:%M:%S')}")
-
-# Grafico
-ticker = asset_map[selected_label]
-data = get_realtime_data(ticker)
-if data is not None:
-    # Calcolo Indicatori
-    data['MA20'] = data['Close'].rolling(20).mean()
-    data['Upper'] = data['MA20'] + 2*data['Close'].rolling(20).std()
-    data['Lower'] = data['MA20'] - 2*data['Close'].rolling(20).std()
+    # Autorefresh specifico per il popup (opzionale: lo chiude dopo 5 minuti se non cliccato)
+    if time_lib.time() - st.session_state.get('alert_time', 0) > 180: # 3 minuti
+        st.session_state['last_alert'] = None
+        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
     
-    fig = go.Figure()
-    fig.add_trace(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='Price'))
-    fig.add_trace(go.Scatter(x=data.index, y=data['Upper'], line=dict(color='rgba(0,255,255,0.3)'), name='BB Up'))
-    fig.add_trace(go.Scatter(x=data.index, y=data['Lower'], line=dict(color='rgba(0,255,255,0.3)'), fill='tonexty', name='BB Low'))
-    fig.update_layout(height=500, template="plotly_dark", margin=dict(l=0, r=0, t=30, b=0))
+    st.divider()
+
+# --- 7. BODY PRINCIPALE ---
+# Banner logic
+banner_path = "banner1.png"
+if os.path.exists(banner_path):
+    st.image(banner_path, use_container_width=True)
+else:
+    st.markdown('<div style="background: linear-gradient(90deg, #0f0c29, #302b63, #24243e); padding: 15px; border-radius: 10px; text-align: center; border: 1px solid #00ffcc;"><h1 style="color: #00ffcc; margin: 0;">📊 FOREX MOMENTUM PRO AI</h1><p style="color: white; opacity: 0.8; margin:0;">Sentinel AI Engine • Forex & Crypto Analysis</p></div>', unsafe_allow_html=True)
+
+st.info(f"🛰️ **Sentinel AI Attiva**: Monitoraggio in corso su {len(asset_map)} asset Forex in tempo reale (1m).")
+st.caption(f"Ultimo aggiornamento globale: {get_now_rome().strftime('%d/%m/%Y %H:%M:%S')}")
+
+st.markdown("---")
+#st.subheader("📈 Grafico in tempo reale")
+st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
+
+p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
+df_rt = get_realtime_data(pair) 
+df_d = yf.download(pair, period="1y", interval="1d", progress=False)
+
+if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty:
+    
+    # Pulizia dati
+    if isinstance(df_d.columns, pd.MultiIndex): df_d.columns = df_d.columns.get_level_values(0)
+    df_d.columns = [c.lower() for c in df_d.columns]
+    
+    # Calcolo indicatori
+    bb = ta.bbands(df_rt['close'], length=20, std=2)
+    df_rt = pd.concat([df_rt, bb], axis=1)
+    df_rt['rsi'] = ta.rsi(df_rt['close'], length=14)
+    df_d['rsi'] = ta.rsi(df_d['close'], length=14)
+    df_d['atr'] = ta.atr(df_d['high'], df_d['low'], df_d['close'], length=14)
+          
+    c_up = [c for c in df_rt.columns if "BBU" in c.upper()][0]
+    c_mid = [c for c in df_rt.columns if "BBM" in c.upper()][0]
+    c_low = [c for c in df_rt.columns if "BBL" in c.upper()][0]
+    
+    curr_p = float(df_rt['close'].iloc[-1])
+    curr_rsi = float(df_rt['rsi'].iloc[-1])
+    rsi_val = float(df_d['rsi'].iloc[-1]) 
+    last_atr = float(df_d['atr'].iloc[-1])
+    
+    score = 50 + (20 if curr_p < df_rt[c_low].iloc[-1] else -20 if curr_p > df_rt[c_up].iloc[-1] else 0)
+
+    # --- COSTRUZIONE GRAFICO ---
+    p_df = df_rt.tail(60)
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, 
+                        vertical_spacing=0.05, row_heights=[0.75, 0.25])
+    
+    # Candele
+    fig.add_trace(go.Candlestick(
+        x=p_df.index, open=p_df['open'], high=p_df['high'], 
+        low=p_df['low'], close=p_df['close'], name='Prezzo'
+    ), row=1, col=1)
+    
+    # Bande Bollinger
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_up], line=dict(color='rgba(0, 191, 255, 0.6)', width=1), name='Upper BB'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_mid], line=dict(color='rgba(0, 0, 0, 0.3)', width=1), name='BBM'), row=1, col=1)
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df[c_low], line=dict(color='rgba(0, 191, 255, 0.6)', width=1), fill='tonexty', fillcolor='rgba(0, 191, 255, 0.15)', name='Lower BB'), row=1, col=1)
+
+    # RSI
+    fig.add_trace(go.Scatter(x=p_df.index, y=p_df['rsi'], line=dict(color='#ffcc00', width=2), name='RSI'), row=2, col=1)
+    fig.add_hline(y=70, line_dash="dot", line_color="red", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dot", line_color="#00ff00", row=2, col=1)
+
+    # --- AGGIUNTA GRIGLIA VERTICALE (OGNI 10 MINUTI) ---
+    for t in p_df.index:
+        if t.minute % 10 == 0:
+            fig.add_vline(x=t, line_width=0.5, line_dash="solid", line_color="rgba(0, 0, 0, 0.3)", layer="below")
+
+    # Layout Grafico
+    fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False, margin=dict(l=0,r=0,t=30,b=0), legend=dict(orientation="h", y=1.02))
     st.plotly_chart(fig, use_container_width=True)
 
-# Tabella Cronologia
-st.subheader("📜 Storico Operazioni")
-df = st.session_state['signal_history']
-if not df.empty:
-    # Pulizia Dati
-    df_view = df.copy()
-    cols = ['Investimento €', 'Risultato €', 'Costo Spread €']
-    for c in cols:
-        if c in df_view.columns:
-            df_view[c] = pd.to_numeric(df_view[c].astype(str).str.replace('€','').str.replace(',','.'), errors='coerce').fillna(0)
+    # 4. Metriche Base
+    c_met1, c_met2 = st.columns(2)
+    c_met1.metric(label=f"Prezzo {selected_label}", value=price_fmt.format(curr_p))
+    c_met2.metric(label="RSI (5m)", value=f"{curr_rsi:.1f}", delta="Ipercomprato" if curr_rsi > 70 else "Ipervenduto" if curr_rsi < 30 else "Neutro", delta_color="inverse")
+    
+    st.caption(f"📢 RSI Daily: {rsi_val:.1f} | Divergenza: {detect_divergence(df_d)}")
 
-    # Dashboard Metriche
-    finished = df_view[df_view['Stato'].isin(['VINTO', 'PERSO', 'CHIUSO MAN.'])]
-    if not finished.empty:
-        net_pl = finished['Risultato €'].sum()
-        win = len(finished[finished['Risultato €'] > 0])
-        wr = (win / len(finished)) * 100
-        
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Net Profit", f"{net_pl:.2f}€", delta_color="normal")
-        c2.metric("Win Rate", f"{wr:.1f}%")
-        c3.metric("Trades Chiusi", len(finished))
+    # --- VISUALIZZAZIONE METRICHE AVANZATE (ADX & AI) ---
+    adx_df_ai = ta.adx(df_rt['high'], df_rt['low'], df_rt['close'], length=14)
+    curr_adx_ai = adx_df_ai['ADX_14'].iloc[-1]
 
-    # Styling Tabella
-    st.dataframe(
-        df_view[['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €']].style
-        .map(style_status, subset=['Stato'])
-        .format({'Investimento €': '€ {:.2f}', 'Risultato €': '€ {:+.2f}'}),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.markdown("---")
+    st.subheader("🕵️ Sentinel Market Analysis")
+    col_a, col_b, col_c = st.columns(3)
+    col_a.metric("RSI Daily", f"{rsi_val:.1f}", detect_divergence(df_d))
+    col_b.metric("Sentinel Score", f"{score}/100")
+    adx_emoji = "🔴" if curr_adx_ai > 30 else "🟡" if curr_adx_ai > 20 else "🟢"
+    col_c.metric("Forza Trend (ADX)", f"{curr_adx_ai:.1f}", adx_emoji)
+
+    # --- TABELLA GUIDA ADX COLORATA (FULL WIDTH) ---
+    st.markdown("### 📊 Guida alla Volatilità (ADX)")
+    
+    adx_guide = pd.DataFrame([
+        {"Valore": "0 - 20", "Stato": "🟢 Laterale", "Affidabilità": "MASSIMA"},
+        {"Valore": "20 - 30", "Stato": "🟡 In formazione", "Affidabilità": "MEDIA"},
+        {"Valore": "30+", "Stato": "🔴 Trend Forte", "Affidabilità": "BASSA"}
+    ])
+
+    def highlight_adx(row):
+        if curr_adx_ai <= 20 and "0 - 20" in row['Valore']: return ['background-color: rgba(0, 255, 0, 0.2)'] * len(row)
+        elif 20 < curr_adx_ai <= 30 and "20 - 30" in row['Valore']: return ['background-color: rgba(255, 255, 0, 0.2)'] * len(row)
+        elif curr_adx_ai > 30 and "30+" in row['Valore']: return ['background-color: rgba(255, 0, 0, 0.2)'] * len(row)
+        return [''] * len(row)
+
+    # 1. Applichiamo lo stile e nascondiamo l'indice
+    # 2. Aggiungiamo 'set_table_attributes' per forzare la larghezza al 100%
+    styled_adx_html = (adx_guide.style
+                       .apply(highlight_adx, axis=1)
+                       .hide(axis='index')
+                       .set_table_attributes('style="width:100%; border-collapse: collapse; text-align: left;"')
+                       .to_html())
+
+    # Visualizziamo con unsafe_allow_html
+    st.markdown(styled_adx_html, unsafe_allow_html=True)
+
+# --- 8. CURRENCY STRENGTH (ORDINATO 7x2) ---
+st.markdown("---")
+st.subheader("⚡ Currency Strength Meter")
+s_data = get_currency_strength()
+
+if not s_data.empty:
+    items = list(s_data.items())
+    # Divisione in due blocchi da 7
+    riga1 = items[:7]
+    riga2 = items[7:14]
+
+    for riga in [riga1, riga2]:
+        cols = st.columns(7)
+        for i, (curr, val) in enumerate(riga):
+            # Colori dinamici basati sulla forza
+            if val > 0.20:
+                bg, border = "rgba(0, 168, 107, 0.15)", "#006400" # Molto forte
+            elif val < -0.20:
+                bg, border = "rgba(220, 20, 60, 0.15)", "#ff4b4b"  # Molto debole
+            else:
+                bg, border = "rgba(178, 178, 178, 0.05)", "#444"   # Neutra
+
+            with cols[i]:
+                st.markdown(
+                    f"""
+                    <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
+                                border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
+                        <div style='font-size:0.8em; color:#000000; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
+                        <b style='color:black; font-size:0.9em;'>{curr}</b><br>
+                        <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
 else:
-    st.info("Nessuna operazione registrata.")
+    st.info("⏳ Analisi macro-volatilità in corso...")
+
+# --- 9. CRONOLOGIA SEGNALI (FIX PROFITTO NETTO) ---
+st.markdown("---")
+st.subheader("📜 Cronologia Segnali")
+
+if not st.session_state['signal_history'].empty:
+    # 1. Preparazione dati (Copia UNICA e pulizia numerica immediata)
+    df_base = st.session_state['signal_history'].copy()
+    
+    # Puliamo le colonne monetarie per i calcoli matematici
+    cols_da_pulire = ['Investimento €', 'Risultato €', 'Costo Spread €']
+    for col in cols_da_pulire:
+        if col in df_base.columns:
+            df_base[col] = pd.to_numeric(
+                df_base[col].astype(str).str.replace('€', '').str.replace(',', '.').str.strip(), 
+                errors='coerce'
+            ).fillna(0.0)
+
+    # 2. Calcolo Statistiche (Dashboard)
+    df_conclusi = df_base[df_base['Stato'].isin(['VINTO', 'PERSO'])]
+    tot_conclusi = len(df_conclusi)
+    vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
+    
+    win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
+    profitto_netto = df_base['Risultato €'].sum()
+    rendimento_medio = df_base['Risultato €'].mean() if tot_conclusi > 0 else 0
+
+    # 3. Visualizzazione Dashboard Metriche
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        st.metric("🎯 Win Rate", f"{win_rate:.1f}%")
+    with m2:
+        # Il delta mostra il profitto totale in verde/rosso
+        st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}", delta=f"{profitto_netto:.2f} €")
+    with m3:
+        st.metric("📊 Media x Trade", f"€ {rendimento_medio:.2f}")
+
+    # --- GRAFICO EQUITY CURVE ---
+    if not df_conclusi.empty:
+        # Ordiniamo cronologicamente (dal più vecchio al più recente)
+        df_chart = df_conclusi.iloc[::-1].copy()
+        df_chart['Equity'] = df_chart['Risultato €'].cumsum()
+        
+        st.line_chart(df_chart['Equity'], use_container_width=True)
+        st.caption("📈 Andamento del Profitto Cumulativo (€)")
+   
+    st.markdown("---")
+
+    # 4. Gestione Tabella e Filtri
+    df_visualizzazione = df_base.copy() # Usiamo i dati già puliti
+    cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
+    
+    for col in cols_necessarie:
+        if col not in df_visualizzazione.columns:
+            df_visualizzazione[col] = "-"
+
+    # Interfaccia Filtri
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
+        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato)
+    with col_f2:
+        opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
+        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset)
+
+    if filtro_stato:
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
+    if filtro_asset:
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
+    
+    # 5. Rendering Tabella con Styler
+    if not df_visualizzazione.empty:
+        format_dict = {
+            'Investimento €': '€ {:.2f}',
+            'Risultato €': '€ {:+.2f}',
+            'Costo Spread €': '€ {:.2f}'
+        }
+
+        try:
+            # Qui applichiamo il grassetto (font-weight: bold) e i colori
+            styled_df = (df_visualizzazione.style
+                .format(format_dict)
+                .map(style_status, subset=['Stato', 'Risultato €']))
+        except:
+            styled_df = (df_visualizzazione.style
+                .format(format_dict)
+                .applymap(style_status, subset=['Stato', 'Risultato €']))
+
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, column_order=cols_necessarie)
+        
+        st.download_button(
+            label=f"📥 Esporta {len(df_visualizzazione)} righe",
+            data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
+            file_name="cronologia_trading.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    else:
+        st.warning("Nessun segnale trovato con i filtri selezionati.")
+else:
+    st.info("📖 In attesa del primo segnale della sentinella...")
