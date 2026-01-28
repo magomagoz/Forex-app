@@ -643,6 +643,26 @@ if not active_trades.empty:
                 nuovo_stato = '❌ STOP LOSS'
                 risultato = -investito
 
+
+
+
+                
+                # Colore dinamico
+                color = "#006400" if latente_perc >= 0 else "#ff4b4b"
+                
+                st.sidebar.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
+                        <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
+                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+
+
+
+
+            
             # 3. Aggiornamento nel DataFrame
             st.session_state.signal_history.at[idx, 'Stato'] = nuovo_stato
             st.session_state.signal_history.at[idx, 'Risultato €'] = f"{risultato:+.2f}"
