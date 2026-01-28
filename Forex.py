@@ -623,56 +623,33 @@ if not active_trades.empty:
 # 1. Recupero trade attivi (Assicurati che lo Stato sia 'In Corso' come da tua immagine)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
+# Monitor Real-Time nella Sidebar
 if not active_trades.empty:
-    st.sidebar.markdown("---")
     st.sidebar.subheader("⚡ Monitor Real-Time")
-    
-    for index, trade in active_trades.iterrows():
-        try:
-            # Download dati fresco
-            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
-            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+    for idx, row in active_trades.iterrows():
+        # Creiamo un ID unico per ogni tasto
+        if st.sidebar.button(f"✖ Chiudi {row['Asset']}", key=f"close_{idx}_{row['Asset']}"):
+            # 1. Recupero prezzo attuale
+            current_price = float(get_realtime_data(asset_map[row['Asset']])['close'].iloc[-1])
+            entry_price = float(str(row['Prezzo']).replace(',', '.'))
+            investito = float(str(row['Investimento €']).replace(',', '.'))
+
+            # 2. Calcolo se è in profitto o perdita al momento della chiusura
+            is_buy = row['Direzione'] in ['BUY', 'COMPRA']
+            if (is_buy and current_price > entry_price) or (not is_buy and current_price < entry_price):
+                nuovo_stato = '✅ TARGET' # O un nuovo stato 'CHIUSO MAN. (GAIN)'
+                risultato = investito * 1.8 # Esempio payout 80%
+            else:
+                nuovo_stato = '❌ STOP LOSS'
+                risultato = -investito
+
+            # 3. Aggiornamento nel DataFrame
+            st.session_state.signal_history.at[idx, 'Stato'] = nuovo_stato
+            st.session_state.signal_history.at[idx, 'Risultato €'] = f"{risultato:+.2f}"
             
-            if not t_data.empty:
-                # --- CORREZIONE VARIABILI ---
-                curr_p = float(t_data['Close'].iloc[-1])
-                # Pulizia stringhe € se presenti
-                entry_p = float(str(trade['Prezzo']).replace('€', '').replace(',', '.').strip())
-                inv = float(str(trade['Investimento €']).replace('€', '').replace(',', '.').strip())
-                
-                # Moltiplicatore pips (Fondamentale per evitare numeri abnormi come +422514%)
-                pips_mult = get_asset_params(trade['Asset'])[2] 
-                
-                # Calcolo differenza basato sulla direzione
-                if trade['Direzione'] == "BUY" or trade['Direzione'] == "COMPRA":
-                    diff_prezzo = curr_p - entry_p
-                else:
-                    diff_prezzo = entry_p - curr_p
-                
-                # Calcolo profitto e percentuale corretti
-                latente_euro = diff_prezzo * pips_mult * (inv / 10)
-                latente_perc = (diff_prezzo / entry_p) * 100
-                
-                color = "#006400" if latente_euro >= 0 else "#FF4B4B"
-                
-                # --- UI MONITOR ---
-                st.sidebar.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
-                        <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
-                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
-                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # TASTO CHIUDI (Opzionale)
-                if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
-                    st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
-                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
-                    st.rerun()
-        except Exception as e:
-            # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
-            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+            # 4. SALVATAGGIO E REFRESH IMMEDIATO
+            save_history_permanently()
+            st.rerun()
 
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
