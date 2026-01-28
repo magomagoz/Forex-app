@@ -41,7 +41,7 @@ st.markdown("""
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X",
-            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X"}
+            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X", "USDCNY": "USDCNY=X", "USDCOP": "USDCOP=X", "USDARS": "USDARS=X", "USDRUB": "USDRUB=X", "USDBRL": "USDBRL=X"}
 
 # --- CONFIGURAZIONE TRADING ---
 SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
@@ -318,7 +318,7 @@ def update_signal_outcomes():
                     f"{icona} *{s_action}* {label}\n"
                     f"Entry: {new_sig['Prezzo']}\n"
                     f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
-                    f"--------\n"
+                    f"-------------------\n"
                     f"€€€: € {new_sig['Investimento €']}"
                 )
                 send_telegram_msg(telegram_text)
