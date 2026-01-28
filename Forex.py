@@ -1035,10 +1035,6 @@ if not st.session_state['signal_history'].empty:
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
 
-    # 2. Calcolo altre metriche (Profitto e Media)
-    profitto_netto = df_stats['Risultato €'].sum()
-    rendimento_medio = df_stats['Risultato €'].mean() if tot_conclusi > 0 else 0
-
     # 3. Visualizzazione Dashboard (Colonne)
     m1, m2, m3 = st.columns(3)
     with m1:
