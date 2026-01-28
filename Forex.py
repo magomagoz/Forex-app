@@ -1018,7 +1018,7 @@ if not st.session_state['signal_history'].empty:
 
     # Calcola solo sui trade conclusi
     df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
-    tot_trade = len(df_conclusi)
+    tot_conclusi = len(df_conclusi)
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
@@ -1027,7 +1027,7 @@ if not st.session_state['signal_history'].empty:
     profitto_netto = df_stats['Risultato €'].sum()
 
     # 3. Rendimento Medio per operazione
-    rendimento_medio = df_stats['Risultato €'].mean() if tot_trade > 0 else 0
+    rendimento_medio = df_stats['Risultato €'].mean() if tot_conclusi > 0 else 0
 
     # --- QUI INSERISCI LE RIGHE CHE HAI CHIESTO ---
     df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
