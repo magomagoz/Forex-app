@@ -118,6 +118,11 @@ def play_safe_sound():
     st.markdown(audio_html, unsafe_allow_html=True)
 
 def style_status(val):
+    base = "font-weight: bold;"
+    if val == 'VINTO': return f'{base} color: #00ffcc;'
+    if val == 'PERSO': return f'{base} color: #ff4b4b;'
+    if val == 'APERTO': return f'{base} color: #ffaa00;'
+    if val == 'CHIUSO MAN.': return f'{base} color: #aaaaaa;' # Grigio per chiusura manuale
     if val == '✅ TARGET': return 'background-color: rgba(0, 255, 204, 0.2); color: #00ffcc;'
     if val == '❌ STOP LOSS': return 'background-color: rgba(255, 75, 75, 0.2); color: #ff4b4b;'
     if val == '🛡️ SL DINAMICO': return 'background-color: rgba(255, 165, 0, 0.2); color: #ffa500;'
@@ -691,58 +696,51 @@ display_performance_stats()
 
 # Dettagli operazione selezionata (se presente)
 
-# 1. Definiamo prima quali sono i trade attivi
-active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+# 1. Definiamo i trade attivi
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'APERTO']
 
 if not active_trades.empty:
     st.sidebar.markdown("---")
     st.sidebar.subheader("⚡ Monitor Real-Time")
     
-    for _, trade in active_trades.iterrows():
+    for index, trade in active_trades.iterrows():
         try:
-            # Recupero ticker corretto
             t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
             t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
             
             if not t_data.empty:
-                # --- DATI DEL TRADE (ESTRATTI DALLA RIGA) ---
                 curr_p = float(t_data['Close'].iloc[-1])
                 entry_p = float(str(trade['Prezzo']).replace(',', '.'))
                 inv = float(str(trade['Investimento €']).replace(',', '.'))
                 direzione = trade['Direzione']
-                asset_name = trade['Asset']
                 
-                # --- CALCOLO PIPS CORRETTO ---
-                # Usiamo la tua funzione per avere il moltiplicatore (10000, 100 o 1)
-                pips_mult = get_asset_params(asset_name)[2] 
+                # Calcolo Pips e Profitto
+                pips_mult = get_asset_params(trade['Asset'])[2] 
+                diff = (curr_p - entry_p) if direzione == "BUY" else (entry_p - curr_p)
                 
-                if direzione == "BUY":
-                    diff_prezzo = curr_p - entry_p
-                else:
-                    diff_prezzo = entry_p - curr_p
-                
-                # Calcolo Profitto Realistico
-                # Rapportiamo lo spostamento dei pips all'investimento (margine 20€)
-                # La formula corretta: (Pips guadagnati) * Valore del pip basato su investimento
-                latente_euro = diff_prezzo * pips_mult * (inv / 10) 
-                
-                # Calcolo Percentuale reale sul prezzo di ingresso
-                latente_perc = (diff_prezzo / entry_p) * 100
-                
-                # Colore dinamico
+                latente_euro = diff * pips_mult * (inv / 10)
+                latente_perc = (diff / entry_p) * 100
                 color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
                 
+                # Visualizzazione UI
                 st.sidebar.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px;">
-                        <b style="font-size: 0.85em; color: #ddd;">{asset_name} | {direzione}</b><br>
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px;">
+                        <b style="font-size: 0.85em;">{trade['Asset']} | {direzione}</b><br>
                         <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
                             {latente_perc:+.2f}% ({latente_euro:+.2f}€)
-                        </span><br>
-                        <small style="color: #888;">Target: {trade['TP']} | SL: {trade['SL']}</small>
+                        </span>
                     </div>
                 """, unsafe_allow_html=True)
+                
+                # TASTO CHIUDI ORA (Unico per ogni trade tramite l'indice)
+                if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
+                    # Aggiorniamo lo stato nel DataFrame principale
+                    st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
+                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
+                    st.sidebar.success(f"Chiuso: {latente_euro:+.2f}€")
+                    st.rerun() # Rinfresca per spostare il trade in cronologia
+                    
         except Exception as e:
-            st.sidebar.caption(f"⏳ {trade['Asset']}: {str(e)}")
             continue
 
 if not active_trades.empty:
