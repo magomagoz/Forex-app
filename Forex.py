@@ -40,7 +40,8 @@ st.markdown("""
 
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X", "BTC-USD": "BTC-USD", "ETH-USD": "ETH-USD"}
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X",
+            "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X", "USDCNY": "USDCNY=X", "USDCOP": "USDCOP=X", "USDARS": "USDARS=X", "USDRUB": "USDRUB=X", "USDBRL": "USDBRL=X"}
 
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -83,6 +84,13 @@ def send_telegram_msg(msg):
 
 def get_now_rome():
     return datetime.now(rome_tz)
+
+def is_market_open(asset_name):
+    today = get_now_rome().weekday()
+    # Se è Sabato (5) o Domenica (6), il Forex è chiuso
+    if today >= 5:
+        return False        
+    return True
 
 def play_notification_sound():
     audio_html = """
@@ -131,9 +139,8 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X"]
-        crypto = ["BTC-USD", "ETH-USD"]
-        data = yf.download(forex + crypto, period="5d", interval="1d", progress=False, timeout=15)
+        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X", "EURGBP=X", "GBPJPY=X", "EURJPY=X", "CNY=X", "COP=X", "ARS=X", "RUB=X", "BRL=X",]
+        data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
             return pd.Series(dtype=float)
@@ -150,15 +157,22 @@ def get_currency_strength():
         returns = close_data.pct_change().iloc[-1] * 100
         
         strength = {
-            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
-            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0)) / 4,
-            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0)) / 4,
+            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0) + returns.get("USDCNY=X",0) + returns.get("USDRUB=X",0) + returns.get("USDCOP=X",0) + returns.get("USDARS=X",0) + returns.get("USDBRL=X",0)) / 12,
+            "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0) + returns.get("EURGBP=X", 0) + returns.get("EURJPY=X", 0)) / 6,
+            "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0) + returns.get("GBPJPY=X", 0)) / 5,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
+            "NZD 🇳🇿": returns.get("NZDUSD=X", 0),
             "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
-            "BTC ₿": returns.get("BTC-USD", 0),
-            "ETH 💎": returns.get("ETH-USD", 0)
+            "CNY 🇨🇳": -returns.get("CNY=X", 0),
+            "RUB 🇷🇺": -returns.get("RUB=X", 0),
+            "COP 🇨🇴": -returns.get("COP=X", 0),
+            "ARS 🇦🇷": -returns.get("ARS=X", 0),
+            "BRL 🇧🇷": -returns.get("BRL=X", 0),
+            "MXN 🇲🇽": -returns.get("MXN=X", 0)
+            #"BTC ₿": returns.get("BTC-USD", 0),
+            #"ETH 💎": returns.get("ETH-USD", 0)
         }
         return pd.Series(strength).sort_values(ascending=False)
     except Exception:
@@ -189,14 +203,12 @@ def detect_divergence(df):
     return "Neutrale"
     
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
-
 # ... (le altre funzioni save_history, send_telegram rimangono uguali, incolla da qui in giù) ...
-
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     
-    COMMISSIONE_APPROX = 0.02 
+    COMMISSIONE_APPROX = 0.05 
     updates_made = False
     
     # Iteriamo solo sui trade aperti
@@ -764,24 +776,42 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-# --- 8. CURRENCY STRENGTH ---
+# --- 8. CURRENCY STRENGTH (ORDINATO 7x2) ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
 
 if not s_data.empty:
-    cols = st.columns(len(s_data))
-    for i, (curr, val) in enumerate(s_data.items()):
-        bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
-        txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
-        cols[i].markdown(
-            f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'>"
-            f"<b style='color:white; font-size:0.8em;'>{curr}</b><br>"
-            f"<span style='color:{txt_c};'>{val:.2f}%</span></div>", 
-            unsafe_allow_html=True
-        )
+    items = list(s_data.items())
+    # Divisione in due blocchi da 7
+    riga1 = items[:7]
+    riga2 = items[7:14]
+
+    for riga in [riga1, riga2]:
+        cols = st.columns(7)
+        for i, (curr, val) in enumerate(riga):
+            # Colori dinamici basati sulla forza
+            if val > 0.20:
+                bg, border = "rgba(0, 168, 107, 0.15)", "#006400" # Molto forte
+            elif val < -0.20:
+                bg, border = "rgba(220, 20, 60, 0.15)", "#ff4b4b"  # Molto debole
+            else:
+                bg, border = "rgba(178, 178, 178, 0.05)", "#444"   # Neutra
+
+            with cols[i]:
+                st.markdown(
+                    f"""
+                    <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
+                                border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
+                        <div style='font-size:0.8em; color:#000000; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
+                        <b style='color:black; font-size:0.9em;'>{curr}</b><br>
+                        <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
 else:
-    st.info("⏳ Caricamento dati macro in corso...")
+    st.info("⏳ Analisi macro-volatilità in corso...")
 
 # --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
 st.markdown("---")
