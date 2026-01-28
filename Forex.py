@@ -12,6 +12,9 @@ from plotly.subplots import make_subplots
 import requests
 import os
 
+# --- CONFIGURAZIONE TRADING ---
+SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
+
 # --- 1. CONFIGURAZIONE & LAYOUT ---
 st.set_page_config(page_title="Forex Momentum Pro AI", layout="wide", page_icon="📈")
 
@@ -42,9 +45,6 @@ st.markdown("""
 rome_tz = pytz.timezone('Europe/Rome')
 asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "USDCHF": "USDCHF=X", "NZDUSD": "NZDUSD=X",
             "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X", "USDCNY": "USDCNY=X", "USDCOP": "USDCOP=X", "USDARS": "USDARS=X", "USDRUB": "USDRUB=X", "USDBRL": "USDBRL=X"}
-
-# --- CONFIGURAZIONE TRADING ---
-SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
 
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
@@ -435,7 +435,7 @@ def run_sentinel():
                     investimento_calcolato = bal_attuale * (risk_attual / 100)
                     
                     new_sig = {
-                        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+                        'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), # <--- MODIFICA QUESTA RIGA
                         'Asset': label, 'Direzione': s_action, 
                         'Prezzo': p_fmt.format(entry_with_spread), 
                         'TP': p_fmt.format(tp_prezzo), 'SL': p_fmt.format(sl_prezzo), 
