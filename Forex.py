@@ -118,12 +118,19 @@ def style_status(val):
     return ''
 
 def get_asset_params(pair):
-    """Restituisce: (unit, format_string, multiplier, type)"""
-    if "BTC" in pair or "ETH" in pair: return 1.0, "{:.2f}", 1, "CRYPTO"
-    elif any(x in pair for x in ["COP", "ARS"]): return 1.0, "{:.2f}", 1, "FOREX_LATAM"
-    elif any(x in pair for x in ["JPY", "RUB"]): return 0.01, "{:.3f}", 100, "FOREX_3DEC"
-    elif "CNY" in pair or "BRL" in pair: return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
-    else: return 0.0001, "{:.5f}", 10000, "FOREX_STD"
+    if "BTC" in pair or "ETH" in pair:
+        return 1.0, "{:.2f}", 1, "CRYPTO"
+    elif any(x in pair for x in ["COP", "ARS"]):
+        # Peso Colombiano e Argentino (es. 3950.50)
+        return 1.0, "{:.2f}", 1, "FOREX_LATAM"
+    elif any(x in pair for x in ["JPY", "RUB"]):
+        # Yen e Rublo (es. 150.250 o 90.150)
+        return 0.01, "{:.3f}", 100, "FOREX_3DEC"
+    elif "CNY" in pair or "BRL" in pair:
+        # Yuan e Real (es. 7.2345 o 4.9567)
+        return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
+    else:
+        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
 
 def get_realtime_data(ticker):
     try:
