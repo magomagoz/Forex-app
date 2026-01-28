@@ -691,6 +691,7 @@ display_performance_stats()
 
 # Dettagli operazione selezionata (se presente)
 
+# 1. Definiamo prima quali sono i trade attivi
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
 if not active_trades.empty:
@@ -699,49 +700,51 @@ if not active_trades.empty:
     
     for _, trade in active_trades.iterrows():
         try:
-            # Recupero rapido dell'ultimo prezzo dal database o download leggero
+            # Recupero ticker corretto
             t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
-            # Usiamo un periodo brevissimo per non sovraccaricare
             t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
             
             if not t_data.empty:
+                # --- DATI DEL TRADE (ESTRATTI DALLA RIGA) ---
                 curr_p = float(t_data['Close'].iloc[-1])
                 entry_p = float(str(trade['Prezzo']).replace(',', '.'))
                 inv = float(str(trade['Investimento €']).replace(',', '.'))
+                direzione = trade['Direzione']
+                asset_name = trade['Asset']
                 
-                # Recupera i parametri corretti per l'asset (moltiplicatore pips)
-                # row_params[2] deve essere: 10000 per EURGBP/EURUSD, 100 per JPY/RUB, 1 per COP/ARS
+                # --- CALCOLO PIPS CORRETTO ---
+                # Usiamo la tua funzione per avere il moltiplicatore (10000, 100 o 1)
                 pips_mult = get_asset_params(asset_name)[2] 
                 
-                # Calcolo corretto della differenza prezzo
-                if direzione == "COMPRA":
-                    diff_prezzo = (prezzo_attuale - prezzo_ingresso)
+                if direzione == "BUY":
+                    diff_prezzo = curr_p - entry_p
                 else:
-                    diff_prezzo = (prezzo_ingresso - prezzo_attuale)
+                    diff_prezzo = entry_p - curr_p
                 
-                # PROFITTO IN EURO (Basato sui tuoi 20€ di margine)
-                # Se diff_prezzo è 0.0001 e pips_mult è 10000, guadagni 1 unità di movimento
-                profitto_euro = diff_prezzo * pips_mult * (investimento / 10) 
+                # Calcolo Profitto Realistico
+                # Rapportiamo lo spostamento dei pips all'investimento (margine 20€)
+                # La formula corretta: (Pips guadagnati) * Valore del pip basato su investimento
+                latente_euro = diff_prezzo * pips_mult * (inv / 10) 
                 
-                latente_euro = inv * p_diff
-                latente_perc = p_diff * 100
+                # Calcolo Percentuale reale sul prezzo di ingresso
+                latente_perc = (diff_prezzo / entry_p) * 100
                 
                 # Colore dinamico
-                color = "#006400" if latente_perc >= 0 else "#ff4b4b"
+                color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
                 
                 st.sidebar.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px;">
-                        <b style="font-size: 0.9em;">{trade['Asset']} ({trade['Direzione']})</b><br>
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; margin-bottom: 10px; background: rgba(255,255,255,0.05); padding: 5px; border-radius: 5px;">
+                        <b style="font-size: 0.85em; color: #ddd;">{asset_name} | {direzione}</b><br>
                         <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
                             {latente_perc:+.2f}% ({latente_euro:+.2f}€)
-                        </span>
+                        </span><br>
+                        <small style="color: #888;">Target: {trade['TP']} | SL: {trade['SL']}</small>
                     </div>
                 """, unsafe_allow_html=True)
-        except:
-            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+        except Exception as e:
+            st.sidebar.caption(f"⏳ {trade['Asset']}: {str(e)}")
             continue
 
-active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
     last_t = active_trades.iloc[0]
