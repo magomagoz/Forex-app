@@ -1005,40 +1005,59 @@ else:
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-# --- DASHBOARD STATISTICHE ---
+# --- 9. CRONOLOGIA SEGNALI ---
+st.markdown("---")
+st.subheader("📜 Cronologia Segnali")
+
 if not st.session_state['signal_history'].empty:
+    # 1. Preparazione dati (Copia e pulizia numerica)
     df_stats = st.session_state['signal_history'].copy()
-    
-    # Assicuriamoci che i dati siano numerici per i calcoli
     df_stats['Risultato €'] = pd.to_numeric(
         df_stats['Risultato €'].astype(str).str.replace('€', '').str.replace(',', '.'), 
         errors='coerce'
     ).fillna(0.0)
 
-    # 1. Calcolo Win Rate %
-    tot_trade = len(df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])])
-    vinti = len(df_stats[df_stats['Stato'] == 'VINTO'])
-    win_rate = (vinti / tot_trade * 100) if tot_trade > 0 else 0
+# --- DASHBOARD STATISTICHE ---
+if not st.session_state['signal_history'].empty:
+    df_stats = st.session_state['signal_history'].copy()
 
+    # Calcola solo sui trade conclusi
+    df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
+    tot_conclusi = len(df_conclusi)
+    vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
+    
+    win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
+    
+    
     # 2. Profitto Netto Totale
     profitto_netto = df_stats['Risultato €'].sum()
 
     # 3. Rendimento Medio per operazione
     rendimento_medio = df_stats['Risultato €'].mean() if tot_trade > 0 else 0
 
-    # Visualizzazione con Colonne (Metriche)
+
+    # --- QUI INSERISCI LE RIGHE CHE HAI CHIESTO ---
+    df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
+    tot_conclusi = len(df_conclusi)
+    vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
+    win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
+    # ----------------------------------------------
+
+    # 2. Calcolo altre metriche (Profitto e Media)
+    profitto_netto = df_stats['Risultato €'].sum()
+    rendimento_medio = df_stats['Risultato €'].mean() if tot_conclusi > 0 else 0
+
+    # 3. Visualizzazione Dashboard (Colonne)
     m1, m2, m3 = st.columns(3)
-    
     with m1:
-        st.metric("🎯 Win Rate", f"{win_rate:.1f}%", help="Percentuale di trade chiusi in profitto")
+        st.metric("🎯 Win Rate", f"{win_rate:.1f}%")
     with m2:
-        colore_profitto = "normal" if profitto_netto >= 0 else "inverse"
-        st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}", delta=f"{profitto_netto:.2f} €", delta_color=colore_profitto)
+        st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}")
     with m3:
         st.metric("📊 Media x Trade", f"€ {rendimento_medio:.2f}")
-
-    st.markdown("---") # Separatore tra stats e tabella
-
+    
+    st.markdown("---")
+    
 if not st.session_state['signal_history'].empty:
     # 1. Copia e preparazione colonne
     df_visualizzazione = st.session_state['signal_history'].copy()
