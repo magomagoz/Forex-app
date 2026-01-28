@@ -1000,62 +1000,53 @@ if not s_data.empty:
 else:
     st.info("⏳ Analisi macro-volatilità in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI ---
+# --- 9. CRONOLOGIA SEGNALI (FIX PROFITTO NETTO) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
 if not st.session_state['signal_history'].empty:
-    # 1. Preparazione dati (Copia e pulizia numerica)
-    df_stats = st.session_state['signal_history'].copy()
-    df_stats['Risultato €'] = pd.to_numeric(
-        df_stats['Risultato €'].astype(str).str.replace('€', '').str.replace(',', '.'), 
-        errors='coerce'
-    ).fillna(0.0)
+    # 1. Preparazione dati (Copia UNICA e pulizia numerica immediata)
+    df_base = st.session_state['signal_history'].copy()
+    
+    # Puliamo le colonne monetarie per i calcoli matematici
+    cols_da_pulire = ['Investimento €', 'Risultato €', 'Costo Spread €']
+    for col in cols_da_pulire:
+        if col in df_base.columns:
+            df_base[col] = pd.to_numeric(
+                df_base[col].astype(str).str.replace('€', '').str.replace(',', '.').str.strip(), 
+                errors='coerce'
+            ).fillna(0.0)
 
-# --- DASHBOARD STATISTICHE ---
-if not st.session_state['signal_history'].empty:
-    df_stats = st.session_state['signal_history'].copy()
-
-    # Calcola solo sui trade conclusi
-    df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
+    # 2. Calcolo Statistiche (Dashboard)
+    df_conclusi = df_base[df_base['Stato'].isin(['VINTO', 'PERSO'])]
     tot_conclusi = len(df_conclusi)
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
-        
-    # 2. Profitto Netto Totale
-    profitto_netto = df_stats['Risultato €'].sum()
+    profitto_netto = df_base['Risultato €'].sum()
+    rendimento_medio = df_base['Risultato €'].mean() if tot_conclusi > 0 else 0
 
-    # 3. Rendimento Medio per operazione
-    rendimento_medio = df_stats['Risultato €'].mean() if tot_conclusi > 0 else 0
-
-    # --- QUI INSERISCI LE RIGHE CHE HAI CHIESTO ---
-    df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
-    tot_conclusi = len(df_conclusi)
-    vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
-    win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
-
-    # 3. Visualizzazione Dashboard (Colonne)
+    # 3. Visualizzazione Dashboard Metriche
     m1, m2, m3 = st.columns(3)
     with m1:
         st.metric("🎯 Win Rate", f"{win_rate:.1f}%")
     with m2:
-        st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}")
+        # Il delta mostra il profitto totale in verde/rosso
+        st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}", delta=f"{profitto_netto:.2f} €")
     with m3:
         st.metric("📊 Media x Trade", f"€ {rendimento_medio:.2f}")
     
     st.markdown("---")
-    
-if not st.session_state['signal_history'].empty:
-    # 1. Copia e preparazione colonne
-    df_visualizzazione = st.session_state['signal_history'].copy()
+
+    # 4. Gestione Tabella e Filtri
+    df_visualizzazione = df_base.copy() # Usiamo i dati già puliti
     cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
     
     for col in cols_necessarie:
         if col not in df_visualizzazione.columns:
             df_visualizzazione[col] = "-"
 
-    # 2. Interfaccia Filtri
+    # Interfaccia Filtri
     col_f1, col_f2 = st.columns(2)
     with col_f1:
         opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
@@ -1064,32 +1055,21 @@ if not st.session_state['signal_history'].empty:
         opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
         filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset)
 
-    # 3. Applicazione Filtri
     if filtro_stato:
         df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
     if filtro_asset:
         df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
     
-    # 4. Visualizzazione finale (Solo se dopo i filtri c'è ancora qualcosa)
+    # 5. Rendering Tabella con Styler
     if not df_visualizzazione.empty:
-        # Pulizia dati monetari per la formattazione
-        cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
-        for col in cols_monetarie:
-            df_visualizzazione[col] = pd.to_numeric(
-                df_visualizzazione[col].astype(str).str.replace('€', '').str.replace(',', '.'), 
-                errors='coerce'
-            ).fillna(0.0)
-
-        # Dizionario formattazione
         format_dict = {
             'Investimento €': '€ {:.2f}',
             'Risultato €': '€ {:+.2f}',
             'Costo Spread €': '€ {:.2f}'
         }
 
-        # Applicazione combinata di FORMATO e COLORE (Styler unico)
-        # Usiamo .map per Pandas 2.1+ o .applymap per versioni vecchie
         try:
+            # Qui applichiamo il grassetto (font-weight: bold) e i colori
             styled_df = (df_visualizzazione.style
                 .format(format_dict)
                 .map(style_status, subset=['Stato', 'Risultato €']))
@@ -1098,12 +1078,7 @@ if not st.session_state['signal_history'].empty:
                 .format(format_dict)
                 .applymap(style_status, subset=['Stato', 'Risultato €']))
 
-        st.dataframe(
-            styled_df,
-            use_container_width=True,
-            hide_index=True,
-            column_order=cols_necessarie
-        )
+        st.dataframe(styled_df, use_container_width=True, hide_index=True, column_order=cols_necessarie)
         
         st.download_button(
             label=f"📥 Esporta {len(df_visualizzazione)} righe",
