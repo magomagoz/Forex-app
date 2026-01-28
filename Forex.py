@@ -324,7 +324,8 @@ def update_signal_outcomes():
                 telegram_text = (
                     f"{icona} *{s_action}* {label}\n"
                     f"Entry: {new_sig['Prezzo']}\n"
-                    f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
+                    f"TP: {new_sig['TP']}\n"
+                    f"SL: {new_sig['SL']}\n"
                     f"-------------------\n"
                     f"€€€: € {new_sig['Investimento €']}"
                 )
