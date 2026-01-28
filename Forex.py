@@ -958,7 +958,7 @@ if not s_data.empty:
         for i, (curr, val) in enumerate(riga):
             # Colori dinamici basati sulla forza
             if val > 0.20:
-                bg, border = "rgba(0, 255, 204, 0.15)", "#00ffcc" # Molto forte
+                bg, border = "rgba(0, 255, 204, 0.15)", "#006400" # Molto forte
             elif val < -0.20:
                 bg, border = "rgba(255, 75, 75, 0.15)", "#ff4b4b"  # Molto debole
             else:
@@ -969,7 +969,7 @@ if not s_data.empty:
                     f"""
                     <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
                                 border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
-                        <div style='font-size:0.8em; color:#bbb; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
+                        <div style='font-size:0.8em; color:#000000; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
                         <b style='color:black; font-size:0.9em;'>{curr}</b><br>
                         <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
                     </div>
