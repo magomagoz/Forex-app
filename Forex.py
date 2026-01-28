@@ -428,7 +428,6 @@ def run_sentinel():
                     sl_prezzo = entry_with_spread - sl_dist if s_action == "COMPRA" else entry_with_spread + sl_dist
                     tp_prezzo = entry_with_spread * 1.012 if s_action == "COMPRA" else entry_with_spread * 0.988
 
-
                     # All'interno del ciclo for di run_sentinel, quando viene generato new_sig:
                     bal_attuale = st.session_state.get('balance_val', 1000)
                     risk_attual = st.session_state.get('risk_val', 2.0)
@@ -443,6 +442,29 @@ def run_sentinel():
                         'Risultato €': "0.00", 'Costo Spread €': f"{(investimento_puntata * SIMULATED_SPREAD):.2f}",
                         'Stato_Prot': 'Iniziale', 'Protezione': 'Trailing 3/6%'
                     }
+
+                    # --- LOGICA DI CHIUSURA AUTOMATICA ---
+                    for index, row in st.session_state['signal_history'].iterrows():
+                        if row['Stato'] == 'APERTO':
+                            current_price = get_last_price(row['Asset']) # Funzione che recupera il prezzo attuale
+                            
+                            # Caso LONG (Acquisto)
+                            if row['Direzione'] == 'BUY':
+                                if current_price >= row['TP']:
+                                    st.session_state['signal_history'].at[index, 'Stato'] = 'VINTO'
+                                    st.session_state['signal_history'].at[index, 'Risultato €'] = 40.0
+                                elif current_price <= row['SL']:
+                                    st.session_state['signal_history'].at[index, 'Stato'] = 'PERSO'
+                                    st.session_state['signal_history'].at[index, 'Risultato €'] = -20.0
+                            
+                            # Caso SHORT (Vendita)
+                            elif row['Direzione'] == 'SELL':
+                                if current_price <= row['TP']:
+                                    st.session_state['signal_history'].at[index, 'Stato'] = 'VINTO'
+                                    st.session_state['signal_history'].at[index, 'Risultato €'] = 40.0
+                                elif current_price >= row['SL']:
+                                    st.session_state['signal_history'].at[index, 'Stato'] = 'PERSO'
+                                    st.session_state['signal_history'].at[index, 'Risultato €'] = -20.0
 
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     st.session_state['last_alert'] = new_sig
