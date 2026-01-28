@@ -1001,10 +1001,6 @@ if not s_data.empty:
 else:
     st.info("⏳ Analisi macro-volatilità in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (OTTIMIZZATA) ---
-st.markdown("---")
-st.subheader("📜 Cronologia Segnali")
-
 # --- 9. CRONOLOGIA SEGNALI ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
