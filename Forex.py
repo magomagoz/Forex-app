@@ -958,9 +958,9 @@ if not s_data.empty:
         for i, (curr, val) in enumerate(riga):
             # Colori dinamici basati sulla forza
             if val > 0.20:
-                bg, border = "rgba(0, 255, 204, 0.15)", "#006400" # Molto forte
+                bg, border = "rgba(0, 255, 0, 0.15)", "#006400" # Molto forte
             elif val < -0.20:
-                bg, border = "rgba(255, 75, 75, 0.15)", "#ff4b4b"  # Molto debole
+                bg, border = "rgba(166, 16, 34, 0.15)", "#ff4b4b"  # Molto debole
             else:
                 bg, border = "rgba(255, 255, 255, 0.05)", "#444"   # Neutra
 
