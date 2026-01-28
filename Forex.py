@@ -408,6 +408,8 @@ def run_sentinel():
             if s_action: debug_info += f" -> 🔥 {s_action}"
             debug_list.append(f"{icon} {debug_info}")
 
+            # ... siamo dentro il ciclo for della sentinella ...
+            
             # Se c'è un segnale (s_action non è None)
             if s_action: 
                 # --- CORREZIONE FONDAMENTALE ---
