@@ -940,52 +940,77 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (VERSIONE FIXATA) ---
+# --- 9. CRONOLOGIA SEGNALI (OTTIMIZZATA) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-if not df_visualizzazione.empty:
-    # --- FIX DECIMALI ---
-    # 1. Convertiamo le colonne monetarie in numeri puri (float)
-    # Questo risolve il problema delle stringhe miste o dei troppi decimali
-    cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
-    for col in cols_monetarie:
-        if col in df_visualizzazione.columns:
-            # Rimuove € e spazi, converte in numero, mette 0 se errore
+if not st.session_state['signal_history'].empty:
+    # 1. Copia e preparazione colonne
+    df_visualizzazione = st.session_state['signal_history'].copy()
+    cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
+    
+    for col in cols_necessarie:
+        if col not in df_visualizzazione.columns:
+            df_visualizzazione[col] = "-"
+
+    # 2. Interfaccia Filtri
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
+        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato)
+    with col_f2:
+        opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
+        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset)
+
+    # 3. Applicazione Filtri
+    if filtro_stato:
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
+    if filtro_asset:
+        df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
+    
+    # 4. Visualizzazione finale (Solo se dopo i filtri c'è ancora qualcosa)
+    if not df_visualizzazione.empty:
+        # Pulizia dati monetari per la formattazione
+        cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
+        for col in cols_monetarie:
             df_visualizzazione[col] = pd.to_numeric(
                 df_visualizzazione[col].astype(str).str.replace('€', '').str.replace(',', '.'), 
                 errors='coerce'
             ).fillna(0.0)
 
-    # 2. Definiamo come visualizzarli (Format Dictionary)
-    format_dict = {
-        'Investimento €': '€ {:.2f}',    # Es: € 20.00
-        'Risultato €': '€ {:+.2f}',      # Es: € +40.00 o € -20.00
-        'Costo Spread €': '€ {:.2f}'     # Es: € 0.50
-    }
+        # Dizionario formattazione
+        format_dict = {
+            'Investimento €': '€ {:.2f}',
+            'Risultato €': '€ {:+.2f}',
+            'Costo Spread €': '€ {:.2f}'
+        }
 
-    # 3. Applichiamo lo stile
-    # Usiamo .format() del Pandas Styler che ha la precedenza assoluta
-    try:
-        # Metodo compatibile con Pandas recenti
-        styled_df = df_visualizzazione.style.format(format_dict).map(style_status, subset=['Stato', 'Risultato €'])
-    except:
-        # Fallback per versioni precedenti
-        styled_df = df_visualizzazione.style.format(format_dict).applymap(style_status, subset=['Stato', 'Risultato €'])
+        # Applicazione combinata di FORMATO e COLORE (Styler unico)
+        # Usiamo .map per Pandas 2.1+ o .applymap per versioni vecchie
+        try:
+            styled_df = (df_visualizzazione.style
+                .format(format_dict)
+                .map(style_status, subset=['Stato', 'Risultato €']))
+        except:
+            styled_df = (df_visualizzazione.style
+                .format(format_dict)
+                .applymap(style_status, subset=['Stato', 'Risultato €']))
 
-    st.dataframe(
-        styled_df,
-        use_container_width=True,
-        hide_index=True,
-        column_order=cols_necessarie
-    )
-    
-    st.download_button(
-        label=f"📥 Esporta vista attuale ({len(df_visualizzazione)} righe)",
-        data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
-        file_name="cronologia_trading.csv",
-        mime="text/csv",
-        use_container_width=True
-    )
+        st.dataframe(
+            styled_df,
+            use_container_width=True,
+            hide_index=True,
+            column_order=cols_necessarie
+        )
+        
+        st.download_button(
+            label=f"📥 Esporta {len(df_visualizzazione)} righe",
+            data=df_visualizzazione.to_csv(index=False).encode('utf-8'),
+            file_name="cronologia_trading.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    else:
+        st.warning("Nessun segnale trovato con i filtri selezionati.")
 else:
-    st.warning("Nessun dato corrispondente ai filtri selezionati.")
+    st.info("📖 In attesa del primo segnale della sentinella...")
