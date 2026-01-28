@@ -165,7 +165,7 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X", "EURGBP=X", "GBPJPY=X", "EURJPY=X"]
+        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "USDCAD=X", "USDCHF=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X", "GBPCHF=X","EURGBP=X", "EURGBP=X", "GBPJPY=X", "EURJPY=X", "CNY=X", "COP=X", "ARS=X", "RUB=X", BRL=X",]
         data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
@@ -183,13 +183,19 @@ def get_currency_strength():
         returns = close_data.pct_change().iloc[-1] * 100
         
         strength = {
-            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0)) / 7,
+            "USD 🇺🇸": (-returns.get("EURUSD=X",0) - returns.get("GBPUSD=X",0) + returns.get("USDJPY=X",0) - returns.get("AUDUSD=X",0) + returns.get("USDCAD=X",0) + returns.get("USDCHF=X",0) - returns.get("NZDUSD=X",0) + returns.get("USDCNY=X",0) + returns.get("USDRUB=X",0) + returns.get("USDCOP=X",0) + returns.get("USDARS=X",0) + returns.get("USDBRL=X",0)) / 12,
             "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0) + returns.get("EURGBP=X", 0) + returns.get("EURJPY=X", 0)) / 6,
             "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0) + returns.get("GBPJPY=X", 0)) / 5,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0)
+            "NZD 🇳🇿": returns.get("NZDUSD=X", 0),
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
+            "CNY 🇨🇳": -returns.get("CNY=X", 0),
+            "RUB 🇷🇺": -returns.get("RUB=X", 0),
+            "COP 🇨🇴": -returns.get("COP=X", 0),
+            "ARS 🇦🇷": -returns.get("ARS=X", 0),
+            "BRL 🇧🇷": -returns.get("BRL=X", 0)
             #"BTC ₿": returns.get("BTC-USD", 0),
             #"ETH 💎": returns.get("ETH-USD", 0)
         }
@@ -198,14 +204,27 @@ def get_currency_strength():
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
+    # --- CRYPTO ---
     if "BTC" in pair or "ETH" in pair:
-        # Per Crypto: 1 punto = 1 Dollaro
         return 1.0, "{:.2f}", 1, "CRYPTO"
-    elif "JPY" in pair:
-        # Per JPY: 0.01 = 1 punto
-        return 0.01, "{:.3f}", 100, "FOREX_JPY"
+    
+    # --- FOREX ESOTICI (Valori Alti) ---
+    elif any(x in pair for x in ["COP", "ARS"]):
+        # Peso Colombiano e Argentino (es. 3950.50)
+        return 1.0, "{:.2f}", 1, "FOREX_LATAM"
+    
+    # --- FOREX JPY & RUB ---
+    elif any(x in pair for x in ["JPY", "RUB"]):
+        # Yen e Rublo (es. 150.250 o 90.150)
+        return 0.01, "{:.3f}", 100, "FOREX_3DEC"
+    
+    # --- FOREX STANDARD & CINA ---
+    elif "CNY" in pair or "BRL" in pair:
+        # Yuan e Real (es. 7.2345 o 4.9567)
+        return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
+    
+    # --- DEFAULT (EURUSD, ecc) ---
     else:
-        # Per Forex standard (EURUSD ecc): 0.0001 = 1 punto (PIP)
         return 0.0001, "{:.5f}", 10000, "FOREX_STD"
 
 def detect_divergence(df):
@@ -218,7 +237,6 @@ def detect_divergence(df):
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
     
-# --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
