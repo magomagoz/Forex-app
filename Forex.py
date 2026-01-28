@@ -709,11 +709,19 @@ if not active_trades.empty:
                 entry_p = float(str(trade['Prezzo']).replace(',', '.'))
                 inv = float(str(trade['Investimento €']).replace(',', '.'))
                 
-                # Calcolo profitto/perdita attuale
-                if trade['Direzione'] == 'COMPRA':
-                    p_diff = (curr_p - entry_p) / entry_p
+                # Recupera i parametri corretti per l'asset (moltiplicatore pips)
+                # row_params[2] deve essere: 10000 per EURGBP/EURUSD, 100 per JPY/RUB, 1 per COP/ARS
+                pips_mult = get_asset_params(asset_name)[2] 
+                
+                # Calcolo corretto della differenza prezzo
+                if direzione == "COMPRA":
+                    diff_prezzo = (prezzo_attuale - prezzo_ingresso)
                 else:
-                    p_diff = (entry_p - curr_p) / entry_p
+                    diff_prezzo = (prezzo_ingresso - prezzo_attuale)
+                
+                # PROFITTO IN EURO (Basato sui tuoi 20€ di margine)
+                # Se diff_prezzo è 0.0001 e pips_mult è 10000, guadagni 1 unità di movimento
+                profitto_euro = diff_prezzo * pips_mult * (investimento / 10) 
                 
                 latente_euro = inv * p_diff
                 latente_perc = p_diff * 100
@@ -1051,7 +1059,16 @@ if not st.session_state['signal_history'].empty:
         st.metric("💰 Profitto Netto", f"€ {profitto_netto:.2f}", delta=f"{profitto_netto:.2f} €")
     with m3:
         st.metric("📊 Media x Trade", f"€ {rendimento_medio:.2f}")
-    
+
+    # --- GRAFICO EQUITY CURVE ---
+    if not df_conclusi.empty:
+        # Ordiniamo cronologicamente (dal più vecchio al più recente)
+        df_chart = df_conclusi.iloc[::-1].copy()
+        df_chart['Equity'] = df_chart['Risultato €'].cumsum()
+        
+        st.line_chart(df_chart['Equity'], use_container_width=True)
+        st.caption("📈 Andamento del Profitto Cumulativo (€)")
+   
     st.markdown("---")
 
     # 4. Gestione Tabella e Filtri
