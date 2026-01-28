@@ -218,6 +218,7 @@ def detect_divergence(df):
     return "Neutrale"
     
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
+# --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
@@ -231,55 +232,44 @@ def update_signal_outcomes():
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
 
+            # Pulizia colonne
             if isinstance(data.columns, pd.MultiIndex): data.columns = data.columns.get_level_values(0)
             data.columns = [str(c).lower() for c in data.columns]
 
             current_price = float(data['close'].iloc[-1])
+            
+            # Conversione sicura da stringa a float per i calcoli
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
-            investimento = float(str(row['Investimento €']).replace(',', '.'))
+            investimento = float(str(row['Investimento €']).replace('€','').replace(',', '.'))
             tp_v = float(str(row['TP']).replace(',', '.'))
             sl_v = float(str(row['SL']).replace(',', '.'))
-            direzione = row['Direzione']
-            tp_v = float(str(row['TP']).replace(',', '.'))
             current_sl = float(str(row['SL']).replace(',', '.'))
+            direzione = row['Direzione']
             
-            # --- CALCOLO GAIN (Basato su prezzo già "spread-ato") ---
+            # --- CALCOLO GAIN ---
             if direzione == 'COMPRA':
                 percent_gain = ((current_price - entry_v) / entry_v) * 100
             else:
                 percent_gain = ((entry_v - current_price) / entry_v) * 100
 
-            # --- LOGICA TRAILING STOP FOREX (3% -> BE, 6% -> 5%) ---
+            # --- LOGICA TRAILING STOP ---
             new_sl = current_sl
             status_prot = row.get('Stato_Prot', 'Iniziale')
 
-            # Solo per asset Forex (escludiamo Crypto dalla logica stretta)
+            # Asset Forex
             if "BTC" not in row['Asset'] and "ETH" not in row['Asset']:
-                # Step 1: Al +3% portiamo a Pareggio (BE)
                 if percent_gain >= 3.0 and 'Iniziale' in status_prot:
                     new_sl = entry_v
                     status_prot = 'BE (0%)'
                     play_safe_sound()
-                    #send_telegram_msg(f"🛡️ {row['Asset']}: SL a Pareggio (Gain +3%)")
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 3%!")
-
+                    send_telegram_msg(f"🛡️ **TARGET DINAMICO**\n{row['Asset']}: Stop Loss a Pareggio!")
                 
-                # Step 2: Al +6% garantiamo il +5% di profitto
                 elif percent_gain >= 6.0 and 'BE' in status_prot:
-                    if direzione == 'COMPRA':
-                        new_sl = entry_v * 1.05
-                    else:
-                        new_sl = entry_v * 0.95
+                    new_sl = entry_v * 1.05 if direzione == 'COMPRA' else entry_v * 0.95
                     status_prot = 'Safe (+5%)'
                     play_safe_sound()
-                    send_telegram_msg(f"💰 {row['Asset']}: SL Garantito +5% (Gain +6%)")
+                    send_telegram_msg(f"💰 **PROFITTO BLINDATO**\n{row['Asset']}: Stop Loss garantisce +5%!")
             
-            # Logica separata per Crypto (se presente)
-            else:
-                if percent_gain >= 10.0 and 'Iniziale' in status_prot:
-                    new_sl = entry_v
-                    status_prot = 'BE (0%)'
-
             # Aggiornamento fisico SL se cambiato
             if new_sl != current_sl:
                 _, p_fmt, _, _ = get_asset_params(row['Asset'])
@@ -294,32 +284,29 @@ def update_signal_outcomes():
             if target_hit or stop_hit:
                 esito = '✅ TARGET' if target_hit else '❌ STOP LOSS'
                 
-                # Calcolo profitto netto
+                # Calcolo profitto netto (Target = x2, Stop = -x1)
                 profitto_netto = (investimento * 2) if target_hit else -investimento
                 
                 # Aggiorniamo il DataFrame
                 df.at[idx, 'Stato'] = esito
-                df.at[idx, 'Risultato €'] = f"{profitto_netto:+.2f}"
+                df.at[idx, 'Risultato €'] = f"{profitto_netto:+.2f}" # Salviamo come stringa formattata
                 updates_made = True
-                
                 play_close_sound()
                 
-                # Notifica Telegram di chiusura
+                # Notifica Telegram
+                icona = "🟢" if s_action == "COMPRA" else "🔴"
                 telegram_text = (
-                    f"🏁 *CHIUSO*: {row['Asset']}\n"
-                    f"Esito: {esito}\n"
-                    f"Netto: {profitto_netto:+.2f}€"
+                    f"{icona} *{s_action}* {label}\n"
+                    f"Entry: {new_sig['Prezzo']}\n"
+                    f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
+                    f"--------\n"
+                    f"€€€: € {new_sig['Investimento €']}"
                 )
-                
-                if new_status:
-                    df.at[idx, 'Stato'] = new_status
-                    df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
-                    updates_made = True
-                    play_close_sound()
+                send_telegram_msg(telegram_text)
 
-        #except Exception as e:
-            #print(f"Errore aggiornamento {row['Asset']}: {e}")
-            #continue
+        except Exception as e:
+            print(f"Errore aggiornamento {row['Asset']}: {e}")
+            continue
     
     if updates_made:
         st.session_state['signal_history'] = df
@@ -957,38 +944,34 @@ else:
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-if not st.session_state['signal_history'].empty:
-    # Creiamo una copia per non sporcare i dati originali durante il filtraggio
-    df_visualizzazione = st.session_state['signal_history'].copy()
-    
-    # Assicuriamoci che tutte le colonne richieste esistano (previene crash)
-    cols_necessarie = ['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Investimento €', 'Risultato €', 'Costo Spread €', 'Stato_Prot']
-    for col in cols_necessarie:
-        if col not in df_visualizzazione.columns:
-            df_visualizzazione[col] = "-"
-
-    # Interfaccia Filtri
-    col_f1, col_f2 = st.columns(2)
-    with col_f1:
-        opzioni_stato = sorted([str(x) for x in df_visualizzazione['Stato'].unique()])
-        filtro_stato = st.multiselect("Filtra Esito:", options=opzioni_stato, placeholder="Tutti gli esiti")
-    with col_f2:
-        opzioni_asset = sorted([str(x) for x in df_visualizzazione['Asset'].unique()])
-        filtro_asset = st.multiselect("Filtra Valuta:", options=opzioni_asset, placeholder="Tutte le valute")
-
-    # Applicazione Filtri
-    if filtro_stato:
-        df_visualizzazione = df_visualizzazione[df_visualizzazione['Stato'].isin(filtro_stato)]
-    if filtro_asset:
-        df_visualizzazione = df_visualizzazione[df_visualizzazione['Asset'].isin(filtro_asset)]
-    
     if not df_visualizzazione.empty:
-        # Usiamo applymap per massima compatibilità con le versioni di Pandas
+        # --- FIX DECIMALI ---
+        # 1. Convertiamo le colonne monetarie in numeri puri (float)
+        # Questo risolve il problema delle stringhe miste o dei troppi decimali
+        cols_monetarie = ['Investimento €', 'Risultato €', 'Costo Spread €']
+        for col in cols_monetarie:
+            if col in df_visualizzazione.columns:
+                # Rimuove € e spazi, converte in numero, mette 0 se errore
+                df_visualizzazione[col] = pd.to_numeric(
+                    df_visualizzazione[col].astype(str).str.replace('€', '').str.replace(',', '.'), 
+                    errors='coerce'
+                ).fillna(0.0)
+
+        # 2. Definiamo come visualizzarli (Format Dictionary)
+        format_dict = {
+            'Investimento €': '€ {:.2f}',    # Es: € 20.00
+            'Risultato €': '€ {:+.2f}',      # Es: € +40.00 o € -20.00
+            'Costo Spread €': '€ {:.2f}'     # Es: € 0.50
+        }
+
+        # 3. Applichiamo lo stile
+        # Usiamo .format() del Pandas Styler che ha la precedenza assoluta
         try:
-            styled_df = df_visualizzazione.style.applymap(style_status, subset=['Stato', 'Risultato €'])
+            # Metodo compatibile con Pandas recenti
+            styled_df = df_visualizzazione.style.format(format_dict).map(style_status, subset=['Stato', 'Risultato €'])
         except:
-            # Fallback se la versione di pandas è la 2.1+
-            styled_df = df_visualizzazione.style.map(style_status, subset=['Stato', 'Risultato €'])
+            # Fallback per versioni precedenti
+            styled_df = df_visualizzazione.style.format(format_dict).applymap(style_status, subset=['Stato', 'Risultato €'])
 
         st.dataframe(
             styled_df,
@@ -1006,6 +989,3 @@ if not st.session_state['signal_history'].empty:
         )
     else:
         st.warning("Nessun dato corrispondente ai filtri selezionati.")
-
-else:
-    st.info("📖 **In attesa del primo segnale...** La sentinella sta scansionando i mercati.")
