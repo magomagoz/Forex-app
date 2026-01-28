@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 import os
+from datetime import datetime, timedelta
 
 # --- CONFIGURAZIONE TRADING ---
 SIMULATED_SPREAD = 0.0005  # Esempio: 5 pips di spread
@@ -405,17 +406,32 @@ def run_sentinel():
                 hist = st.session_state['signal_history']
                 # Controllo Duplicati / Trade in corso
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
-                
-                # Controllo Tempo (30 min)
+
                 recent_signals = False
                 if not hist.empty:
-                    asset_hist = hist[hist['Asset'] == label]
+                    asset_hist = hist[hist['Asset'] == label] # label è ad es. "EURUSD"
                     if not asset_hist.empty:
-                        last_sig = asset_hist.iloc[0]['DataOra']
-                        # Semplice check temporale stringa se stesso giorno
-                        if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
-                           recent_signals = True
-              
+                        # Recupera l'ultimo orario
+                        ultima_data_str = asset_hist.iloc[0]['DataOra']
+                        try:
+                            # Usa il formato che abbiamo impostato prima
+                            ultima_data = datetime.strptime(ultima_data_str, "%d/%m/%Y %H:%M:%S")
+                            differenza = (datetime.now() - ultima_data).total_seconds() / 60
+                            if differenza < 30:
+                                recent_signals = True
+                        except Exception as e:
+                            recent_signals = False
+            
+                # 3. LOGICA DI INVIO SEGNALE (Solo se non ci sono segnali recenti)
+                if s_action and not recent_signals:
+                    # Crea il nuovo segnale...
+                    # Invia l'ordine...
+                    st.success(f"🚀 Nuovo segnale inviato per {label}!")
+                
+                elif s_action and recent_signals:
+                    # Messaggio opzionale per il debug
+                    debug_list.append(f"⏳ {label}: Segnale ignorato (Già inviato meno di 30 min fa)")
+  
                 if not is_running and not recent_signals:
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_puntata = current_balance * (current_risk / 100)
@@ -481,7 +497,7 @@ def run_sentinel():
                     )
                     send_telegram_msg(telegram_text)
 
-            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+            #st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
