@@ -118,6 +118,14 @@ def style_status(val):
     if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
     return ''
 
+def calcola_performance():
+    df = st.session_state.signal_history
+    # Pulizia dei dati: converte la colonna Risultato in numeri, ignorando errori
+    profitti = pd.to_numeric(df['Risultato €'].str.replace('+', '').replace('€', ''), errors='coerce').fillna(0)
+    totale = profitti.sum()
+    win_rate = (len(df[df['Stato'] == '✅ TARGET']) / len(df[df['Stato'] != 'In Corso'])) * 100 if not df.empty else 0
+    return totale, win_rate
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -611,15 +619,6 @@ st.sidebar.metric(
 #fig_equity.update_layout(height=100, margin=dict(l=0,r=0,t=0,b=0), xaxis_visible=False, yaxis_visible=False, paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
 #st.sidebar.plotly_chart(fig_equity, use_container_width=True, config={'displayModeBar': False})
 
-# Dettagli operazione selezionata (se presente)
-active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
-if not active_trades.empty:
-    st.sidebar.warning("⚡ Ultima Operazione Attiva")
-    last_t = active_trades.iloc[0]
-    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
-    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
-
-
 # 1. Recupero trade attivi (Assicurati che lo Stato sia 'In Corso' come da tua immagine)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
@@ -642,10 +641,6 @@ if not active_trades.empty:
             else:
                 nuovo_stato = '❌ STOP LOSS'
                 risultato = -investito
-
-
-
-
                 
                 # Colore dinamico
                 color = "#006400" if latente_perc >= 0 else "#ff4b4b"
@@ -658,19 +653,36 @@ if not active_trades.empty:
                         </span>
                     </div>
                 """, unsafe_allow_html=True)
-
-
-
-
             
             # 3. Aggiornamento nel DataFrame
             st.session_state.signal_history.at[idx, 'Stato'] = nuovo_stato
             st.session_state.signal_history.at[idx, 'Risultato €'] = f"{risultato:+.2f}"
+
+            # 1. Chiamata alla funzione
+            totale_profitto, wr = calcola_performance()
+            
+            # 2. Visualizzazione Metriche
+            col1, col2 = st.columns(2)
+            col1.metric("Profitto Totale", f"€ {totale_profitto:.2f}", delta=f"{totale_profitto:.2f}")
+            col2.metric("Win Rate", f"{wr:.1f}%")
+            
+            # 3. La Barra del Win Rate (Visuale)
+            st.write(f"**Efficienza Operativa: {wr:.1f}%**")
+            st.progress(wr / 100) # Questa è la barra che si riempie in base al Win Rate
+            
+            # 4. Barra del Budget (opzionale)
+            # Se vuoi una barra che mostri quanto sei vicino a un obiettivo (es. 100€ di profitto)
+            obiettivo = 100.0
+            progresso_obj = min(max(totale_profitto / obiettivo, 0.0), 1.0)
+            st.write(f"**Target Giornaliero (€ {obiettivo})**")
+            st.progress(progresso_obj)
+
             
             # 4. SALVATAGGIO E REFRESH IMMEDIATO
             save_history_permanently()
             st.rerun()
 
+st.sidebar.markdown("---")
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
     last_t = active_trades.iloc[0]
