@@ -970,7 +970,7 @@ if not s_data.empty:
                     <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
                                 border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
                         <div style='font-size:0.8em; color:#bbb; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
-                        <b style='color:white; font-size:0.9em;'>{curr}</b><br>
+                        <b style='color:black; font-size:0.9em;'>{curr}</b><br>
                         <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
                     </div>
                     """, 
