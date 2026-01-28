@@ -211,28 +211,28 @@ def get_currency_strength():
         return pd.Series(dtype=float)
 
 def get_asset_params(pair):
+    # Ritorna: (tick_size, format_str, precision, label)
+    
     # --- CRYPTO ---
     if "BTC" in pair or "ETH" in pair:
-        return 1.0, "{:.2f}", 1, "CRYPTO"
+        return 1.0, "{:.2f}", 2, "CRYPTO" # Precisione 2 per .2f
     
     # --- FOREX ESOTICI (Valori Alti) ---
     elif any(x in pair for x in ["COP", "ARS"]):
-        # Peso Colombiano e Argentino (es. 3950.50)
-        return 1.0, "{:.2f}", 1, "FOREX_LATAM"
+        # Usiamo 2 decimali per la precisione monetaria
+        return 1.0, "{:.2f}", 2, "FOREX_LATAM"
     
     # --- FOREX JPY & RUB ---
     elif any(x in pair for x in ["JPY", "RUB"]):
-        # Yen e Rublo (es. 150.250 o 90.150)
-        return 0.01, "{:.3f}", 100, "FOREX_3DEC"
+        return 0.01, "{:.3f}", 3, "FOREX_3DEC"
     
-    # --- FOREX STANDARD & CINA ---
+    # --- FOREX STANDARD (4 decimali) ---
     elif "CNY" in pair or "BRL" in pair:
-        # Yuan e Real (es. 7.2345 o 4.9567)
-        return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
+        return 0.0001, "{:.4f}", 4, "FOREX_4DEC"
     
-    # --- DEFAULT (EURUSD, ecc) ---
+    # --- DEFAULT (EURUSD, GBPUSD, ecc - 5 decimali) ---
     else:
-        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
+        return 0.0001, "{:.5f}", 5, "FOREX_STD"
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
@@ -884,7 +884,12 @@ st.markdown("---")
 #st.subheader("📈 Grafico in tempo reale")
 st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
 
-p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
+# Nel tuo loop:
+p_tick, p_format, p_prec, p_label = get_asset_params(label)
+
+# La f-string ora funzionerà perfettamente:
+prezzo_formattato = f"{curr_v:.{p_prec}f}" 
+
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
