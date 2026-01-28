@@ -317,22 +317,6 @@ def update_signal_outcomes():
                     updates_made = True
                     play_close_sound()
 
-                    # Notifica Telegram
-                    icona = "🟢" if s_action == "COMPRA" else "🔴"
-                    telegram_text = (
-                        f"{icona} *{s_action}* {label}\n"
-                        f"Entry: {new_sig['Prezzo']}\n"
-                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
-                        f"Size: € {new_sig['Investimento €']}"
-                    )
-                    send_telegram_msg(telegram_text)
-
-            st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
-
-        except Exception as e:
-            debug_list.append(f"❌ {label} Err: {str(e)}")
-            continue
-
         #except Exception as e:
             #print(f"Errore aggiornamento {row['Asset']}: {e}")
             #continue
@@ -462,8 +446,7 @@ def run_sentinel():
                     telegram_text = (
                         f"{icona} *{s_action}* {label}\n"
                         f"Entry: {new_sig['Prezzo']}\n"
-                        f"TP: {new_sig['TP']}\n"
-                        f"SL: {new_sig['SL']}\n"
+                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
                         f"--------\n"
                         f"€€€: € {new_sig['Investimento €']}"
                     )
