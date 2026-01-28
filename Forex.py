@@ -963,7 +963,6 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-
 # --- 8. CURRENCY STRENGTH (ORDINATO 7x2) ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
@@ -1023,21 +1022,18 @@ if not st.session_state['signal_history'].empty:
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
-    
-    
+        
     # 2. Profitto Netto Totale
     profitto_netto = df_stats['Risultato €'].sum()
 
     # 3. Rendimento Medio per operazione
     rendimento_medio = df_stats['Risultato €'].mean() if tot_trade > 0 else 0
 
-
     # --- QUI INSERISCI LE RIGHE CHE HAI CHIESTO ---
     df_conclusi = df_stats[df_stats['Stato'].isin(['VINTO', 'PERSO'])]
     tot_conclusi = len(df_conclusi)
     vinti = len(df_conclusi[df_conclusi['Stato'] == 'VINTO'])
     win_rate = (vinti / tot_conclusi * 100) if tot_conclusi > 0 else 0
-    # ----------------------------------------------
 
     # 2. Calcolo altre metriche (Profitto e Media)
     profitto_netto = df_stats['Risultato €'].sum()
