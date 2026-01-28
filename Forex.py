@@ -340,207 +340,168 @@ def update_signal_outcomes():
         save_history_permanently()
 
 def run_sentinel():
-    # --- AUTO-PULIZIA CRONOLOGIA (Gestione Memoria) ---
+    # --- 1. AUTO-PULIZIA MEMORIA ---
+    if 'signal_history' not in st.session_state:
+        st.session_state['signal_history'] = pd.DataFrame()
+        
     if not st.session_state['signal_history'].empty:
-        # Se superiamo i 50 record, teniamo solo i 50 più recenti
         if len(st.session_state['signal_history']) > 50:
             st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
-            save_history_permanently()
-    
-    #"""Scansiona tutti gli asset e popola il Debug Monitor"""
-    current_balance = st.session_state.get('balance_val', 1000)
-    current_risk = st.session_state.get('risk_val', 1.0)
-    
-    # Lista per il monitoraggio live nella sidebar
+            # save_history_permanently() # Decommenta se hai questa funzione
+
+    # Setup Variabili
     debug_list = []
-    
     assets = list(asset_map.items())
+    hist = st.session_state['signal_history']
+    
+    # --- 2. CICLO DI SCANSIONE (Unico per efficienza) ---
     for label, ticker in assets:
         try:
-            # 1. SCARICO DATI (Maggiore tolleranza errori)
+            # A. SCARICO DATI
             df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
             df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
             
-            if df_rt_s.empty or df_d_s.empty: 
+            if df_rt_s.empty or df_d_s.empty:
                 debug_list.append(f"🔴 {label}: No Data")
                 continue
             
-            # Pulizia Colonne ROBUSTA
+            # Pulizia Colonne
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
             
-            # Rinominiamo esplicitamente per pandas_ta
-            df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
-            df_d_s.columns = [c.lower() for c in df_d_s.columns]
+            curr_v = float(df_rt_s['Close'].iloc[-1]) # Prezzo Attuale
+            
+            # --- B. AGGIORNAMENTO TRADE APERTI (Check TP/SL) ---
+            # Controlliamo se abbiamo trade aperti per QUESTO asset
+            if not hist.empty:
+                indices = hist[(hist['Asset'] == label) & (hist['Stato'] == 'APERTO')].index
+                for idx in indices:
+                    trade = hist.loc[idx]
+                    tp = float(str(trade['TP']).replace(',', '.'))
+                    sl = float(str(trade['SL']).replace(',', '.'))
+                    
+                    outcome = None
+                    risultato = 0.0
+                    
+                    if trade['Direzione'] == 'BUY':
+                        if curr_v >= tp: outcome, risultato = 'VINTO', 40.0
+                        elif curr_v <= sl: outcome, risultato = 'PERSO', -20.0
+                    elif trade['Direzione'] == 'SELL':
+                        if curr_v <= tp: outcome, risultato = 'VINTO', 40.0
+                        elif curr_v >= sl: outcome, risultato = 'PERSO', -20.0
+                    
+                    if outcome:
+                        st.session_state['signal_history'].at[idx, 'Stato'] = outcome
+                        st.session_state['signal_history'].at[idx, 'Risultato €'] = risultato
+                        st.toast(f"🔔 {label} Trade Chiuso: {outcome} ({risultato}€)")
 
-            # 2. CALCOLO INDICATORI
-            bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
-            if bb_s is None: continue # Skip se errore calcolo
-
-            c_low = [c for c in bb_s.columns if "BBL" in c.upper()][0]
-            c_up = [c for c in bb_s.columns if "BBU" in c.upper()][0]
+            # --- C. CALCOLO INDICATORI (Per Nuovi Segnali) ---
+            # Bande di Bollinger
+            bb_s = ta.bbands(df_rt_s['Close'], length=20, std=2)
+            if bb_s is None: continue
             
-            curr_v = float(df_rt_s['close'].iloc[-1])
-            low_bb = float(bb_s[c_low].iloc[-1])
-            up_bb = float(bb_s[c_up].iloc[-1])
+            lower_col = [c for c in bb_s.columns if "BBL" in c][0]
+            upper_col = [c for c in bb_s.columns if "BBU" in c][0]
+            low_bb = bb_s[lower_col].iloc[-1]
+            up_bb = bb_s[upper_col].iloc[-1]
             
-            rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
-            
-            adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
+            # RSI e ADX
+            rsi_d = ta.rsi(df_d_s['Close'], length=14).iloc[-1]
+            adx_df = ta.adx(df_rt_s['High'], df_rt_s['Low'], df_rt_s['Close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
 
-            # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
+            # --- D. LOGICA INGRESSO ---
             s_action = None
-            
-            # Debug Status
-            dist_low = curr_v - low_bb
-            dist_up = up_bb - curr_v
-            
-            # Logica: Prezzo SOTTO banda bassa o SOPRA banda alta
             if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
-                s_action = "COMPRA"
+                s_action = "BUY"
             elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
-                s_action = "VENDI"
-
-            # Aggiungiamo info al monitor debug
-            icon = "🟢" if s_action else "⚪"
-            debug_info = f"{label}: {curr_v:.4f} | BB: {low_bb:.4f}/{up_bb:.4f}"
-            if s_action: debug_info += f" -> 🔥 {s_action}"
-            debug_list.append(f"{icon} {debug_info}")
-
-            # ... siamo dentro il ciclo for della sentinella ...
+                s_action = "SELL"
             
-            # Se c'è un segnale (s_action non è None)
-            if s_action: 
-                # --- CORREZIONE FONDAMENTALE ---
-                # Recuperiamo i parametri dell'asset (Ticker, Decimali, Moltiplicatore)
-                row_params = get_asset_params(label) 
-                # -------------------------------
-        
-                # Controllo anti-spam (30 min)
+            # Debug Monitor Info
+            icon = "🟢" if s_action else "⚪"
+            debug_list.append(f"{icon} {label}: {curr_v:.4f} | RSI: {rsi_d:.1f}")
+
+            # --- E. ESECUZIONE SEGNALE ---
+            if s_action:
+                # 1. Recupero Parametri
+                # Assumo che get_asset_params ritorni: (unit, decimali, multiplier, type)
+                params = get_asset_params(label)
+                p_decimals = params[1]
+                p_mult = params[2]
+
+                # 2. Controllo Anti-Spam (30 min)
                 recent_signals = False
-                if not hist.empty:
-                    asset_hist = hist[hist['Asset'] == label]
-                    if not asset_hist.empty:
-                        ultima_data_str = asset_hist.iloc[0]['DataOra']
-                        try:
-                            ultima_data = datetime.strptime(ultima_data_str, "%d/%m/%Y %H:%M:%S")
-                            if (datetime.now() - ultima_data).total_seconds() / 60 < 30:
-                                recent_signals = True
-                        except:
-                            recent_signals = False
-                
+                asset_hist = hist[hist['Asset'] == label]
+                if not asset_hist.empty:
+                    last_time_str = asset_hist.iloc[0]['DataOra']
+                    try:
+                        # Gestisce formati diversi per sicurezza
+                        fmt = "%d/%m/%Y %H:%M:%S"
+                        last_dt = datetime.strptime(last_time_str, fmt)
+                        if (datetime.now() - last_dt).total_seconds() / 60 < 30:
+                            recent_signals = True
+                    except:
+                        pass # Se errore data, assume nessun segnale recente
+
                 if not recent_signals:
-                    # Calcolo Spread Proporzionale (Investimento 20€ standard)
-                    costo_spread_reale = (SIMULATED_SPREAD * row_params[2]) * (20.0 / 10.0)
-        
+                    # 3. Calcoli Prezzi
+                    entry_price = curr_v
+                    
+                    # Calcolo TP/SL (Risk Reward 1:2)
+                    # Distanza base: 0.2% del prezzo (adattabile)
+                    distanza = entry_price * 0.002 
+                    
+                    if s_action == "BUY":
+                        sl_price = entry_price - distanza       # Rischio 1
+                        tp_price = entry_price + (distanza * 2) # Reward 2
+                    else: # SELL
+                        sl_price = entry_price + distanza
+                        tp_price = entry_price - (distanza * 2)
+
+                    # Calcolo Spread (Formula corretta)
+                    investimento = 20.0
+                    costo_spread = (SIMULATED_SPREAD * p_mult) * (investimento / 10.0)
+
+                    # 4. Creazione Dizionario Segnale
                     new_sig = {
                         'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
                         'Asset': label,
                         'Direzione': s_action,
-                        'Prezzo': curr_price,
-                        'TP': round(tp_price, row_params[1]),
-                        'SL': round(sl_price, row_params[1]),
+                        'Prezzo': f"{entry_price:.{p_decimals}f}",
+                        'TP': f"{tp_price:.{p_decimals}f}",
+                        'SL': f"{sl_price:.{p_decimals}f}",
                         'Stato': 'APERTO',
-                        'Investimento €': 20.00,
+                        'Investimento €': investimento,
                         'Risultato €': 0.00,
-                        'Costo Spread €': costo_spread_reale, # Ora row_params è definito e funziona
+                        'Costo Spread €': costo_spread,
                         'Stato_Prot': 'Iniziale'
                     }
-                    
-                    # Aggiunta alla cronologia e salvataggio
+
+                    # 5. Salvataggio e Notifica
                     st.session_state['signal_history'] = pd.concat([
                         pd.DataFrame([new_sig]), 
                         st.session_state['signal_history']
                     ], ignore_index=True)
                     
-                    # Aggiorna il set dei segnali inviati
                     st.session_state['sent_signals'].add(label)
-                    st.toast(f"🚀 Segnale {label}: {s_action} inviato!", icon="🔥")
-            
-                # 3. LOGICA DI INVIO SEGNALE (Solo se non ci sono segnali recenti)
-                if s_action and not recent_signals:
-                    # Crea il nuovo segnale...
-                    # Invia l'ordine...
-                    st.success(f"🚀 Nuovo segnale inviato per {label}!")
+                    
+                    # Notifica UI
+                    st.toast(f"🚀 {label}: Ordine {s_action} aperto!", icon="🔥")
+                    
+                    # Notifica Telegram (Opzionale)
+                    # msg = f"🔥 {s_action} {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']}"
+                    # send_telegram_msg(msg)
                 
-                elif s_action and recent_signals:
-                    # Messaggio opzionale per il debug
-                    debug_list.append(f"⏳ {label}: Segnale ignorato (Già inviato meno di 30 min fa)")
-  
-                if not is_running and not recent_signals:
-                    p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
-                    investimento_puntata = current_balance * (current_risk / 100)
-                    
-                    # Calcolo Entry con Spread
-                    entry_with_spread = curr_v * (1 + SIMULATED_SPREAD) if s_action == "COMPRA" else curr_v * (1 - SIMULATED_SPREAD)
-                    
-                    # SL e TP (Punti basati su asset_params)
-                    sl_dist = entry_with_spread * 0.003
-                    sl_prezzo = entry_with_spread - sl_dist if s_action == "COMPRA" else entry_with_spread + sl_dist
-                    tp_prezzo = entry_with_spread * 1.012 if s_action == "COMPRA" else entry_with_spread * 0.988
-
-                    # All'interno del ciclo for di run_sentinel, quando viene generato new_sig:
-                    bal_attuale = st.session_state.get('balance_val', 1000)
-                    risk_attual = st.session_state.get('risk_val', 2.0)
-                    investimento_calcolato = bal_attuale * (risk_attual / 100)
-                    
-                    new_sig = {
-                        'DataOra': get_now_rome().strftime("%d/%m/%Y %H:%M:%S"), # <--- MODIFICA QUESTA RIGA
-                        'Asset': label, 'Direzione': s_action, 
-                        'Prezzo': p_fmt.format(entry_with_spread), 
-                        'TP': p_fmt.format(tp_prezzo), 'SL': p_fmt.format(sl_prezzo), 
-                        'Stato': 'In Corso', 'Investimento €': f"{investimento_calcolato:.2f}",
-                        'Risultato €': "0.00", 'Costo Spread €': (SIMULATED_SPREAD * row_params[2]) * (investimento / 20),
-                        'Stato_Prot': 'Iniziale', 'Protezione': 'Trailing 3/6%'
-                    }
-                    
-                    # --- LOGICA DI CHIUSURA AUTOMATICA ---
-                    for index, row in st.session_state['signal_history'].iterrows():
-                        if row['Stato'] == 'APERTO':
-                            current_price = get_last_price(row['Asset']) # Funzione che recupera il prezzo attuale
-                            
-                            # Caso LONG (Acquisto)
-                            if row['Direzione'] == 'BUY':
-                                if current_price >= row['TP']:
-                                    st.session_state['signal_history'].at[index, 'Stato'] = 'VINTO'
-                                    st.session_state['signal_history'].at[index, 'Risultato €'] = 40.0
-                                elif current_price <= row['SL']:
-                                    st.session_state['signal_history'].at[index, 'Stato'] = 'PERSO'
-                                    st.session_state['signal_history'].at[index, 'Risultato €'] = -20.0
-                            
-                            # Caso SHORT (Vendita)
-                            elif row['Direzione'] == 'SELL':
-                                if current_price <= row['TP']:
-                                    st.session_state['signal_history'].at[index, 'Stato'] = 'VINTO'
-                                    st.session_state['signal_history'].at[index, 'Risultato €'] = 40.0
-                                elif current_price >= row['SL']:
-                                    st.session_state['signal_history'].at[index, 'Stato'] = 'PERSO'
-                                    st.session_state['signal_history'].at[index, 'Risultato €'] = -20.0
-
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
-                    st.session_state['last_alert'] = new_sig
-                    save_history_permanently()
-                    
-                    # Notifica Telegram
-                    icona = "🟢" if s_action == "COMPRA" else "🔴"
-                    telegram_text = (
-                        f"{icona} *{s_action}* {label}\n"
-                        f"Entry: {new_sig['Prezzo']}\n"
-                        f"TP: {new_sig['TP']} | SL: {new_sig['SL']}\n"
-                        f"--------------------\n"
-                        f"€€€: € {new_sig['Investimento €']}"
-                    )
-                    send_telegram_msg(telegram_text)
-
-            #st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+                else:
+                    debug_list.append(f"⏳ {label}: Ignorato (Recente)")
 
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
             continue
-    
+
+    # Chiusura Funzione
     st.session_state['sentinel_logs'] = debug_list
-    st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
+    st.session_state['last_scan_status'] = f"✅ Scan OK: {datetime.now().strftime('%H:%M:%S')}"
 
 def display_performance_stats():
     if st.session_state['signal_history'].empty:
