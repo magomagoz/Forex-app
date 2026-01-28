@@ -653,7 +653,7 @@ if not active_trades.empty:
                 latente_euro = diff_prezzo * pips_mult * (inv / 10)
                 latente_perc = (diff_prezzo / entry_p) * 100
                 
-                color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
+                color = "#006400" if latente_euro >= 0 else "#FF4B4B"
                 
                 # --- UI MONITOR ---
                 st.sidebar.markdown(f"""
@@ -689,6 +689,43 @@ for s_name, is_open in get_session_status().items():
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
    
+# --- TASTO TEST TELEGRAM ---
+st.sidebar.markdown("---")
+if st.sidebar.button("✈️ TEST NOTIFICA TELEGRAM"):
+    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
+    send_telegram_msg(test_msg)
+    st.sidebar.success("Segnale di test inviato!")
+
+# --- TASTO TEST DINAMICO ---
+if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
+    # Calcolo dinamico basato sui tuoi cursori attuali
+    current_bal = st.session_state.get('balance_val', 1000)
+    current_r = st.session_state.get('risk_val', 2.0)
+    inv_test = current_bal * (current_r / 100)
+    
+    test_data = {
+        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+        'Asset': 'TEST/EUR', 
+        'Direzione': 'VENDI', 
+        'Prezzo': '1.0950', 
+        'TP': '1.0900', 
+        'SL': '1.0980', 
+        'Stato': 'In Corso',
+        'Investimento €': f"{inv_test:.2f}", # Ora legge il 2% di 1000 = 20.00
+        'Risultato €': "0.00",
+        'Costo Spread €': f"{(inv_test):.2f}",
+        'Stato_Prot': 'Iniziale',
+        'Protezione': 'Trailing 3/6%'
+    }
+    
+    st.session_state['signal_history'] = pd.concat(
+        [pd.DataFrame([test_data]), st.session_state['signal_history']], 
+        ignore_index=True
+    )
+    st.session_state['last_alert'] = test_data
+    if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+    st.rerun()
+
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
@@ -698,13 +735,6 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
         st.session_state['signal_history'] = pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Size', 'Stato'])
         save_history_permanently() # Questo sovrascrive il file CSV con uno vuoto
         st.rerun()
-
-st.sidebar.markdown("---")
-
-if st.sidebar.button("TEST ALERT"):
-    st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
-    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-    st.rerun()
 
 st.sidebar.markdown("---")
 
