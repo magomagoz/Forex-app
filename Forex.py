@@ -884,12 +884,7 @@ st.markdown("---")
 #st.subheader("📈 Grafico in tempo reale")
 st.subheader(f"📈 Grafico {selected_label} (1m) con BB e RSI")
 
-# Nel tuo loop:
-p_tick, p_format, p_prec, p_label = get_asset_params(pair)
-
-# La f-string ora funzionerà perfettamente:
-prezzo_formattato = f"{curr_v:.{p_prec}f}" 
-
+p_unit, price_fmt, p_mult, a_type = get_asset_params(pair)
 df_rt = get_realtime_data(pair) 
 df_d = yf.download(pair, period="1y", interval="1d", progress=False)
 
