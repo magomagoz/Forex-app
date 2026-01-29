@@ -40,7 +40,7 @@ st.markdown("""
 
 # Definizione Fuso Orario Roma
 rome_tz = pytz.timezone('Europe/Rome')
-asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDJPY": "USDJPY=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "NZDUSD": "NZDUSD=X",
+asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDCHF": "USDCHF=X", "AUDUSD": "AUDUSD=X", "USDCAD": "USDCAD=X", "NZDUSD": "NZDUSD=X",
             "EURGBP": "EURGBP=X", "GBPJPY": "GBPJPY=X", "EURJPY": "EURJPY=X"}
 
 # Refresh automatico ogni 60 secondi
@@ -123,6 +123,24 @@ def style_status(val):
     if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
     return ''
 
+def calcola_pnl_protetto(prezzo_entrata, prezzo_attuale, direzione, investimento):
+    # Calcolo base della variazione percentuale
+    if direzione == "COMPRA":
+        variazione = (prezzo_attuale - prezzo_entrata) / prezzo_entrata
+    else:
+        variazione = (prezzo_entrata - prezzo_attuale) / prezzo_entrata
+    
+    perc = variazione * 100
+    
+    # --- FILTRO ANTI-FOLLIA ---
+    # Se la variazione è assurda (es. > 50% nel Forex in pochi minuti), 
+    # ignoriamo il dato per evitare glitch grafici o chiusure errate.
+    if abs(perc) > 50: 
+        return 0.0, 0.0, True # Ritorna 'True' per indicare un glitch rilevato
+        
+    profitto_euro = investimento * variazione
+    return perc, profitto_euro, False
+
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -144,7 +162,7 @@ def get_realtime_data(ticker):
 
 def get_currency_strength():
     try:
-        forex = ["EURUSD=X", "GBPUSD=X", "USDJPY=X", "AUDUSD=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X","EURGBP=X"]
+        forex = ["EURUSD=X", "GBPUSD=X", "USDCHF=X", "AUDUSD=X", "NZDUSD=X", "EURCHF=X","EURJPY=X", "GBPJPY=X","EURGBP=X"]
         data = yf.download(forex, period="5d", interval="1d", progress=False, timeout=15)
         
         if data is None or data.empty: 
@@ -166,7 +184,7 @@ def get_currency_strength():
             "EUR 🇪🇺": (returns.get("EURUSD=X",0) + returns.get("EURJPY=X",0) + returns.get("EURGBP=X",0) + returns.get("EURCHF=X", 0) + returns.get("EURGBP=X", 0) + returns.get("EURJPY=X", 0)) / 6,
             "GBP 🇬🇧": (returns.get("GBPUSD=X",0) + returns.get("GBPJPY=X",0) - returns.get("EURGBP=X",0) + returns.get("GBPCHF=X", 0) + returns.get("GBPJPY=X", 0)) / 5,
             "JPY 🇯🇵": (-returns.get("USDJPY=X",0) - returns.get("EURJPY=X",0) - returns.get("GBPJPY=X",0)) / 3,
-            #"CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
+            "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
             "NZD 🇳🇿": returns.get("NZDUSD=X", 0),
             "CAD 🇨🇦": -returns.get("USDCAD=X", 0)
