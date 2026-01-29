@@ -955,9 +955,9 @@ else:
             column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
         )
     
-    except Exception as e:
-        # Se lo stile fallisce, mostra la tabella semplice
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
+except Exception as e:
+    # Se lo stile fallisce, mostra la tabella semplice
+    st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     # Spazio e pulsante esportazione
     st.write("") 
