@@ -203,49 +203,61 @@ def detect_divergence(df):
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
-    
-    COMMISSIONE_APPROX = 0.02 
     updates_made = False
     
-    # Iteriamo solo sui trade aperti
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
+            if data.empty: continue
+            
+            curr_p = float(data['Close'].iloc[-1])
+            entry_v = float(str(row['Prezzo']).replace(',', '.'))
+            # Calcoliamo la distanza iniziale dello SL per calcolare i rapporti percentuali
+            dist_iniziale = abs(entry_v - float(str(row['SL']).replace(',', '.'))) if row['Stato_Prot'] == 'In Attesa' else abs(entry_v - float(str(row['SL']).replace(',', '.'))) # approssimazione
+            
+            # Calcolo profitto attuale in termini di "Step" (0.1% prezzo = 10% ROI)
+            if row['Direzione'] == 'COMPRA':
+                diff = curr_p - entry_v
+            else:
+                diff = entry_v - curr_p
+                
+            roi_attuale = (diff / entry_v) * 1000 # Esempio: 0.1% movimento = 1 unità
+          
+            # --- LOGICA DINAMICA 4 STEP ---
+            nuovo_sl = None
+            livello_attuale = row.get('Stato_Prot', 'Iniziale')
 
-            if not data.empty:
-                # Pulizia colonne per evitare MultiIndex error
-                if isinstance(data.columns, pd.MultiIndex): 
-                    data.columns = data.columns.get_level_values(0)
-                data.columns = [c.capitalize() for c in data.columns] # Force: Open, High, Low, Close
-                                
-                current_high = float(data['High'].iloc[-1])
-                current_low = float(data['Low'].iloc[-1])
-                current_close = float(data['Close'].iloc[-1])
-                
-                entry_v = float(str(row['Prezzo']).replace(',', '.'))
-                sl_v = float(str(row['SL']).replace(',', '.')) 
-                tp_v = float(str(row['TP']).replace(',', '.'))
-                investimento = float(str(row['Investimento €']).replace(',', '.'))
-                
-                new_status = None
-                risultato_finale = 0.0
+            # Step 1: Profitto +5% -> SL a Pareggio (0%)
+            if diff >= (dist_iniziale * 0.5) and livello_attuale != 'LIVELLO_1':
+                nuovo_sl = entry_v
+                df.at[idx, 'Stato_Prot'] = 'LIVELLO_1'
+                df.at[idx, 'Protezione'] = '🛡️ BE (0%)'
+            
+            # Step 2: Profitto +10% -> SL a +5%
+            elif diff >= (dist_iniziale * 1.0) and livello_attuale != 'LIVELLO_2':
+                nuovo_sl = entry_v + (dist_iniziale * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_iniziale * 0.5)
+                df.at[idx, 'Stato_Prot'] = 'LIVELLO_2'
+                df.at[idx, 'Protezione'] = '✅ Blindato +5%'
+            
+            # Step 3: Profitto +15% -> SL a +10%
+            elif diff >= (dist_iniziale * 1.5) and livello_attuale != 'LIVELLO_3':
+                nuovo_sl = entry_v + (dist_iniziale * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_iniziale * 1.0)
+                df.at[idx, 'Stato_Prot'] = 'LIVELLO_3'
+                df.at[idx, 'Protezione'] = '💰 Blindato +10%'
+            
+            # Step 4: Profitto +19% -> SL a +15%
+            elif diff >= (dist_iniziale * 1.9) and livello_attuale != 'LIVELLO_4':
+                nuovo_sl = entry_v + (dist_iniziale * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_iniziale * 1.5)
+                df.at[idx, 'Stato_Prot'] = 'LIVELLO_4'
+                df.at[idx, 'Protezione'] = '🚀 Blindato +15%'
 
-                # --- TARGET DINAMICO ---
-                dist_target = abs(tp_v - entry_v)
-                progresso = abs(current_close - entry_v)
-                
-                if progresso >= (dist_target * 0.25) and row.get('Stato_Prot') != 'Garantito':
-                    if row['Direzione'] == 'COMPRA':
-                        nuovo_sl = entry_v + (dist_target * 0.20)
-                    else:
-                        nuovo_sl = entry_v - (dist_target * 0.20)
-                    
-                    df.at[idx, 'SL'] = f"{nuovo_sl:.5f}" if "JPY" not in row['Asset'] else f"{nuovo_sl:.2f}"
-                    df.at[idx, 'Stato_Prot'] = 'Garantito'
-                    updates_made = True
-                    play_safe_sound() 
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 3%!")
+            if nuovo_sl:
+                p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
+                df.at[idx, 'SL'] = p_fmt.format(nuovo_sl)
+                updates_made = True
+                play_safe_sound()
+                send_telegram_msg(f"🛡️ **Protezione Avanzata {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({df.at[idx, 'Protezione']})")
                 
                 # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
                 if row['Direzione'] == 'COMPRA':
@@ -368,15 +380,21 @@ def run_sentinel():
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_totale = current_balance * (current_risk / 100)
                     
-                    # Stop Loss Fisso su ampiezza banda o % fissa
-                    distanza_sl = (curr_v * 0.0010) if "JPY" not in label else (curr_v * 0.0010) # 0.1% movimento
+
+                    
+                    # --- Sostituisci la parte del calcolo SL/TP dentro run_sentinel ---
+
+                    # Definiamo la variazione percentuale del prezzo per lo SL (es. 0.1% di movimento prezzo = 10% ROI con leva)
+                    # Se vuoi che il 10% sia proprio il movimento del prezzo (molto ampio), usa 0.10. 
+                    # Di solito nel forex si usa lo 0.0010 (10 pips) per rappresentare lo stop standard.
+                    distanza_base = curr_v * 0.0010  # Questa è la tua unità del 10%
                     
                     if s_action == "COMPRA":
-                        sl = curr_v - distanza_sl
-                        tp = curr_v + (distanza_sl * 2.0)
+                        sl = curr_v - distanza_base          # -10% ROI
+                        tp = curr_v + (distanza_base * 2.0)  # +20% ROI
                     else:
-                        sl = curr_v + distanza_sl
-                        tp = curr_v - (distanza_sl * 2.0)
+                        sl = curr_v + distanza_base
+                        tp = curr_v - (distanza_base * 2.0)
                     
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
@@ -386,7 +404,7 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
                         'Protezione': "Standard",
-                        'Stato_Prot': 'In Attesa',
+                        'Stato_Prot': '0',
                         'Stato': 'In Corso',
                         'Investimento €': f"{investimento_totale:.2f}",
                         'Risultato €': "0.00"
