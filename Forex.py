@@ -594,7 +594,7 @@ st.sidebar.markdown("---")
 st.sidebar.subheader("⚡ Monitor Real-Time")
 
 if not active_trades.empty:
-    st.info("💤 In attesa del primo trade")
+    st.sidebar.info("💤 In attesa del primo trade")
 else:
     for index, trade in active_trades.iterrows():
         try:
