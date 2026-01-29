@@ -70,9 +70,23 @@ def load_history_from_csv():
             return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
     return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
 
+# Recupero dai Secrets
+TELE_TOKEN = st.secrets["TELEGRAM_TOKEN"]
+TELE_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
+
 def send_telegram_msg(msg):
-    token = "8235666467:AAGCsvEhlrzl7bH537bJTjsSwQ3P3PMRW10" 
-    chat_id = "7191509088" 
+    """Funzione rapida per inviare notifiche"""
+    url = f"https://api.telegram.org/bot{TELE_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELE_CHAT_ID,
+        "text": messaggio,
+        "parse_mode": "Markdown"
+    }
+    try:
+        requests.post(url, json=payload, timeout=5)
+    except Exception as e:
+        print(f"Errore Telegram: {e}")
+
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
         params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
