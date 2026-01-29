@@ -951,42 +951,24 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-# --- 8. CURRENCY STRENGTH (ORDINATO 4x2) ---
+# --- 8. CURRENCY STRENGTH ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
 
 if not s_data.empty:
-    items = list(s_data.items())
-    # Divisione in due blocchi da 4
-    riga1 = items[:4]
-    riga2 = items[4:8]
-
-    for riga in [riga1, riga2]:
-        cols = st.columns(7)
-        for i, (curr, val) in enumerate(riga):
-            # Colori dinamici basati sulla forza
-            if val > 0.20:
-                bg, border = "rgba(0, 168, 107, 0.15)", "#006400" # Molto forte
-            elif val < -0.20:
-                bg, border = "rgba(220, 20, 60, 0.15)", "#ff4b4b"  # Molto debole
-            else:
-                bg, border = "rgba(178, 178, 178, 0.05)", "#444"   # Neutra
-
-            with cols[i]:
-                st.markdown(
-                    f"""
-                    <div style='text-align:center; background:{bg}; padding:8px; border-radius:8px; 
-                                border:1px solid {border}; min-height:85px; margin-bottom:10px;'>
-                        <div style='font-size:0.8em; color:#000000; margin-bottom:4px;'>RANK {items.index((curr,val))+1}</div>
-                        <b style='color:black; font-size:0.9em;'>{curr}</b><br>
-                        <span style='color:{border}; font-size:1.1em; font-weight:bold;'>{val:+.2f}%</span>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
+    cols = st.columns(len(s_data))
+    for i, (curr, val) in enumerate(s_data.items()):
+        bg = "#006400" if val > 0.15 else "#8B0000" if val < -0.15 else "#333333"
+        txt_c = "#00FFCC" if val > 0.15 else "#FF4B4B" if val < -0.15 else "#FFFFFF"
+        cols[i].markdown(
+            f"<div style='text-align:center; background:{bg}; padding:6px; border-radius:8px; border:1px solid {txt_c}; min-height:80px;'>"
+            f"<b style='color:white; font-size:0.8em;'>{curr}</b><br>"
+            f"<span style='color:{txt_c};'>{val:.2f}%</span></div>", 
+            unsafe_allow_html=True
+        )
 else:
-    st.info("⏳ Analisi macro-volatilità in corso...")
+    st.info("⏳ Caricamento dati macro in corso...")
 
 # --- 9. CRONOLOGIA SEGNALI (CON COLORI DINAMICI) ---
 st.markdown("---")
