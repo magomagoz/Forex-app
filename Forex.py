@@ -579,6 +579,66 @@ if not active_trades.empty:
     st.sidebar.write(f"Asset: **{last_t['Asset']}**")
     st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
 
+# 1. Recupero trade attivi (Assicurati che lo Stato sia 'In Corso' come da tua immagine)
+active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
+
+if not active_trades.empty:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("⚡ Monitor Real-Time")
+    
+    for index, trade in active_trades.iterrows():
+        try:
+            # Download dati fresco
+            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+            
+            if not t_data.empty:
+                # --- CORREZIONE VARIABILI ---
+                curr_p = float(t_data['Close'].iloc[-1])
+                # Pulizia stringhe € se presenti
+                entry_p = float(str(trade['Prezzo']).replace('€', '').replace(',', '.').strip())
+                inv = float(str(trade['Investimento €']).replace('€', '').replace(',', '.').strip())
+                
+                # Moltiplicatore pips (Fondamentale per evitare numeri abnormi come +422514%)
+                pips_mult = get_asset_params(trade['Asset'])[2] 
+                
+                # Calcolo differenza basato sulla direzione
+                if trade['Direzione'] == "BUY" or trade['Direzione'] == "COMPRA":
+                    diff_prezzo = curr_p - entry_p
+                else:
+                    diff_prezzo = entry_p - curr_p
+                
+                # Calcolo profitto e percentuale corretti
+                latente_euro = diff_prezzo * pips_mult * (inv / 10)
+                latente_perc = (diff_prezzo / entry_p) * 100
+                
+                color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
+                
+                # --- UI MONITOR ---
+                st.sidebar.markdown(f"""
+                    <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
+                        <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
+                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                        </span>
+                    </div>
+                """, unsafe_allow_html=True)
+                
+                # TASTO CHIUDI (Opzionale)
+                if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
+                    st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
+                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
+                    st.rerun()
+        except Exception as e:
+            # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
+            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+
+if not active_trades.empty:
+    st.sidebar.warning("⚡ Ultima Operazione Attiva")
+    last_t = active_trades.iloc[0]
+    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
+    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
+
 st.sidebar.markdown("---")
 # ... (restante codice sidebar: sessioni, win rate, reset)
 st.sidebar.subheader("🌍 Sessioni di Mercato")
@@ -588,6 +648,59 @@ for s_name, is_open in get_session_status().items():
     st.sidebar.markdown(f"**{s_name}** <small>: {status_text}</small> {color}",
 unsafe_allow_html=True)
    
+# --- TASTO ESPORTAZIONE DATI ---
+#st.sidebar.markdown("---")
+#st.sidebar.subheader("💾 Backup Report")
+
+#if not st.session_state['signal_history'].empty:
+    #csv_data = st.session_state['signal_history'].to_csv(index=False).encode('utf-8')
+    #st.sidebar.download_button(
+        #label="📥 SCARICA CRONOLOGIA CSV",
+        #data=csv_data,
+        #file_name=f"Trading_Report_{get_now_rome().strftime('%Y%m%d_%H%M')}.csv",
+        #mime="text/csv",
+        #use_container_width=True
+    #)
+#else:
+    #st.sidebar.info("Nessun dato da esportare")
+
+# --- TASTO TEST TELEGRAM ---
+st.sidebar.markdown("---")
+if st.sidebar.button("✈️ TEST NOTIFICA TELEGRAM"):
+    test_msg = "🔔 **SENTINEL TEST**\nIl sistema di notifiche è operativo! 🚀"
+    send_telegram_msg(test_msg)
+    st.sidebar.success("Segnale di test inviato!")
+
+# --- TASTO TEST DINAMICO ---
+if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
+    # Calcolo dinamico basato sui tuoi cursori attuali
+    current_bal = st.session_state.get('balance_val', 1000)
+    current_r = st.session_state.get('risk_val', 2.0)
+    inv_test = current_bal * (current_r / 100)
+    
+    test_data = {
+        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+        'Asset': 'TEST/EUR', 
+        'Direzione': 'VENDI', 
+        'Prezzo': '1.0950', 
+        'TP': '1.0900', 
+        'SL': '1.0980', 
+        'Stato': 'In Corso',
+        'Investimento €': f"{inv_test:.2f}", # Ora legge il 2% di 1000 = 20.00
+        'Risultato €': "0.00",
+        'Costo Spread €': f"{(inv_test):.2f}",
+        'Stato_Prot': 'Iniziale',
+        'Protezione': 'Trailing 3/6%'
+    }
+    
+    st.session_state['signal_history'] = pd.concat(
+        [pd.DataFrame([test_data]), st.session_state['signal_history']], 
+        ignore_index=True
+    )
+    st.session_state['last_alert'] = test_data
+    if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+    st.rerun()
+
 # Reset Sidebar
 st.sidebar.markdown("---")
 with st.sidebar.popover("🗑️ **Reset Cronologia**"):
@@ -600,12 +713,12 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-if st.sidebar.button("TEST ALERT"):
-    st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
-    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-    st.rerun()
+#if st.sidebar.button("TEST ALERT"):
+    #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
+    #if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+    #st.rerun()
 
-st.sidebar.markdown("---")
+#st.sidebar.markdown("---")
 
 # --- 6. POPUP ALERT (VERSIONE NATIVA - NON BLOCCA SIDEBAR) ---
 if st.session_state.get('last_alert'):
