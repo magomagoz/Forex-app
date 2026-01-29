@@ -71,8 +71,8 @@ def load_history_from_csv():
     return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
 
 # Recupero dai Secrets
-TELE_TOKEN = st.secrets["telegram_token"]
-TELE_CHAT_ID = st.secrets["telegram_chat_id"]
+TELE_TOKEN = st.secrets["TELEGRAM_TOKEN"]
+TELE_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
 
 def send_telegram_msg(msg):
     """Funzione rapida per inviare notifiche"""
