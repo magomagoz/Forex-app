@@ -423,56 +423,77 @@ def run_sentinel():
 
             # --- E. ESECUZIONE SEGNALE ---
             if s_action:
-                # --- RECUPERO PARAMETRI (PUNTO 1) ---
-                p_tick, p_str, p_prec, p_type = get_asset_params(label)
+                # 1. Recupero Parametri
+                # Assumo che get_asset_params ritorni: (unit, decimali, multiplier, type)
+                params = get_asset_params(label)
+                p_decimals = params[1]
+                p_mult = params[2]
+
+                # 2. Controllo Anti-Spam (30 min)
+                recent_signals = False
+                asset_hist = hist[hist['Asset'] == label]
+                if not asset_hist.empty:
+                    last_time_str = asset_hist.iloc[0]['DataOra']
+                    try:
+                        # Gestisce formati diversi per sicurezza
+                        fmt = "%d/%m/%Y %H:%M:%S"
+                        last_dt = datetime.strptime(last_time_str, fmt)
+                        if (datetime.now() - last_dt).total_seconds() / 60 < 30:
+                            recent_signals = True
+                    except:
+                        pass # Se errore data, assume nessun segnale recente
+
+                if not recent_signals:
+                    # 3. Calcoli Prezzi
+                    entry_price = curr_v
+                    
+                    # Calcolo TP/SL (Risk Reward 1:2)
+                    # Distanza base: 0.2% del prezzo (adattabile)
+                    distanza = entry_price * 0.002 
+                    
+                    if s_action == "BUY":
+                        sl_price = entry_price - distanza       # Rischio 1
+                        tp_price = entry_price + (distanza * 2) # Reward 2
+                    else: # SELL
+                        sl_price = entry_price + distanza
+                        tp_price = entry_price - (distanza * 2)
+
+                    # Calcolo Spread (Formula corretta)
+                    investimento = 20.0
+                    costo_spread = (SIMULATED_SPREAD * p_mult) * (investimento / 10.0)
+
+                    # 4. Creazione Dizionario Segnale
+                    new_sig = {
+                        'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                        'Asset': label,
+                        'Direzione': s_action,
+                        'Prezzo': f"{entry_price:.{p_decimals}f}",
+                        'TP': f"{tp_price:.{p_decimals}f}",
+                        'SL': f"{sl_price:.{p_decimals}f}",
+                        'Stato': 'APERTO',
+                        'Investimento €': investimento,
+                        'Risultato €': 0.00,
+                        'Costo Spread €': costo_spread,
+                        'Stato_Prot': 'Iniziale'
+                    }
+
+                    # 5. Salvataggio e Notifica
+                    st.session_state['signal_history'] = pd.concat([
+                        pd.DataFrame([new_sig]), 
+                        st.session_state['signal_history']
+                    ], ignore_index=True)
+                    
+                    st.session_state['sent_signals'].add(label)
+                    
+                    # Notifica UI
+                    st.toast(f"🚀 {label}: Ordine {s_action} aperto!", icon="🔥")
+                    
+                    # Notifica Telegram (Opzionale)
+                    # msg = f"🔥 {s_action} {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']}"
+                    # send_telegram_msg(msg)
                 
-                # PROTEZIONE: Se p_prec non è un numero, forziamo il default
-                if not isinstance(p_prec, (int, float)):
-                    p_prec = 5 
                 else:
-                    p_prec = int(p_prec) # Ci assicuriamo che sia un intero per la f-string
-    
-                dist = curr_v * 0.002
-                tp_val = (curr_v + (dist*2)) if s_action == "COMPRA" else (curr_v - (dist*2))
-                sl_val = (curr_v - dist) if s_action == "COMPRA" else (curr_v + dist)
-    
-                # FORMATTAZIONE SICURA (Risolve Error Format Specifier)
-                prezzo_f = f"{curr_v:.{p_prec}f}"
-                tp_f = f"{tp_val:.{p_prec}f}"
-                sl_f = f"{sl_val:.{p_prec}f}"
-    
-                # Creazione dizionario segnale
-                new_sig = {
-                    'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                    'Asset': label,
-                    'Direzione': s_action,
-                    'Prezzo': prezzo_f,
-                    'TP': tp_f,
-                    'SL': sl_f,
-                    'Stato': 'In Corso',
-                    'Investimento €': f"{trade_size:.2f}",
-                    'Risultato €': "0.00",
-                    'Stato_Prot': 'Iniziale',
-                    'Protezione': 'Trailing 0.5%'
-                }
-          
-                # 5. Salvataggio e Notifica
-                st.session_state['signal_history'] = pd.concat([
-                    pd.DataFrame([new_sig]), 
-                    st.session_state['signal_history']
-                ], ignore_index=True)
-                    
-                st.session_state['sent_signals'].add(label)
-                    
-                # Notifica UI
-                st.toast(f"🚀 {label}: Ordine {s_action} aperto!", icon="🔥")
-                    
-                # Notifica Telegram (Opzionale)
-                # msg = f"🔥 {s_action} {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']}"
-                # send_telegram_msg(msg)
-                
-            else:
-                debug_list.append(f"⏳ {label}: Ignorato (Recente)")
+                    debug_list.append(f"⏳ {label}: Ignorato (Recente)")
 
         except Exception as e:
             debug_list.append(f"❌ {label} Err: {str(e)}")
@@ -658,6 +679,27 @@ st.sidebar.metric(
 )
 
 display_performance_stats()
+
+# --- SEZIONE PERFORMANCE VISIVA ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Performance Operativa")
+
+# Chiamiamo la funzione di calcolo
+totale_profitto, wr = calcola_performance()
+
+# Disegniamo le metriche
+st.sidebar.metric("Profitto Totale", f"€ {totale_profitto:.2f}")
+
+# Disegniamo la barra (Win Rate)
+st.sidebar.write(f"Efficienza: {wr:.1f}%")
+st.sidebar.progress(wr / 100)
+
+# Opzionale: Barra del target giornaliero (es. obiettivo 50€)
+target_giornaliero = 50.0
+progresso_target = min(max(totale_profitto / target_giornaliero, 0.0), 1.0)
+st.sidebar.write(f"Target Daily: €{target_giornaliero}")
+st.sidebar.progress(progresso_target)
+st.sidebar.markdown("---")
 
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
