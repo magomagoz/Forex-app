@@ -619,9 +619,9 @@ else:
                     diff_prezzo = entry_p - curr_p
                 
                 # Calcolo profitto e percentuale corretti
-                latente_euro = diff_prezzo * pips_mult * (inv / 10)
-                latente_perc = (diff_prezzo / entry_p) * 100
-                    
+                latente_perc = (diff_prezzo / entry_p) * 100 if trade['Direzione'] == "COMPRA" else -(diff_prezzo / entry_p) * 100
+                latente_euro = (inv * latente_perc) / 100 
+    
                 color = "#006400" if latente_euro >= 0 else "#FF4B4B"
                     
                 # --- UI MONITOR ---
