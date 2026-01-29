@@ -219,50 +219,50 @@ def update_signal_outcomes():
                 # --- LOGICA 4-STEP "ONLY FORWARD" ---
                 # dist_10pct è la distanza di prezzo che rappresenta il tuo -10% iniziale
                 
-        # --- LOGICA 4-STEP FAST-TRACK ---
-        if row['Direzione'] in ['COMPRA', 'VENDI']:
-            # Calcoliamo il profitto in termini di unità (1 unità = dist_10pct)
-            # dist_10pct è lo scostamento di prezzo che rappresenta il 10% di ROI
-            if row['Direzione'] == 'COMPRA':
-                profitto_prezzo = current_close - entry_v
-            else:
-                profitto_prezzo = entry_v - current_close
-        
-            # Determiniamo il miglior livello raggiungibile in questo istante
-            target_lvl = 0
-            nuovo_sl_val = None
-            prot_label = ""
-        
-            if profitto_prezzo >= (dist_10pct * 1.9): 
-                target_lvl = 4
-                nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
-                prot_label = "Blindato +15%"
-            elif profitto_prezzo >= (dist_10pct * 1.5): 
-                target_lvl = 3
-                nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
-                prot_label = "Blindato +10%"
-            elif profitto_prezzo >= (dist_10pct * 1.0): 
-                target_lvl = 2
-                nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
-                prot_label = "Blindato +5%"
-            elif profitto_prezzo >= (dist_10pct * 0.5): 
-                target_lvl = 1
-                nuovo_sl_val = entry_v
-                prot_label = "Pareggio (0%)"
-        
-            # Estraiamo il livello attuale (es. da "LIVELLO_1" prendiamo 1)
-            current_lvl_num = int(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
-        
-            # AGGIORNIAMO SOLO SE IL TARGET È SUPERIORE AL LIVELLO ATTUALE
-            if target_lvl > current_lvl_num:
-                p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
-                df.at[idx, 'SL'] = p_fmt.format(nuovo_sl_val)
-                df.at[idx, 'Stato_Prot'] = f"LIVELLO_{target_lvl}"
-                df.at[idx, 'Protezione'] = prot_label
-                updates_made = True
-                play_safe_sound()
-                send_telegram_msg(f"🛡️ **Protezione Avanzata {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({df.at[idx, 'Protezione']})")
-                
+            # --- LOGICA 4-STEP FAST-TRACK ---
+            if row['Direzione'] in ['COMPRA', 'VENDI']:
+                # Calcoliamo il profitto in termini di unità (1 unità = dist_10pct)
+                # dist_10pct è lo scostamento di prezzo che rappresenta il 10% di ROI
+                if row['Direzione'] == 'COMPRA':
+                    profitto_prezzo = current_close - entry_v
+                else:
+                    profitto_prezzo = entry_v - current_close
+            
+                # Determiniamo il miglior livello raggiungibile in questo istante
+                target_lvl = 0
+                nuovo_sl_val = None
+                prot_label = ""
+            
+                if profitto_prezzo >= (dist_10pct * 1.9): 
+                    target_lvl = 4
+                    nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
+                    prot_label = "Blindato +15%"
+                elif profitto_prezzo >= (dist_10pct * 1.5): 
+                    target_lvl = 3
+                    nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
+                    prot_label = "Blindato +10%"
+                elif profitto_prezzo >= (dist_10pct * 1.0): 
+                    target_lvl = 2
+                    nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
+                    prot_label = "Blindato +5%"
+                elif profitto_prezzo >= (dist_10pct * 0.5): 
+                    target_lvl = 1
+                    nuovo_sl_val = entry_v
+                    prot_label = "Pareggio (0%)"
+            
+                # Estraiamo il livello attuale (es. da "LIVELLO_1" prendiamo 1)
+                current_lvl_num = int(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
+            
+                # AGGIORNIAMO SOLO SE IL TARGET È SUPERIORE AL LIVELLO ATTUALE
+                if target_lvl > current_lvl_num:
+                    p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
+                    df.at[idx, 'SL'] = p_fmt.format(nuovo_sl_val)
+                    df.at[idx, 'Stato_Prot'] = f"LIVELLO_{target_lvl}"
+                    df.at[idx, 'Protezione'] = prot_label
+                    updates_made = True
+                    play_safe_sound()
+                    send_telegram_msg(f"🛡️ **Protezione Avanzata {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({df.at[idx, 'Protezione']})")
+                    
                 # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
                 if row['Direzione'] == 'COMPRA':
                     if current_high >= tp_v: 
