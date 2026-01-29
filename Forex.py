@@ -169,13 +169,13 @@ def get_currency_strength():
             "CHF 🇨🇭": (-returns.get("USDCHF=X",0) - returns.get("EURCHF=X",0) - returns.get("GBPCHF=X",0)) / 3,
             "AUD 🇦🇺": returns.get("AUDUSD=X", 0),
             "NZD 🇳🇿": returns.get("NZDUSD=X", 0),
-            "CAD 🇨🇦": -returns.get("USDCAD=X", 0),
-            "CNY 🇨🇳": -returns.get("CNY=X", 0),
-            "RUB 🇷🇺": -returns.get("RUB=X", 0),
-            "COP 🇨🇴": -returns.get("COP=X", 0),
-            "ARS 🇦🇷": -returns.get("ARS=X", 0),
-            "BRL 🇧🇷": -returns.get("BRL=X", 0),
-            "MXN 🇲🇽": -returns.get("MXN=X", 0)
+            "CAD 🇨🇦": -returns.get("USDCAD=X", 0)
+            #"CNY 🇨🇳": -returns.get("CNY=X", 0),
+            #"RUB 🇷🇺": -returns.get("RUB=X", 0),
+            #"COP 🇨🇴": -returns.get("COP=X", 0),
+            #"ARS 🇦🇷": -returns.get("ARS=X", 0),
+            #"BRL 🇧🇷": -returns.get("BRL=X", 0),
+            #"MXN 🇲🇽": -returns.get("MXN=X", 0)
             #"BTC ₿": returns.get("BTC-USD", 0),
             #"ETH 💎": returns.get("ETH-USD", 0)
         }
@@ -951,16 +951,16 @@ if df_rt is not None and not df_rt.empty and df_d is not None and not df_d.empty
     # Visualizziamo con unsafe_allow_html
     st.markdown(styled_adx_html, unsafe_allow_html=True)
 
-# --- 8. CURRENCY STRENGTH (ORDINATO 7x2) ---
+# --- 8. CURRENCY STRENGTH (ORDINATO 4x2) ---
 st.markdown("---")
 st.subheader("⚡ Currency Strength Meter")
 s_data = get_currency_strength()
 
 if not s_data.empty:
     items = list(s_data.items())
-    # Divisione in due blocchi da 7
-    riga1 = items[:7]
-    riga2 = items[7:14]
+    # Divisione in due blocchi da 4
+    riga1 = items[:4]
+    riga2 = items[4:8]
 
     for riga in [riga1, riga2]:
         cols = st.columns(7)
