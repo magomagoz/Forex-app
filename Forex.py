@@ -620,7 +620,7 @@ if not active_trades.empty:
                 latente_euro = diff_prezzo * pips_mult * (inv / 10)
                 latente_perc = (diff_prezzo / entry_p) * 100
                 
-                color = "#00FFCC" if latente_euro >= 0 else "#FF4B4B"
+                color = "#006400" if latente_euro >= 0 else "#FF4B4B"
                 
                 # --- UI MONITOR ---
                 st.sidebar.markdown(f"""
