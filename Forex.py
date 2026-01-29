@@ -288,9 +288,8 @@ def update_signal_outcomes():
         save_history_permanently()
 
 def run_sentinel():
-    """Scansiona tutti gli asset e popola il Debug Monitor"""
-    current_balance = st.session_state.get('balance_val', 1000)
-    current_risk = st.session_state.get('risk_val', 1.0)
+    current_balance = st.session_state.balance_val 
+    current_risk = st.session_state.risk_val
     
     # Lista per il monitoraggio live nella sidebar
     debug_list = []
@@ -465,13 +464,16 @@ def get_equity_data():
         
     return pd.Series(equity_curve)
 
+st.sidebar.header("🛠 Trading Desk (1m)")
+balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
+risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 2.0, step=0.5, key="risk_val")
+
 # --- 4. ESECUZIONE SENTINEL ---
 # Assicuriamoci che lo scanner giri solo se lo stato è inizializzato
 if 'signal_history' in st.session_state:
     run_sentinel()
 
 # --- 5. SIDEBAR ---
-st.sidebar.header("🛠 Trading Desk (1m)")
 
 # Countdown Testuale e Barra Rossa Animata
 st.sidebar.markdown("⏳ **Prossimo Scan**")
@@ -517,8 +519,6 @@ else:
 # Parametri Input
 selected_label = st.sidebar.selectbox("**Asset**", list(asset_map.keys()))
 pair = asset_map[selected_label]
-balance = st.sidebar.number_input("**Conto (€)**", value=1000, key="balance_val")
-risk_pc = st.sidebar.slider("**Investimento %**", 0.5, 5.0, 2.0, step=0.5, key="risk_val")
 
 # --- Sotto il widget risk_pc ---
 st.sidebar.markdown(
