@@ -497,7 +497,7 @@ def get_equity_data():
             
         # 3. Sommiamo SOLO se il trade è concluso (quindi ha un risultato diverso da 0 o vuoto)
         # Consideriamo validi tutti gli stati di chiusura
-        if row['Stato'] in ['✅ TARGET', '❌ STOP LOSS', 'CHIUSO MAN.', '🛡️ SL DINAMICO']:
+        if row['Stato'] in ['✅ TARGET', '❌ STOP LOSS', '🖐️ CHIUSURA MANUALE', '🛡️ SL DINAMICO']:
             current_bal += val_float
             
         equity_curve.append(current_bal)
@@ -594,6 +594,36 @@ st.sidebar.metric("Investimento per operazione", f"€ {investimento_simulato:.2
 
 
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
+
+st.sidebar.markdown("---")
+
+# --- LOGICA DINAMICA ANALISI OPERATIVA ---
+st.sidebar.subheader("📊 Analisi Operativa")
+
+# Recuperiamo il DataFrame della cronologia
+df_hist = st.session_state.get('signal_history', pd.DataFrame())
+
+if not df_hist.empty:
+    # 1. Conta i trade con stato 'In Corso' o 'APERTO'
+    pendenti = len(df_hist[df_hist['Stato'].isin(['In Corso', 'APERTO'])])
+    
+    # 2. Conta i trade già conclusi (Target, Stop Loss o Chiusi manualmente)
+    chiusi = len(df_hist[df_hist['Stato'].isin(['✅ TARGET', '❌ STOP LOSS', '🖐️ CHIUSO MAN.'])])
+    
+    # 3. Conta i trade vinti per il calcolo veloce (opzionale)
+    vinti = len(df_hist[df_hist['Stato'] == '✅ TARGET'])
+else:
+    pendenti = 0
+    chiusi = 0
+    vinti = 0
+
+# Visualizzazione Dinamica
+st.sidebar.write(f"⏳ **Trade Pendenti:** {pendenti}")
+st.sidebar.write(f"✅ **Trade Chiusi:** {chiusi}")
+
+# Un piccolo tocco extra: mostriamo quanti ne abbiamo vinti sul totale dei chiusi
+if chiusi > 0:
+    st.sidebar.caption(f"🏆 Successi: {vinti} su {chiusi}")
 
 st.sidebar.markdown("---")
 
