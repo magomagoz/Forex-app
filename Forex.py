@@ -936,28 +936,28 @@ if not s_data.empty:
 else:
     st.info("⏳ Analisi macro-volatilità in corso...")
 
-    # --- 9. CRONOLOGIA SEGNALI AGGIORNATA ---
-    st.markdown("---")
-    st.subheader("📜 Cronologia Segnali")
+# --- 9. CRONOLOGIA SEGNALI AGGIORNATA ---
+st.markdown("---")
+st.subheader("📜 Cronologia Segnali")
     
-    if not st.session_state['signal_history'].empty:
-        display_df = st.session_state['signal_history'].copy()
+if not st.session_state['signal_history'].empty:
+    display_df = st.session_state['signal_history'].copy()
         
-        # 1. Assicuriamoci che la colonna DataOra sia ordinabile (se non lo è già)
-        # 2. Ordiniamo in modo decrescente (ascending=False)
-        display_df = display_df.sort_values(by='DataOra', ascending=False)
+    # 1. Assicuriamoci che la colonna DataOra sia ordinabile (se non lo è già)
+    # 2. Ordiniamo in modo decrescente (ascending=False)
+    display_df = display_df.sort_values(by='DataOra', ascending=False)
     
-        # Visualizzazione Tabella
-        st.dataframe(
-            display_df.style.map(style_status, subset=['Stato']),
-            use_container_width=True,
-            hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
-        )
+    # Visualizzazione Tabella
+    st.dataframe(
+        display_df.style.map(style_status, subset=['Stato']),
+        use_container_width=True,
+        hide_index=True,
+        column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
+    )
     
-        except Exception as e:
-            # Se lo stile fallisce, mostra la tabella semplice
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+    except Exception as e:
+        # Se lo stile fallisce, mostra la tabella semplice
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     # Spazio e pulsante esportazione
     st.write("") 
