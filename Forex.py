@@ -753,7 +753,7 @@ if st.sidebar.button("🔊 TEST ALERT COMPLETO"):
     inv_test = current_bal * (current_r / 100)
     
     test_data = {
-        'DataOra': get_now_rome().strftime("%H:%M:%S"),
+        'DataOra': get_now_rome().strftime("%dd/%mm/%YYYY %H:%M:%S"),
         'Asset': 'TEST/EUR', 
         'Direzione': 'VENDI', 
         'Prezzo': '1.0950', 
