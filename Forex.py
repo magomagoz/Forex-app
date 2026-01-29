@@ -376,10 +376,6 @@ def run_sentinel():
                     # --- CALCOLO SIZE E PARAMETRI ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_totale = current_balance * (current_risk / 100)
-                    
-
-                    
-                    # --- Sostituisci la parte del calcolo SL/TP dentro run_sentinel ---
 
                     # Definiamo la variazione percentuale del prezzo per lo SL (es. 0.1% di movimento prezzo = 10% ROI con leva)
                     # Se vuoi che il 10% sia proprio il movimento del prezzo (molto ampio), usa 0.10. 
@@ -401,7 +397,7 @@ def run_sentinel():
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
                         'Protezione': "Standard",
-                        'Stato_Prot': '0',
+                        'Stato_Prot': 'SL -10%',
                         'Stato': 'In Corso',
                         'Investimento €': f"{investimento_totale:.2f}",
                         'Risultato €': "0.00"
