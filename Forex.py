@@ -590,9 +590,9 @@ if not active_trades.empty:
 # 1. Recupero trade attivi (Assicurati che lo Stato sia 'In Corso' come da tua immagine)
 active_trades = st.session_state['signal_history'][st.session_state['signal_history']['Stato'] == 'In Corso']
 
-if not active_trades.empty:
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("⚡ Monitor Real-Time")
+#if not active_trades.empty:
+st.sidebar.markdown("---")
+st.sidebar.subheader("⚡ Monitor Real-Time")
     
     for index, trade in active_trades.iterrows():
         try:
