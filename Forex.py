@@ -594,52 +594,52 @@ active_trades = st.session_state['signal_history'][st.session_state['signal_hist
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚡ Monitor Real-Time")
     
-    for index, trade in active_trades.iterrows():
-        try:
-            # Download dati fresco
-            t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
-            t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
+for index, trade in active_trades.iterrows():
+    try:
+        # Download dati fresco
+        t_ticker = asset_map.get(trade['Asset'], trade['Asset'])
+        t_data = yf.download(t_ticker, period="1d", interval="1m", progress=False, timeout=5)
             
-            if not t_data.empty:
-                # --- CORREZIONE VARIABILI ---
-                curr_p = float(t_data['Close'].iloc[-1])
-                # Pulizia stringhe € se presenti
-                entry_p = float(str(trade['Prezzo']).replace('€', '').replace(',', '.').strip())
-                inv = float(str(trade['Investimento €']).replace('€', '').replace(',', '.').strip())
+        if not t_data.empty:
+            # --- CORREZIONE VARIABILI ---
+            curr_p = float(t_data['Close'].iloc[-1])
+            # Pulizia stringhe € se presenti
+            entry_p = float(str(trade['Prezzo']).replace('€', '').replace(',', '.').strip())
+            inv = float(str(trade['Investimento €']).replace('€', '').replace(',', '.').strip())
                 
-                # Moltiplicatore pips (Fondamentale per evitare numeri abnormi come +422514%)
-                pips_mult = get_asset_params(trade['Asset'])[2] 
+            # Moltiplicatore pips (Fondamentale per evitare numeri abnormi come +422514%)
+            pips_mult = get_asset_params(trade['Asset'])[2] 
                 
-                # Calcolo differenza basato sulla direzione
-                if trade['Direzione'] == "BUY" or trade['Direzione'] == "COMPRA":
-                    diff_prezzo = curr_p - entry_p
-                else:
-                    diff_prezzo = entry_p - curr_p
+            # Calcolo differenza basato sulla direzione
+            if trade['Direzione'] == "BUY" or trade['Direzione'] == "COMPRA":
+                diff_prezzo = curr_p - entry_p
+            else:
+                diff_prezzo = entry_p - curr_p
+            
+            # Calcolo profitto e percentuale corretti
+            latente_euro = diff_prezzo * pips_mult * (inv / 10)
+            latente_perc = (diff_prezzo / entry_p) * 100
                 
-                # Calcolo profitto e percentuale corretti
-                latente_euro = diff_prezzo * pips_mult * (inv / 10)
-                latente_perc = (diff_prezzo / entry_p) * 100
+            color = "#006400" if latente_euro >= 0 else "#FF4B4B"
                 
-                color = "#006400" if latente_euro >= 0 else "#FF4B4B"
-                
-                # --- UI MONITOR ---
-                st.sidebar.markdown(f"""
-                    <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
-                        <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
-                        <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
-                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
-                        </span>
-                    </div>
-                """, unsafe_allow_html=True)
-                
-                # TASTO CHIUDI (Opzionale)
-                if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
-                    st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
-                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
-                    st.rerun()
-        except Exception as e:
-            # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
-            st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
+            # --- UI MONITOR ---
+            st.sidebar.markdown(f"""
+                <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
+                    <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
+                    <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
+                        {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                    </span>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # TASTO CHIUDI (Opzionale)
+            if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
+                st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
+                st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
+                st.rerun()
+    except Exception as e:
+        # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
+        st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
 
 st.sidebar.markdown("---")
 if not active_trades.empty:
