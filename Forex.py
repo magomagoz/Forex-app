@@ -85,6 +85,18 @@ def send_telegram_msg(msg):
 def get_now_rome():
     return datetime.now(rome_tz)
 
+def style_protection(val):
+    # Se il capitale è blindato in profitto, usiamo un verde brillante
+    if 'Blindato' in str(val) or 'Garantito' in str(val):
+        return 'background-color: #2ecc71; color: white; font-weight: bold;'
+    # Se siamo al pareggio (Break-Even), usiamo un blu o arancio
+    elif 'Pareggio' in str(val):
+        return 'background-color: #3498db; color: white;'
+    # Se è lo stop loss iniziale (-10%)
+    elif 'Standard' in str(val):
+        return 'color: #e74c3c; font-weight: bold;'
+    return ''
+
 def play_notification_sound():
     audio_html = """
         <audio autoplay><source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg"></audio>
@@ -936,28 +948,33 @@ if not s_data.empty:
 else:
     st.info("⏳ Analisi macro-volatilità in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI AGGIORNATA ---
+# --- 9. CRONOLOGIA SEGNALI (CON COLORI DINAMICI) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
-# 1. Controlliamo se ci sono dati
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
-    
-    # Ordiniamo in modo decrescente per DataOra
     display_df = display_df.sort_values(by='DataOra', ascending=False)
 
-    # 2. Inizio blocco TRY per la visualizzazione stilizzata
     try:
+        # Applichiamo gli stili a colonne diverse
+        styled_df = display_df.style.map(
+            style_status, subset=['Stato']
+        ).map(
+            style_protection, subset=['Protezione']
+        )
+
         st.dataframe(
-            display_df.style.map(style_status, subset=['Stato']),
+            styled_df,
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
+            column_order=[
+                'DataOra', 'Asset', 'Direzione', 'Prezzo', 
+                'TP', 'SL', 'Stato', 'Protezione', 
+                'Investimento €', 'Risultato €'
+            ]
         )
-    # 3. L'EXCEPT deve essere allineato verticalmente al TRY
     except Exception as e:
-        # Se lo stile fallisce (es. per colonne mancanti), mostra la tabella base
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
     # 4. Pulsante esportazione (Sempre dentro l'IF, ma fuori dal TRY/EXCEPT)
