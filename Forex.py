@@ -455,29 +455,28 @@ def run_sentinel():
                     'Stato_Prot': 'Iniziale',
                     'Protezione': 'Trailing 0.5%'
                 }
-            # ... qui prosegue il tuo codice per aggiungere il segnale a session_state
-
-                    # 5. Salvataggio e Notifica
-                    st.session_state['signal_history'] = pd.concat([
-                        pd.DataFrame([new_sig]), 
-                        st.session_state['signal_history']
-                    ], ignore_index=True)
+          
+                # 5. Salvataggio e Notifica
+                st.session_state['signal_history'] = pd.concat([
+                    pd.DataFrame([new_sig]), 
+                    st.session_state['signal_history']
+                ], ignore_index=True)
                     
-                    st.session_state['sent_signals'].add(label)
+                st.session_state['sent_signals'].add(label)
                     
-                    # Notifica UI
-                    st.toast(f"🚀 {label}: Ordine {s_action} aperto!", icon="🔥")
+                # Notifica UI
+                st.toast(f"🚀 {label}: Ordine {s_action} aperto!", icon="🔥")
                     
-                    # Notifica Telegram (Opzionale)
-                    # msg = f"🔥 {s_action} {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']}"
-                    # send_telegram_msg(msg)
+                # Notifica Telegram (Opzionale)
+                # msg = f"🔥 {s_action} {label}\nPrice: {new_sig['Prezzo']}\nTP: {new_sig['TP']}"
+                # send_telegram_msg(msg)
                 
-                else:
-                    debug_list.append(f"⏳ {label}: Ignorato (Recente)")
+            else:
+                debug_list.append(f"⏳ {label}: Ignorato (Recente)")
 
-        except Exception as e:
-            debug_list.append(f"❌ {label} Err: {str(e)}")
-            continue
+    except Exception as e:
+        debug_list.append(f"❌ {label} Err: {str(e)}")
+        continue
 
     # Chiusura Funzione
     st.session_state['sentinel_logs'] = debug_list
