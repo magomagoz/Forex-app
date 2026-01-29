@@ -219,36 +219,36 @@ def update_signal_outcomes():
                 # --- LOGICA 4-STEP "ONLY FORWARD" ---
                 # dist_10pct è la distanza di prezzo che rappresenta il tuo -10% iniziale
                 
-                if row['Direzione'] == 'COMPRA':
-                    profitto_prezzo = current_close - entry_v
-                    
-                    # STEP 1: Raggiunto +5% -> SL a Pareggio (0%)
-                    if profitto_prezzo >= (dist_10pct * 0.5) and row['Stato_Prot'] == 'LIVELLO_0':
-                        df.at[idx, 'SL'] = f"{entry_v:.5f}"
-                        df.at[idx, 'Stato_Prot'] = 'LIVELLO_1'
-                        df.at[idx, 'Protezione'] = 'Pareggio (0%)'
-                        updates_made = True
+            if row['Direzione'] == 'COMPRA':
+                profitto_prezzo = current_close - entry_v
                 
-                    # STEP 2: Raggiunto +10% -> SL a +5%
-                    elif profitto_prezzo >= (dist_10pct * 1.0) and row['Stato_Prot'] == 'LIVELLO_1':
-                        df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 0.5)):.5f}"
-                        df.at[idx, 'Stato_Prot'] = 'LIVELLO_2'
-                        df.at[idx, 'Protezione'] = 'Garantito +5%'
-                        updates_made = True
+                # STEP 1: Raggiunto +5% -> SL a Pareggio (0%)
+                if profitto_prezzo >= (dist_10pct * 0.5) and row['Stato_Prot'] == 'LIVELLO_0':
+                    df.at[idx, 'SL'] = f"{entry_v:.5f}"
+                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_1'
+                    df.at[idx, 'Protezione'] = 'Pareggio (0%)'
+                    updates_made = True
                 
-                    # STEP 3: Raggiunto +15% -> SL a +10%
-                    elif profitto_prezzo >= (dist_10pct * 1.5) and row['Stato_Prot'] == 'LIVELLO_2':
-                        df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.0)):.5f}"
-                        df.at[idx, 'Stato_Prot'] = 'LIVELLO_3'
-                        df.at[idx, 'Protezione'] = 'Garantito +10%'
-                        updates_made = True
+                # STEP 2: Raggiunto +10% -> SL a +5%
+                elif profitto_prezzo >= (dist_10pct * 1.0) and row['Stato_Prot'] == 'LIVELLO_1':
+                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 0.5)):.5f}"
+                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_2'
+                    df.at[idx, 'Protezione'] = 'Garantito +5%'
+                    updates_made = True
                 
-                    # STEP 4: Raggiunto +19% -> SL a +15%
-                    elif profitto_prezzo >= (dist_10pct * 1.9) and row['Stato_Prot'] == 'LIVELLO_3':
-                        df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.5)):.5f}"
-                        df.at[idx, 'Stato_Prot'] = 'LIVELLO_4'
-                        df.at[idx, 'Protezione'] = 'Garantito +15%'
-                        updates_made = True
+                # STEP 3: Raggiunto +15% -> SL a +10%
+                elif profitto_prezzo >= (dist_10pct * 1.5) and row['Stato_Prot'] == 'LIVELLO_2':
+                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.0)):.5f}"
+                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_3'
+                    df.at[idx, 'Protezione'] = 'Garantito +10%'
+                    updates_made = True
+                
+                # STEP 4: Raggiunto +19% -> SL a +15%
+                elif profitto_prezzo >= (dist_10pct * 1.9) and row['Stato_Prot'] == 'LIVELLO_3':
+                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.5)):.5f}"
+                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_4'
+                    df.at[idx, 'Protezione'] = 'Garantito +15%'
+                    updates_made = True
                 
                 # --- CONTROLLO CHIUSURA AUTOMATICA ---
                 # Se il prezzo tocca lo SL aggiornato, il blocco successivo (già presente nel tuo script)
