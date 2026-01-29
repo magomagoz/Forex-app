@@ -468,27 +468,37 @@ if 'last_scan_status' not in st.session_state:
 update_signal_outcomes()
 
 def get_equity_data():
-    """Calcola l'andamento del saldo applicando il rischio scelto ai trade chiusi"""
-    initial_balance = balance 
+    """Calcola l'andamento del saldo sommando i risultati reali registrati"""
+    # 1. Partiamo dal saldo iniziale impostato nella sidebar
+    initial_balance = st.session_state.get('balance_val', 1000)
     equity_curve = [initial_balance]
     
     if st.session_state['signal_history'].empty:
         return pd.Series(equity_curve)
     
-    # Ordiniamo dal più vecchio al più recente per la curva temporale
+    # 2. Ordiniamo dal più vecchio al più recente per costruire la curva
+    # Nota: Assumiamo che i trade più vecchi siano in fondo, quindi invertiamo se necessario
+    # Nel tuo script salvi i nuovi in cima (concat), quindi per la curva temporale dobbiamo invertire (`iloc[::-1]`)
     df_sorted = st.session_state['signal_history'].iloc[::-1]
+    
     current_bal = initial_balance
     
     for _, row in df_sorted.iterrows():
-        # Applichiamo il rischio scelto sulla barra al saldo attuale
-        risk_amount = current_bal * (risk_pc / 100)
+        # Prendiamo il valore dalla colonna 'Risultato €'
+        val_str = str(row['Risultato €'])
         
-        if row['Stato'] == '✅ TARGET':
-            # Simuliamo un profitto con Reward Ratio 1:2
-            current_bal += (risk_amount * 2) 
-        elif row['Stato'] == '❌ STOP LOSS':
-            # Perdita fissa della quota rischio
-            current_bal -= risk_amount
+        # Puliamo la stringa (rimuoviamo simbolo € o spazi se presenti)
+        val_clean = val_str.replace('€', '').replace(',', '.').strip()
+        
+        try:
+            val_float = float(val_clean)
+        except:
+            val_float = 0.0
+            
+        # 3. Sommiamo SOLO se il trade è concluso (quindi ha un risultato diverso da 0 o vuoto)
+        # Consideriamo validi tutti gli stati di chiusura
+        if row['Stato'] in ['✅ TARGET', '❌ STOP LOSS', 'CHIUSO MAN.', '🛡️ SL DINAMICO']:
+            current_bal += val_float
             
         equity_curve.append(current_bal)
         
@@ -667,7 +677,8 @@ else:
                 # TASTO CHIUDI (Opzionale)
                 if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
                     st.session_state['signal_history'].at[index, 'Stato'] = 'CHIUSO MAN.'
-                    st.session_state['signal_history'].at[index, 'Risultato €'] = round(latente_euro, 2)
+                    # CORREZIONE: Usiamo la f-string :+.2f per forzare segno e decimali
+                    st.session_state['signal_history'].at[index, 'Risultato €'] = f"{latente_euro:+.2f}"
                     st.rerun()
         except Exception as e:
             # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
