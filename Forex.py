@@ -474,9 +474,9 @@ def run_sentinel():
             else:
                 debug_list.append(f"⏳ {label}: Ignorato (Recente)")
 
-    except Exception as e:
-        debug_list.append(f"❌ {label} Err: {str(e)}")
-        continue
+        except Exception as e:
+            debug_list.append(f"❌ {label} Err: {str(e)}")
+            continue
 
     # Chiusura Funzione
     st.session_state['sentinel_logs'] = debug_list
