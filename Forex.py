@@ -110,19 +110,6 @@ def style_status(val):
     if val == 'Garantito': return 'color: #FFA500; font-weight: bold;' # Arancione per protezione attiva
     return ''
 
-def get_trailing_params(asset_name):
-    """
-    Ritorna: (Step1_BE, Step2_Save, SL_Iniziale_Percent)
-    Forex: Scaglioni stretti per micro-movimenti
-    Crypto: Scaglioni larghi per alta volatilità
-    """
-    if any(x in asset_name for x in ["BTC", "ETH"]):
-        # Parametri Crypto
-        return 5.0, 10.0, -10.0  # +5% -> BE, +10% -> +5%, Inizio -10%
-    else:
-        # Parametri Forex
-        return 0.5, 1.0, -2.0    # +0.5% -> BE, +1.0% -> +0.5%, Inizio -2% (Forex a -10% è troppo lontano)
-
 def get_session_status():
     now_rome = get_now_rome().time()
     sessions = {
@@ -202,14 +189,14 @@ def detect_divergence(df):
     return "Neutrale"
     
 # --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
-    
+
 # ... (le altre funzioni save_history, send_telegram rimangono uguali, incolla da qui in giù) ...
 
 def update_signal_outcomes():
     if st.session_state['signal_history'].empty: return
     df = st.session_state['signal_history']
     
-    COMMISSIONE_APPROX = 0.03 
+    COMMISSIONE_APPROX = 0.02 
     updates_made = False
     
     # Iteriamo solo sui trade aperti
@@ -250,7 +237,7 @@ def update_signal_outcomes():
                     df.at[idx, 'Stato_Prot'] = 'Garantito'
                     updates_made = True
                     play_safe_sound() 
-                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 20%!")
+                    send_telegram_msg(f"🛡️ **TARGET DINAMICO ATTIVATO**\n{row['Asset']}: Il profitto è ora blindato al 3%!")
                 
                 # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
                 if row['Direzione'] == 'COMPRA':
@@ -291,20 +278,9 @@ def update_signal_outcomes():
     if updates_made:
         st.session_state['signal_history'] = df
         save_history_permanently()
-def run_sentinel():
-    # --- AUTO-PULIZIA CRONOLOGIA (Gestione Memoria) ---
-    if not st.session_state['signal_history'].empty:
-        # Se superiamo i 50 record, teniamo solo i 50 più recenti
-        if len(st.session_state['signal_history']) > 50:
-            st.session_state['signal_history'] = st.session_state['signal_history'].head(50)
-            save_history_permanently()
 
-    # Azzera i popup aperti all'inizio di ogni nuovo ciclo di scansione
-    st.session_state['last_alert'] = None
-    if 'alert_notified' in st.session_state: 
-        del st.session_state['alert_notified']
-    
-    #"""Scansiona tutti gli asset e popola il Debug Monitor"""
+def run_sentinel():
+    """Scansiona tutti gli asset e popola il Debug Monitor"""
     current_balance = st.session_state.get('balance_val', 1000)
     current_risk = st.session_state.get('risk_val', 1.0)
     
@@ -379,22 +355,14 @@ def run_sentinel():
                         # Semplice check temporale stringa se stesso giorno
                         if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
                            recent_signals = True
-              
+
                 if not is_running and not recent_signals:
-                    # --- Dentro run_sentinel() dove crei new_sig ---
-                   # --- CALCOLO SIZE E PARAMETRI CON PROTEZIONE 50% ---
+                    # --- CALCOLO SIZE E PARAMETRI ---
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
                     investimento_totale = current_balance * (current_risk / 100)
                     
-                    # Calcoliamo la distanza massima permessa (50% dell'investimento)
-                    # Nel trading con moltiplicatore, il 50% di perdita corrisponde a metà escursione verso lo SL
-                    distanza_sl = (curr_v * 0.0010) # Distanza base calcolata dall'algoritmo
-                    
-                    # --- LOGICA DI SICUREZZA AGGIUNTA ---
-                    # Se la distanza calcolata è troppo ampia, la forziamo 
-                    # per assicurarci di non perdere mai più del 50% della puntata
-                    max_dist_sicura = curr_v * 0.0045 # Esempio: limite escursione prezzo
-                    distanza_sl = min(distanza_sl, max_dist_sicura)
+                    # Stop Loss Fisso su ampiezza banda o % fissa
+                    distanza_sl = (curr_v * 0.0010) if "JPY" not in label else (curr_v * 0.0010) # 0.1% movimento
                     
                     if s_action == "COMPRA":
                         sl = curr_v - distanza_sl
@@ -402,7 +370,7 @@ def run_sentinel():
                     else:
                         sl = curr_v + distanza_sl
                         tp = curr_v - (distanza_sl * 2.0)
-                 
+                    
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -410,18 +378,16 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(curr_v), 
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
-                        'Protezione': "ATTIVA (50%)" if distanza_sl == max_dist_sicura else "Standard",
+                        'Protezione': "Standard",
                         'Stato_Prot': 'In Attesa',
                         'Stato': 'In Corso',
                         'Investimento €': f"{investimento_totale:.2f}",
                         'Risultato €': "0.00"
                     }
-
-                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     
-                    st.session_state['last_alert'] = new_sig
+                    st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
-
+                    st.session_state['last_alert'] = new_sig
                     
                     telegram_text = (f"🚀 *{s_action}* {label}\n"
                                      f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
@@ -436,18 +402,19 @@ def run_sentinel():
     # Salviamo il log per visualizzarlo in sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
-# Sostituisci la tua funzione get_win_rate con questa:
-def display_performance_stats():
+def get_win_rate():
     if st.session_state['signal_history'].empty:
-        return
-    
+        return "Nessun dato"
     df = st.session_state['signal_history']
-    conclusi = df[df['Stato'].str.contains('TARGET|STOP|DINAMICO', na=False)]
+    # Consideriamo conclusi solo quelli che non sono "In Corso"
+    closed_trades = df[df['Stato'] != 'In Corso']
+    total = len(closed_trades)
     
-    if not conclusi.empty:
-        vittorie = len(conclusi[conclusi['Stato'] == '✅ TARGET'])
-        wr = (vittorie / len(conclusi)) * 100
-        st.sidebar.write(f"📊 **Win Rate**: {wr:.1f}% ({vittorie}/{len(conclusi)})")
+    if total == 0: return "In attesa di chiusure..."
+    
+    wins = len(closed_trades[closed_trades['Stato'] == '✅ TARGET'])
+    wr = (wins / total) * 100
+    return f"Win Rate: {wr:.1f}% ({wins}/{total})"
 
 # --- INIZIALIZZAZIONE STATO (Session State) ---
 if 'signal_history' not in st.session_state: 
@@ -577,6 +544,7 @@ st.sidebar.subheader("💰 Gestione Capitale")
 st.sidebar.metric("Conto iniziale", f"€ {balance:.2f}")
 st.sidebar.metric("Investimento per operazione", f"€ {investimento_simulato:.2f}")
 
+
 #st.sidebar.info(f"💳 **Saldo Attuale Operativo**: € {saldo_residuo:.2f}")
 
 st.sidebar.markdown("---")
@@ -595,24 +563,7 @@ dd = ((current_equity - max_val) / max_val) * 100 if max_val > 0 else 0
 
 # Visualizzazione Metriche
 st.sidebar.metric("Saldo Attuale Operativo", f"€ {current_equity:.2f}", delta=f"{total_return}%")
-#st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
-
-# --- LOGICA COLORE DRAWDOWN ---
-# Verde se tra 0 e 10%, Rosso se oltre 20%, Grigio/Default tra 10 e 20
-dd_color = "normal" 
-if 0 <= abs(dd) <= 10:
-    dd_color = "normal" # Streamlit usa il verde di default per i delta positivi/normali
-elif abs(dd) > 20:
-    dd_color = "inverse" # Lo rende rosso se considerato come valore negativo
-
-st.sidebar.metric(
-    "Drawdown Massimo", 
-    f"{dd:.2f}%", 
-    delta="OTTIMO" if abs(dd) <= 10 else "ATTENZIONE" if abs(dd) > 20 else "",
-    delta_color=dd_color
-)
-
-display_performance_stats()
+st.sidebar.metric("Drawdown Massimo", f"{dd:.2f}%", delta_color="inverse")
 
 # Grafico Equity (Piccolo e pulito)
 #fig_equity = go.Figure()
@@ -649,48 +600,51 @@ with st.sidebar.popover("🗑️ **Reset Cronologia**"):
 
 st.sidebar.markdown("---")
 
-#if st.sidebar.button("TEST ALERT"):
-    #st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
-    #if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
-    #st.rerun()
+if st.sidebar.button("TEST ALERT"):
+    st.session_state['last_alert'] = {'Asset': 'TEST/EUR', 'Direzione': 'COMPRA', 'Prezzo': '1.0000', 'TP': '1.0100', 'SL': '0.9900', 'Protezione': 'Standard'}
+    if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+    st.rerun()
 
-#st.sidebar.markdown("---")
+st.sidebar.markdown("---")
 
-# --- 6. POPUP ALERT (SINCRONIZZATO CON REFRESH 60s) ---
+# --- 6. POPUP ALERT (VERSIONE NATIVA - NON BLOCCA SIDEBAR) ---
 if st.session_state.get('last_alert'):
-    # Suona solo la prima volta che appare l'alert
-    if 'alert_notified' not in st.session_state:
+    # Inizializzazione Timer
+    if 'alert_start_time' not in st.session_state:
+        st.session_state['alert_start_time'] = time_lib.time()
         play_notification_sound()
-        st.session_state['alert_notified'] = True
 
-    alert = st.session_state['last_alert']
-    hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
-
-    # Box Alert Grafico
-    st.markdown(f"""
-        <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
-            <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE RILEVATO: {alert['Asset']}</h2>
-            <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
-            <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']}</p>
-            <div style="margin-top: 10px; font-size: 0.8em; color: #555;">
-                Questo alert scomparirà automaticamente al prossimo aggiornamento della sentinella.
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    elapsed = time_lib.time() - st.session_state['alert_start_time']
+    countdown = max(0, int(30 - elapsed))
     
-    # Tasto per chiusura manuale immediata
-    if st.button("✅ CHIUDI ALERT ORA", use_container_width=True):
+    # Auto-chiusura
+    if elapsed > 30:
         st.session_state['last_alert'] = None
-        if 'alert_notified' in st.session_state: del st.session_state['alert_notified']
+        if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
         st.rerun()
-    
-    st.divider()
 
-# --- LOGICA DI PULIZIA AUTOMATICA ---
-# Questa parte assicura che al prossimo giro di 'run_sentinel', l'alert venga rimosso
-#if 'last_alert' in st.session_state and st.session_state['last_alert'] is not None:
-        # Opzionale: puoi decidere di resettarlo qui o lasciarlo resettare alla fine dello script
-        # Per la tua richiesta, lo resettiamo all'inizio di ogni scan in run_sentinel()
+    if st.session_state.get('last_alert'):
+        alert = st.session_state['last_alert']
+        color = "success" if alert['Direzione'] == 'COMPRA' else "error"
+        hex_color = "#00ffcc" if alert['Direzione'] == 'COMPRA' else "#ff4b4b"
+
+        # Creiamo un contenitore in cima alla pagina
+        with st.container():
+            st.markdown(f"""
+                <div style="background-color: #000; border: 3px solid {hex_color}; padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: center; box-shadow: 0 0 20px {hex_color}44;">
+                    <h2 style="color: white; margin: 0;">🚀 NUOVO SEGNALE: {alert['Asset']}</h2>
+                    <h1 style="color: {hex_color}; margin: 5px 0;">{alert['Direzione']} @ {alert['Prezzo']}</h1>
+                    <p style="color: #888; margin: 0;">TP: {alert['TP']} | SL: {alert['SL']} | Auto-chiusura in {countdown}s</p>
+                </div>
+            """, unsafe_allow_html=True)
+            
+            # Tasto CHIUDI nativo di Streamlit
+            if st.button("✅ HO VISTO, CHIUDI ALERT", key="close_manual", use_container_width=True):
+                st.session_state['last_alert'] = None
+                if 'alert_start_time' in st.session_state: del st.session_state['alert_start_time']
+                st.rerun()
+        
+        st.divider() # Separa l'alert dal resto del grafico
 
 # --- 7. BODY PRINCIPALE ---
 # Banner logic
@@ -829,66 +783,42 @@ if not s_data.empty:
 else:
     st.info("⏳ Caricamento dati macro in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (FILTRI PULITI) ---
+# --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
 
+# Inizializziamo display_df vuoto per evitare NameError
+#display_df = pd.DataFrame()
+
+# 1. CONTROLLO SE CI SONO DATI
 if not st.session_state['signal_history'].empty:
-    full_history = st.session_state['signal_history'].copy()
-    
-    # --- UI FILTRI COMPATTI ---
-    col_f1, col_f2 = st.columns(2)
-    
-    with col_f1:
-        # Usiamo una lista vuota come default per non mostrare i "pulsanti"
-        opzioni_stato = sorted(full_history['Stato'].unique().tolist())
-        filtro_stato = st.multiselect(
-            "Filtra Esito:", 
-            options=opzioni_stato, 
-            default=[], 
-            placeholder="Tutti gli esiti"
-        )
-    
-    with col_f2:
-        opzioni_asset = sorted(full_history['Asset'].unique().tolist())
-        filtro_asset = st.multiselect(
-            "Filtra Valuta:", 
-            options=opzioni_asset, 
-            default=[], 
-            placeholder="Tutte le valute"
-        )
+    display_df = st.session_state['signal_history'].copy()
+    display_df = display_df.iloc[::-1] # Recenti in alto
 
-    # --- LOGICA DI FILTRAGGIO ---
-    # Se la lista è vuota, non filtriamo (mostriamo tutto)
-    df_filtrato = full_history.copy()
-    
-    if filtro_stato:
-        df_filtrato = df_filtrato[df_filtrato['Stato'].isin(filtro_stato)]
-    
-    if filtro_asset:
-        df_filtrato = df_filtrato[df_filtrato['Asset'].isin(filtro_asset)]
-    
-    # Inversione per vedere i più recenti in alto
-    display_df = df_filtrato.iloc[::-1] 
-
-    # --- VISUALIZZAZIONE ---
-    if not display_df.empty:
+    # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
+    try:
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
             hide_index=True,
-            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Risultato €']
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
         )
-        
-        st.download_button(
-            label=f"📥 Esporta vista attuale ({len(display_df)} righe)",
-            data=display_df.to_csv(index=False).encode('utf-8'),
-            file_name="cronologia_trading.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    else:
-        st.warning("Nessun dato corrispondente ai filtri selezionati.")
+    
+    except Exception as e:
+        # Se lo stile fallisce, mostra la tabella semplice
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
+    # Spazio e pulsante esportazione
+    st.write("") 
+    csv_data = display_df.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Esporta Cronologia (CSV)",
+        data=csv_data,
+        file_name=f"trading_history_{datetime.now().strftime('%Y%m%d')}.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
+# 4. SE LA CRONOLOGIA È VUOTA
 else:
     st.info("Nessun segnale registrato.")
