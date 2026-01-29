@@ -939,27 +939,28 @@ else:
 # --- 9. CRONOLOGIA SEGNALI AGGIORNATA ---
 st.markdown("---")
 st.subheader("📜 Cronologia Segnali")
-    
+
+# 1. Controlliamo se ci sono dati
 if not st.session_state['signal_history'].empty:
     display_df = st.session_state['signal_history'].copy()
-        
-    # 1. Assicuriamoci che la colonna DataOra sia ordinabile (se non lo è già)
-    # 2. Ordiniamo in modo decrescente (ascending=False)
+    
+    # Ordiniamo in modo decrescente per DataOra
     display_df = display_df.sort_values(by='DataOra', ascending=False)
-    
-    # Visualizzazione Tabella
-    st.dataframe(
-        display_df.style.map(style_status, subset=['Stato']),
-        use_container_width=True,
-        hide_index=True,
-        column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
-    )
-    
+
+    # 2. Inizio blocco TRY per la visualizzazione stilizzata
+    try:
+        st.dataframe(
+            display_df.style.map(style_status, subset=['Stato']),
+            use_container_width=True,
+            hide_index=True,
+            column_order=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'TP', 'SL', 'Stato', 'Stato_Prot', 'Investimento €', 'Risultato €']
+        )
+    # 3. L'EXCEPT deve essere allineato verticalmente al TRY
     except Exception as e:
-        # Se lo stile fallisce, mostra la tabella semplice
+        # Se lo stile fallisce (es. per colonne mancanti), mostra la tabella base
         st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-    # Spazio e pulsante esportazione
+    # 4. Pulsante esportazione (Sempre dentro l'IF, ma fuori dal TRY/EXCEPT)
     st.write("") 
     csv_data = display_df.to_csv(index=False).encode('utf-8')
     st.download_button(
@@ -970,6 +971,6 @@ if not st.session_state['signal_history'].empty:
         use_container_width=True
     )
 
-# 4. SE LA CRONOLOGIA È VUOTA
+# 5. Se la cronologia è vuota (allineato all'IF iniziale)
 else:
     st.info("Nessun segnale registrato.")
