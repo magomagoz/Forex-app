@@ -229,10 +229,10 @@ def get_asset_params(pair):
     elif "CNY" in pair or "BRL" in pair:
         # Yuan e Real (es. 7.2345 o 4.9567)
         return 0.0001, "{:.4f}", 10000, "FOREX_4DEC"
-    
-    # --- DEFAULT (EURUSD, ecc) ---
+        
     else:
-        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
+        # DEFAULT (EURUSD, ecc)
+        return 0.0001, "{:.5f}", 5, "FOREX_STD"
 
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
@@ -422,60 +422,40 @@ def run_sentinel():
             debug_list.append(f"{icon} {label}: {curr_v:.4f} | RSI: {rsi_d:.1f}")
 
             # --- E. ESECUZIONE SEGNALE ---
-            if s_action:
-                # 1. Recupero Parametri
-                # Assumo che get_asset_params ritorni: (unit, decimali, multiplier, type)
-                params = get_asset_params(label)
-                p_decimals = params[1]
-                p_mult = params[2]
+        if s_action:
+            # --- RECUPERO PARAMETRI (PUNTO 1) ---
+            p_tick, p_str, p_prec, p_type = get_asset_params(label)
+            
+            # PROTEZIONE: Se p_prec non è un numero, forziamo il default
+            if not isinstance(p_prec, (int, float)):
+                p_prec = 5 
+            else:
+                p_prec = int(p_prec) # Ci assicuriamo che sia un intero per la f-string
 
-                # 2. Controllo Anti-Spam (30 min)
-                recent_signals = False
-                asset_hist = hist[hist['Asset'] == label]
-                if not asset_hist.empty:
-                    last_time_str = asset_hist.iloc[0]['DataOra']
-                    try:
-                        # Gestisce formati diversi per sicurezza
-                        fmt = "%d/%m/%Y %H:%M:%S"
-                        last_dt = datetime.strptime(last_time_str, fmt)
-                        if (datetime.now() - last_dt).total_seconds() / 60 < 30:
-                            recent_signals = True
-                    except:
-                        pass # Se errore data, assume nessun segnale recente
+            dist = curr_v * 0.002
+            tp_val = (curr_v + (dist*2)) if s_action == "COMPRA" else (curr_v - (dist*2))
+            sl_val = (curr_v - dist) if s_action == "COMPRA" else (curr_v + dist)
 
-                if not recent_signals:
-                    # 3. Calcoli Prezzi
-                    entry_price = curr_v
-                    
-                    # Calcolo TP/SL (Risk Reward 1:2)
-                    # Distanza base: 0.2% del prezzo (adattabile)
-                    distanza = entry_price * 0.002 
-                    
-                    if s_action == "BUY":
-                        sl_price = entry_price - distanza       # Rischio 1
-                        tp_price = entry_price + (distanza * 2) # Reward 2
-                    else: # SELL
-                        sl_price = entry_price + distanza
-                        tp_price = entry_price - (distanza * 2)
+            # FORMATTAZIONE SICURA (Risolve Error Format Specifier)
+            prezzo_f = f"{curr_v:.{p_prec}f}"
+            tp_f = f"{tp_val:.{p_prec}f}"
+            sl_f = f"{sl_val:.{p_prec}f}"
 
-                    # Calcolo Spread (Formula corretta)
-                    investimento = 20.0
-                    costo_spread = (SIMULATED_SPREAD * p_mult) * (investimento / 10.0)
-
-                    # 4. Creazione Dizionario Segnale
-                    new_sig = {
-                        'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                        'Asset': label,
-                        'Direzione': s_action,
-                        'Prezzo': f"{entry_price:.{p_decimals}f}",
-                        'TP': f"{tp_price:.{p_decimals}f}",
-                        'SL': f"{sl_price:.{p_decimals}f}",
-                        'Stato': 'APERTO',
-                        'Investimento €': investimento,
-                        'Risultato €': 0.00,
-                        'Costo Spread €': costo_spread,
-                        'Stato_Prot': 'Iniziale'
-                    }
+            # Creazione dizionario segnale
+            new_sig = {
+                'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                'Asset': label,
+                'Direzione': s_action,
+                'Prezzo': prezzo_f,
+                'TP': tp_f,
+                'SL': sl_f,
+                'Stato': 'In Corso',
+                'Investimento €': f"{trade_size:.2f}",
+                'Risultato €': "0.00",
+                'Stato_Prot': 'Iniziale',
+                'Protezione': 'Trailing 0.5%'
+            }
+            # ... qui prosegue il tuo codice per aggiungere il segnale a session_state
 
                     # 5. Salvataggio e Notifica
                     st.session_state['signal_history'] = pd.concat([
