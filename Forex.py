@@ -705,21 +705,34 @@ else:
                 else:
                     diff_prezzo = entry_p - curr_p
                 
-                # Calcolo profitto e percentuale corretti
+                # ... (codice precedente: calcolo latente_perc e latente_euro)
                 latente_perc = (diff_prezzo / entry_p) * 100 if trade['Direzione'] == "COMPRA" else -(diff_prezzo / entry_p) * 100
                 latente_euro = (inv * latente_perc) / 100 
     
+                # --- INIZIO FILTRO ANTI-FOLLIA ---
+                # Se la variazione è superiore al 50% (impossibile nel Forex 1m senza glitch),
+                # resettiamo i valori a 0 per evitare di inquinare la dashboard.
+                is_glitch = False
+                if abs(latente_perc) > 50:
+                    latente_perc = 0.0
+                    latente_euro = 0.0
+                    is_glitch = True
+                # --- FINE FILTRO ANTI-FOLLIA ---
+
                 color = "#006400" if latente_euro >= 0 else "#FF4B4B"
+                if is_glitch: color = "#FFA500" # Arancione per indicare "Dato Dubbio"
                     
                 # --- UI MONITOR ---
                 st.sidebar.markdown(f"""
                     <div style="border-left: 4px solid {color}; padding-left: 10px; background: rgba(255,255,255,0.05); padding: 8px; border-radius: 5px; margin-bottom: 5px;">
                         <b style="font-size: 0.85em;">{trade['Asset']} | {trade['Direzione']}</b><br>
                         <span style="color:{color}; font-size: 1.1em; font-weight: bold;">
-                            {latente_perc:+.2f}% ({latente_euro:+.2f}€)
+                            {"⚠️ GLITCH DATI" if is_glitch else f"{latente_perc:+.2f}% ({latente_euro:+.2f}€)"}
                         </span>
                     </div>
                 """, unsafe_allow_html=True)
+                
+                # ... (resto del codice per il tasto chiudi)
                 
                 # TASTO CHIUDI (Opzionale)
                 if st.sidebar.button(f"✖ Chiudi {trade['Asset']}", key=f"close_{index}"):
