@@ -641,6 +641,7 @@ if not active_trades.empty:
             # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
             st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
 
+st.sidebar.markdown("---")
 if not active_trades.empty:
     st.sidebar.warning("⚡ Ultima Operazione Attiva")
     last_t = active_trades.iloc[0]
