@@ -593,7 +593,7 @@ active_trades = st.session_state['signal_history'][st.session_state['signal_hist
 st.sidebar.markdown("---")
 st.sidebar.subheader("⚡ Monitor Real-Time")
 
-if not active_trades.empty:
+if active_trades.empty:
     st.sidebar.info("💤 In attesa del primo trade")
 else:
     for index, trade in active_trades.iterrows():
