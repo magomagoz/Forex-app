@@ -595,7 +595,7 @@ st.sidebar.subheader("⚡ Monitor Real-Time")
 
 if not active_trades.empty:
     st.info("💤 In attesa del primo trade")
-else
+else:
     for index, trade in active_trades.iterrows():
         try:
             # Download dati fresco
