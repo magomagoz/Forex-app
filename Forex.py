@@ -398,7 +398,7 @@ def run_sentinel():
                     st.session_state['last_alert'] = new_sig
                     
                     telegram_text = (f"🚀 *{s_action}* {label}\n"
-                                     f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}")
+                                     f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}\n-------------\nInvestito: {new_sig['Investimento €']}")
                     send_telegram_msg(telegram_text)
 
             st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
@@ -640,13 +640,6 @@ for index, trade in active_trades.iterrows():
     except Exception as e:
         # Mostra l'errore tecnico reale solo per debug se vuoi, altrimenti lascia il messaggio di attesa
         st.sidebar.caption(f"⏳ Aggiornamento {trade['Asset']}...")
-
-st.sidebar.markdown("---")
-if not active_trades.empty:
-    st.sidebar.warning("⚡ Ultima Operazione Attiva")
-    last_t = active_trades.iloc[0]
-    st.sidebar.write(f"Asset: **{last_t['Asset']}**")
-    st.sidebar.write(f"SL: `{last_t['SL']}` | TP: `{last_t['TP']}`")
 
 st.sidebar.markdown("---")
 # ... (restante codice sidebar: sessioni, win rate, reset)
