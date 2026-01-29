@@ -422,39 +422,39 @@ def run_sentinel():
             debug_list.append(f"{icon} {label}: {curr_v:.4f} | RSI: {rsi_d:.1f}")
 
             # --- E. ESECUZIONE SEGNALE ---
-        if s_action:
-            # --- RECUPERO PARAMETRI (PUNTO 1) ---
-            p_tick, p_str, p_prec, p_type = get_asset_params(label)
-            
-            # PROTEZIONE: Se p_prec non è un numero, forziamo il default
-            if not isinstance(p_prec, (int, float)):
-                p_prec = 5 
-            else:
-                p_prec = int(p_prec) # Ci assicuriamo che sia un intero per la f-string
-
-            dist = curr_v * 0.002
-            tp_val = (curr_v + (dist*2)) if s_action == "COMPRA" else (curr_v - (dist*2))
-            sl_val = (curr_v - dist) if s_action == "COMPRA" else (curr_v + dist)
-
-            # FORMATTAZIONE SICURA (Risolve Error Format Specifier)
-            prezzo_f = f"{curr_v:.{p_prec}f}"
-            tp_f = f"{tp_val:.{p_prec}f}"
-            sl_f = f"{sl_val:.{p_prec}f}"
-
-            # Creazione dizionario segnale
-            new_sig = {
-                'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-                'Asset': label,
-                'Direzione': s_action,
-                'Prezzo': prezzo_f,
-                'TP': tp_f,
-                'SL': sl_f,
-                'Stato': 'In Corso',
-                'Investimento €': f"{trade_size:.2f}",
-                'Risultato €': "0.00",
-                'Stato_Prot': 'Iniziale',
-                'Protezione': 'Trailing 0.5%'
-            }
+            if s_action:
+                # --- RECUPERO PARAMETRI (PUNTO 1) ---
+                p_tick, p_str, p_prec, p_type = get_asset_params(label)
+                
+                # PROTEZIONE: Se p_prec non è un numero, forziamo il default
+                if not isinstance(p_prec, (int, float)):
+                    p_prec = 5 
+                else:
+                    p_prec = int(p_prec) # Ci assicuriamo che sia un intero per la f-string
+    
+                dist = curr_v * 0.002
+                tp_val = (curr_v + (dist*2)) if s_action == "COMPRA" else (curr_v - (dist*2))
+                sl_val = (curr_v - dist) if s_action == "COMPRA" else (curr_v + dist)
+    
+                # FORMATTAZIONE SICURA (Risolve Error Format Specifier)
+                prezzo_f = f"{curr_v:.{p_prec}f}"
+                tp_f = f"{tp_val:.{p_prec}f}"
+                sl_f = f"{sl_val:.{p_prec}f}"
+    
+                # Creazione dizionario segnale
+                new_sig = {
+                    'DataOra': datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
+                    'Asset': label,
+                    'Direzione': s_action,
+                    'Prezzo': prezzo_f,
+                    'TP': tp_f,
+                    'SL': sl_f,
+                    'Stato': 'In Corso',
+                    'Investimento €': f"{trade_size:.2f}",
+                    'Risultato €': "0.00",
+                    'Stato_Prot': 'Iniziale',
+                    'Protezione': 'Trailing 0.5%'
+                }
             # ... qui prosegue il tuo codice per aggiungere il segnale a session_state
 
                     # 5. Salvataggio e Notifica
