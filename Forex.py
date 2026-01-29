@@ -219,40 +219,47 @@ def update_signal_outcomes():
                 # --- LOGICA 4-STEP "ONLY FORWARD" ---
                 # dist_10pct è la distanza di prezzo che rappresenta il tuo -10% iniziale
                 
+        # --- LOGICA 4-STEP FAST-TRACK ---
+        if row['Direzione'] in ['COMPRA', 'VENDI']:
+            # Calcoliamo il profitto in termini di unità (1 unità = dist_10pct)
+            # dist_10pct è lo scostamento di prezzo che rappresenta il 10% di ROI
             if row['Direzione'] == 'COMPRA':
                 profitto_prezzo = current_close - entry_v
-                
-                # STEP 1: Raggiunto +5% -> SL a Pareggio (0%)
-                if profitto_prezzo >= (dist_10pct * 0.5) and row['Stato_Prot'] == 'LIVELLO_0':
-                    df.at[idx, 'SL'] = f"{entry_v:.5f}"
-                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_1'
-                    df.at[idx, 'Protezione'] = 'Pareggio (0%)'
-                    updates_made = True
-                
-                # STEP 2: Raggiunto +10% -> SL a +5%
-                elif profitto_prezzo >= (dist_10pct * 1.0) and row['Stato_Prot'] == 'LIVELLO_1':
-                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 0.5)):.5f}"
-                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_2'
-                    df.at[idx, 'Protezione'] = 'Garantito +5%'
-                    updates_made = True
-                
-                # STEP 3: Raggiunto +15% -> SL a +10%
-                elif profitto_prezzo >= (dist_10pct * 1.5) and row['Stato_Prot'] == 'LIVELLO_2':
-                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.0)):.5f}"
-                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_3'
-                    df.at[idx, 'Protezione'] = 'Garantito +10%'
-                    updates_made = True
-                
-                # STEP 4: Raggiunto +19% -> SL a +15%
-                elif profitto_prezzo >= (dist_10pct * 1.9) and row['Stato_Prot'] == 'LIVELLO_3':
-                    df.at[idx, 'SL'] = f"{(entry_v + (dist_10pct * 1.5)):.5f}"
-                    df.at[idx, 'Stato_Prot'] = 'LIVELLO_4'
-                    df.at[idx, 'Protezione'] = 'Garantito +15%'
-                    updates_made = True
-                
-                # --- CONTROLLO CHIUSURA AUTOMATICA ---
-                # Se il prezzo tocca lo SL aggiornato, il blocco successivo (già presente nel tuo script)
-                # chiuderà il trade perché current_low <= sl_v.
+            else:
+                profitto_prezzo = entry_v - current_close
+        
+            # Determiniamo il miglior livello raggiungibile in questo istante
+            target_lvl = 0
+            nuovo_sl_val = None
+            prot_label = ""
+        
+            if profitto_prezzo >= (dist_10pct * 1.9): 
+                target_lvl = 4
+                nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
+                prot_label = "Blindato +15%"
+            elif profitto_prezzo >= (dist_10pct * 1.5): 
+                target_lvl = 3
+                nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
+                prot_label = "Blindato +10%"
+            elif profitto_prezzo >= (dist_10pct * 1.0): 
+                target_lvl = 2
+                nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
+                prot_label = "Blindato +5%"
+            elif profitto_prezzo >= (dist_10pct * 0.5): 
+                target_lvl = 1
+                nuovo_sl_val = entry_v
+                prot_label = "Pareggio (0%)"
+        
+            # Estraiamo il livello attuale (es. da "LIVELLO_1" prendiamo 1)
+            current_lvl_num = int(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
+        
+            # AGGIORNIAMO SOLO SE IL TARGET È SUPERIORE AL LIVELLO ATTUALE
+            if target_lvl > current_lvl_num:
+                p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
+                df.at[idx, 'SL'] = p_fmt.format(nuovo_sl_val)
+                df.at[idx, 'Stato_Prot'] = f"LIVELLO_{target_lvl}"
+                df.at[idx, 'Protezione'] = prot_label
+                updates_made = True
                 play_safe_sound()
                 send_telegram_msg(f"🛡️ **Protezione Avanzata {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({df.at[idx, 'Protezione']})")
                 
@@ -929,20 +936,18 @@ if not s_data.empty:
 else:
     st.info("⏳ Analisi macro-volatilità in corso...")
 
-# --- 9. CRONOLOGIA SEGNALI (CORRETTO) ---
-st.markdown("---")
-st.subheader("📜 Cronologia Segnali")
-
-# Inizializziamo display_df vuoto per evitare NameError
-#display_df = pd.DataFrame()
-
-# 1. CONTROLLO SE CI SONO DATI
-if not st.session_state['signal_history'].empty:
-    display_df = st.session_state['signal_history'].copy()
-    display_df = display_df.iloc[::-1] # Recenti in alto
-
-    # 2. TENTATIVO DI MOSTRARE LA TABELLA CON STILE
-    try:
+    # --- 9. CRONOLOGIA SEGNALI AGGIORNATA ---
+    st.markdown("---")
+    st.subheader("📜 Cronologia Segnali")
+    
+    if not st.session_state['signal_history'].empty:
+        display_df = st.session_state['signal_history'].copy()
+        
+        # 1. Assicuriamoci che la colonna DataOra sia ordinabile (se non lo è già)
+        # 2. Ordiniamo in modo decrescente (ascending=False)
+        display_df = display_df.sort_values(by='DataOra', ascending=False)
+    
+        # Visualizzazione Tabella
         st.dataframe(
             display_df.style.map(style_status, subset=['Stato']),
             use_container_width=True,
