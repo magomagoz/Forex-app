@@ -341,34 +341,32 @@ def update_signal_outcomes():
         save_history_permanently()
 
 def run_sentinel():
+    """Scanner multi-asset per l'individuazione di segnali Mean Reversion e Trend Strength"""
     current_balance = st.session_state.balance_val 
     current_risk = st.session_state.risk_val
-    
-    # Lista per il monitoraggio live nella sidebar
     debug_list = []
     
-    assets = list(asset_map.items())
-    for label, ticker in assets:
+    # 1. Ciclo di scansione su tutti gli asset definiti
+    for label, ticker in asset_map.items():
         try:
-            # 1. SCARICO DATI (Maggiore tolleranza errori)
-            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False)
-            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False)
+            # Download dati: 2 giorni a 1m per i segnali, 1 anno a 1d per il trend macro
+            df_rt_s = yf.download(ticker, period="2d", interval="1m", progress=False, timeout=10)
+            df_d_s = yf.download(ticker, period="1y", interval="1d", progress=False, timeout=10)
             
             if df_rt_s.empty or df_d_s.empty: 
                 debug_list.append(f"🔴 {label}: No Data")
                 continue
             
-            # Pulizia Colonne ROBUSTA
+            # Pulizia MultiIndex e normalizzazione colonne
             if isinstance(df_rt_s.columns, pd.MultiIndex): df_rt_s.columns = df_rt_s.columns.get_level_values(0)
             if isinstance(df_d_s.columns, pd.MultiIndex): df_d_s.columns = df_d_s.columns.get_level_values(0)
-            
-            # Rinominiamo esplicitamente per pandas_ta
             df_rt_s.columns = [c.lower() for c in df_rt_s.columns]
             df_d_s.columns = [c.lower() for c in df_d_s.columns]
 
-            # 2. CALCOLO INDICATORI
+            # 2. Calcolo Indicatori Tecnici (Sentinel AI Engine)
+            # Bande di Bollinger (20, 2)
             bb_s = ta.bbands(df_rt_s['close'], length=20, std=2)
-            if bb_s is None: continue # Skip se errore calcolo
+            if bb_s is None: continue
 
             c_low = [c for c in bb_s.columns if "BBL" in c.upper()][0]
             c_up = [c for c in bb_s.columns if "BBU" in c.upper()][0]
@@ -377,62 +375,66 @@ def run_sentinel():
             low_bb = float(bb_s[c_low].iloc[-1])
             up_bb = float(bb_s[c_up].iloc[-1])
             
+            # RSI Daily (per evitare di andare contro il trend primario)
             rsi_d = ta.rsi(df_d_s['close'], length=14).iloc[-1]
             
+            # ADX (per filtrare i mercati troppo volatili/pericolosi)
             adx_df = ta.adx(df_rt_s['high'], df_rt_s['low'], df_rt_s['close'], length=14)
             curr_adx = adx_df['ADX_14'].iloc[-1] if adx_df is not None else 0
 
-            # 3. CONDIZIONI DI INGRESSO (Mean Reversion)
+            # 3. Logica di Ingresso: Mean Reversion Filtrata
             s_action = None
             
-            # Debug Status
-            dist_low = curr_v - low_bb
-            dist_up = up_bb - curr_v
-            
-            # Logica: Prezzo SOTTO banda bassa o SOPRA banda alta
-            if curr_v < low_bb and rsi_d < 60 and curr_adx < 45: 
+            # CONDIZIONE COMPRA: Prezzo < Banda Bassa + RSI non saturo + ADX basso (no trend esplosivo)
+            if curr_v < low_bb and rsi_d < 60 and curr_adx < 35: 
                 s_action = "COMPRA"
-            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 45: 
+            # CONDIZIONE VENDI: Prezzo > Banda Alta + RSI non saturo + ADX basso
+            elif curr_v > up_bb and rsi_d > 40 and curr_adx < 35: 
                 s_action = "VENDI"
 
-            # Aggiungiamo info al monitor debug
+            # Debug Monitor Update
             icon = "🟢" if s_action else "⚪"
-            debug_info = f"{label}: {curr_v:.4f} | BB: {low_bb:.4f}/{up_bb:.4f}"
+            debug_info = f"{label}: {curr_v:.4f} | ADX: {curr_adx:.1f}"
             if s_action: debug_info += f" -> 🔥 {s_action}"
             debug_list.append(f"{icon} {debug_info}")
 
+            # 4. Gestione Apertura Segnale
             if s_action:
                 hist = st.session_state['signal_history']
-                # Controllo Duplicati / Trade in corso
+                
+                # Check 1: Evita duplicati (Asset già in corso)
                 is_running = not hist.empty and ((hist['Asset'] == label) & (hist['Stato'] == 'In Corso')).any()
                 
-                # Controllo Tempo (30 min)
+                # Check 2: Raffreddamento (Cooldown 30 min tra segnali sullo stesso asset)
                 recent_signals = False
                 if not hist.empty:
                     asset_hist = hist[hist['Asset'] == label]
                     if not asset_hist.empty:
-                        last_sig = asset_hist.iloc[0]['DataOra']
-                        # Semplice check temporale stringa se stesso giorno
-                        if last_sig > (get_now_rome().replace(minute=get_now_rome().minute - 30)).strftime("%H:%M:%S"):
+                        last_sig_time = datetime.strptime(asset_hist.iloc[0]['DataOra'], "%H:%M:%S").time()
+                        now_time = get_now_rome().time()
+                        # Calcolo approssimativo minuti passati
+                        minutes_diff = (now_time.hour * 60 + now_time.minute) - (last_sig_time.hour * 60 + last_sig_time.minute)
+                        if 0 <= minutes_diff < 30:
                            recent_signals = True
 
                 if not is_running and not recent_signals:
-                    # --- CALCOLO SIZE E PARAMETRI ---
+                    # Parametri specifici per l'asset (Pips, Precisione)
                     p_unit, p_fmt, p_mult, a_type = get_asset_params(label)
+                    
+                    # Calcolo Capitale Investito
                     investimento_totale = current_balance * (current_risk / 100)
 
-                    # Definiamo la variazione percentuale del prezzo per lo SL (es. 0.1% di movimento prezzo = 10% ROI con leva)
-                    # Se vuoi che il 10% sia proprio il movimento del prezzo (molto ampio), usa 0.10. 
-                    # Di solito nel forex si usa lo 0.0010 (10 pips) per rappresentare lo stop standard.
-                    distanza_base = curr_v * 0.0010  # Questa è la tua unità del 10%
+                    # Definizione Livelli (0.1% di movimento = Unità base per lo Stop Loss)
+                    distanza_base = curr_v * 0.0010 
                     
                     if s_action == "COMPRA":
-                        sl = curr_v - distanza_base          # -10% ROI
-                        tp = curr_v + (distanza_base * 2.0)  # +20% ROI
+                        sl = curr_v - distanza_base
+                        tp = curr_v + (distanza_base * 2.0)
                     else:
                         sl = curr_v + distanza_base
                         tp = curr_v - (distanza_base * 2.0)
                     
+                    # Creazione Dizionario Segnale
                     new_sig = {
                         'DataOra': get_now_rome().strftime("%H:%M:%S"),
                         'Asset': label, 
@@ -440,28 +442,33 @@ def run_sentinel():
                         'Prezzo': p_fmt.format(curr_v), 
                         'TP': p_fmt.format(tp), 
                         'SL': p_fmt.format(sl), 
-                        'Protezione': "Standard",
-                        'Stato_Prot': 'SL -10%',
+                        'Protezione': "Iniziale (Standard)",
+                        'Stato_Prot': 'LIVELLO_0',
                         'Stato': 'In Corso',
                         'Investimento €': f"{investimento_totale:.2f}",
                         'Risultato €': "0.00"
                     }
                     
+                    # Salvataggio e Notifica
                     st.session_state['signal_history'] = pd.concat([pd.DataFrame([new_sig]), hist], ignore_index=True)
                     save_history_permanently()
                     st.session_state['last_alert'] = new_sig
                     
-                    telegram_text = (f"🚀 *{s_action}* {label}\n"
-                                     f"Entry: {new_sig['Prezzo']}\nTP: {new_sig['TP']}\nSL: {new_sig['SL']}\n-------------\nInvestito: {new_sig['Investimento €']}")
+                    telegram_text = (f"🚀 *NUOVO SEGNALE: {s_action}*\n"
+                                     f"📈 Asset: {label}\n"
+                                     f"💰 Entry: {new_sig['Prezzo']}\n"
+                                     f"🎯 TP: {new_sig['TP']}\n"
+                                     f"🛡️ SL: {new_sig['SL']}\n"
+                                     f"💳 Risk: {new_sig['Investimento €']}€")
                     send_telegram_msg(telegram_text)
 
             st.session_state['last_scan_status'] = f"✅ Scan OK: {get_now_rome().strftime('%H:%M:%S')}"
 
         except Exception as e:
-            debug_list.append(f"❌ {label} Err: {str(e)}")
+            debug_list.append(f"❌ {label} Error: {str(e)}")
             continue
     
-    # Salviamo il log per visualizzarlo in sidebar
+    # Aggiornamento log sidebar
     st.session_state['sentinel_logs'] = debug_list
                     
 def get_win_rate():
