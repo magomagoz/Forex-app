@@ -193,20 +193,6 @@ def get_currency_strength():
     except Exception:
         return pd.Series(dtype=float)
 
-def get_asset_params(pair):
-    """
-    Restituisce: (unità_minima, formato_prezzo, moltiplicatore_reale, tipo)
-    """
-    if "BTC" in pair or "ETH" in pair:
-        # Per Crypto: 1 punto = 1 Dollaro
-        return 1.0, "{:.2f}", 1, "CRYPTO"
-    elif "JPY" in pair:
-        # Per JPY: 0.01 = 1 punto
-        return 0.01, "{:.3f}", 100, "FOREX_JPY"
-    else:
-        # Per Forex standard (EURUSD ecc): 0.0001 = 1 punto (PIP)
-        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
-
 def detect_divergence(df):
     if len(df) < 20: return "Analisi..."
     price, rsi_col = df['close'], df['rsi']
@@ -229,69 +215,64 @@ def send_telegram_msg(msg):
         print(f"Errore invio Telegram: {e}")
 
 def update_signal_outcomes():
-    """Monitora i trade in corso, gestisce Break-Even e Trailing Stop 4-Step"""
+    """Monitora i trade, gestisce Break-Even e Trailing Stop con protezione commissioni"""
     if st.session_state['signal_history'].empty: 
         return
     
     df = st.session_state['signal_history']
     updates_made = False
-    COMMISSIONE_APPROX = 0.05 # Simulazione commissione fissa in €
+    COMMISSIONE_APPROX = 0.05 # Costo fisso simulato (es. spread/fee)
     
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
-            # Scarichiamo dati a 1m per massima precisione di uscita
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
-            # 1. Recupero Prezzi Attuali
+            # Prezzi attuali
             current_close = float(data['Close'].iloc[-1])
             current_high = float(data['High'].iloc[-1])
             current_low = float(data['Low'].iloc[-1])
             
-            # 2. Conversione Valori storici
+            # Valori di ingresso
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
             sl_v = float(str(row['SL']).replace(',', '.'))
             tp_v = float(str(row['TP']).replace(',', '.'))
             investimento = float(str(row['Investimento €']).replace(',', '.'))
             
-            # Calcoliamo la distanza base (il 10% di ROI target iniziale)
-            # Se non salvata, la ricalcoliamo come distanza tra entry e SL iniziale
-            dist_10pct = abs(entry_v - sl_v) 
+            # Distanza Stop Loss iniziale (Unità di rischio)
+            dist_init = abs(entry_v - sl_v) 
             
-            # 3. Calcolo Profitto Direzionale
-            if row['Direzione'] == 'COMPRA':
-                profitto_prezzo = current_close - entry_v
-            else:
-                profitto_prezzo = entry_v - current_close
+            # Calcolo profitto in termini di prezzo
+            is_buy = row['Direzione'] == 'COMPRA'
+            profitto_prezzo = (current_close - entry_v) if is_buy else (entry_v - current_close)
             
-            # --- LOGICA DI PROTEZIONE AVANZATA ---
+            # --- LOGICA DI PROTEZIONE DINAMICA ---
             target_lvl = 0
             nuovo_sl_val = None
             prot_label = row['Protezione']
 
-            # STEP 0: BREAK-EVEN (Scatta al 1% di profitto prezzo per coprire spread/fee)
-            # (Un decimo della distanza dello Stop Loss standard)
-            if profitto_prezzo >= (dist_10pct * 0.1) and "Pareggio" not in row['Protezione']:
+            # 1. BREAK-EVEN (Scatta al +1% di ROI teorico, circa 0.1 * dist_init)
+            if profitto_prezzo >= (dist_init * 0.1) and "Pareggio" not in row['Protezione']:
                 target_lvl = 0.5
                 nuovo_sl_val = entry_v 
                 prot_label = "Pareggio (Break-Even)"
 
-            # STEP 1-4: TRAILING STOP
-            if profitto_prezzo >= (dist_10pct * 1.9): 
+            # 2. TRAILING STEP PROGRESSIVI
+            if profitto_prezzo >= (dist_init * 1.9): 
                 target_lvl = 4
-                nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
+                nuovo_sl_val = entry_v + (dist_init * 1.5) if is_buy else entry_v - (dist_init * 1.5)
                 prot_label = "Blindato +15%"
-            elif profitto_prezzo >= (dist_10pct * 1.5): 
+            elif profitto_prezzo >= (dist_init * 1.5): 
                 target_lvl = 3
-                nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
+                nuovo_sl_val = entry_v + (dist_init * 1.0) if is_buy else entry_v - (dist_init * 1.0)
                 prot_label = "Blindato +10%"
-            elif profitto_prezzo >= (dist_10pct * 1.0): 
+            elif profitto_prezzo >= (dist_init * 1.0): 
                 target_lvl = 2
-                nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
+                nuovo_sl_val = entry_v + (dist_init * 0.5) if is_buy else entry_v - (dist_init * 0.5)
                 prot_label = "Blindato +5%"
 
-            # Applicazione Spostamento SL
+            # Verifica se possiamo avanzare di livello (solo in avanti)
             current_lvl_num = float(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
             if target_lvl > current_lvl_num and nuovo_sl_val is not None:
                 p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
@@ -300,45 +281,56 @@ def update_signal_outcomes():
                 df.at[idx, 'Protezione'] = prot_label
                 updates_made = True
                 play_safe_sound()
-                send_telegram_msg(f"🛡️ **Protezione {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({prot_label})")
 
-            # 4. CONTROLLO CHIUSURA (TARGET O STOP LOSS)
+            # --- VERIFICA CHIUSURE ---
             new_status = None
-            risultato_finale = 0.0
+            prezzo_uscita = None
 
-            if row['Direzione'] == 'COMPRA':
+            if is_buy:
                 if current_high >= tp_v: 
-                    new_status = '✅ TARGET'
-                    risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                    new_status, prezzo_uscita = '✅ TARGET', tp_v
                 elif current_low <= sl_v: 
-                    new_status = '🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'
-                    # Se SL dinamico, calcoliamo il profitto reale al momento dello stop
-                    variazione = (sl_v - entry_v) / entry_v
-                    risultato_finale = (investimento * variazione) - COMMISSIONE_APPROX
-            
-            elif row['Direzione'] == 'VENDI':
+                    new_status, prezzo_uscita = ('🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'), sl_v
+            else: # SELL
                 if current_low <= tp_v: 
-                    new_status = '✅ TARGET'
-                    risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                    new_status, prezzo_uscita = '✅ TARGET', tp_v
                 elif current_high >= sl_v: 
-                    new_status = '🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'
-                    variazione = (entry_v - sl_v) / entry_v
-                    risultato_finale = (investimento * variazione) - COMMISSIONE_APPROX
+                    new_status, prezzo_uscita = ('🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'), sl_v
 
             if new_status:
+                # Calcolo variazione percentuale reale all'uscita
+                var_finale = (prezzo_uscita - entry_v) / entry_v if is_buy else (entry_v - prezzo_uscita) / entry_v
+                
+                # Calcolo Risultato con FILTRO PROTEZIONE (minimo 0 se protetto)
+                lordo = investimento * var_finale
+                netto = lordo - COMMISSIONE_APPROX
+                
+                # Se il trade era "Blindato" o in "Pareggio", non permettiamo un risultato negativo
+                if target_lvl >= 0.5:
+                    netto = max(0.0, netto)
+
                 df.at[idx, 'Stato'] = new_status
-                df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
+                df.at[idx, 'Risultato €'] = f"{netto:+.2f}"
                 updates_made = True
                 play_close_sound()
-                send_telegram_msg(f"🔔 **CHIUSURA {row['Asset']}**\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€")
+                send_telegram_msg(f"🔔 **CHIUSURA {row['Asset']}**\nEsito: {new_status}\nNetto: {netto:+.2f}€")
 
         except Exception as e:
-            print(f"Errore aggiornamento trade {idx}: {e}")
+            print(f"Errore calcolo trade {idx}: {e}")
             continue 
         
     if updates_made:
         st.session_state['signal_history'] = df
         save_history_permanently()
+
+def get_asset_params(pair):
+    """Restituisce unità, formato, moltiplicatore e tipo asset"""
+    if any(x in pair for x in ["BTC", "ETH"]):
+        return 1.0, "{:.2f}", 1, "CRYPTO"
+    elif "JPY" in pair:
+        return 0.01, "{:.3f}", 100, "FOREX_JPY"
+    else:
+        return 0.0001, "{:.5f}", 10000, "FOREX_STD"
 
 def run_sentinel():
     """Scanner multi-asset per l'individuazione di segnali Mean Reversion e Trend Strength"""
