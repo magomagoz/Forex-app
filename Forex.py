@@ -46,7 +46,11 @@ asset_map = {"EURUSD": "EURUSD=X", "GBPUSD": "GBPUSD=X", "USDCHF": "USDCHF=X", "
 # Refresh automatico ogni 60 secondi
 st_autorefresh(interval=60 * 1000, key="sentinel_refresh")
 
-# --- 2. FUNZIONI TECNICHE ---
+# Recupero dai Secrets
+TELE_TOKEN = st.secrets["TELEGRAM_TOKEN"]
+TELE_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
+   
+# --- 2. FUNZIONI TECNICHE CORRETTE & OTTIMIZZATE ---
 def save_history_permanently():
     """Salva la cronologia attuale su un file fisico CSV"""
     try:
@@ -69,32 +73,6 @@ def load_history_from_csv():
         except:
             return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
     return pd.DataFrame(columns=['DataOra', 'Asset', 'Direzione', 'Prezzo', 'SL', 'TP', 'Stato', 'Investimento €', 'Risultato €', 'Stato_Prot', 'Protezione'])
-
-# Recupero dai Secrets
-TELE_TOKEN = st.secrets["TELEGRAM_TOKEN"]
-TELE_CHAT_ID = st.secrets["TELEGRAM_CHAT_ID"]
-
-def send_telegram_msg(msg):
-    """Funzione rapida per inviare notifiche"""
-    url = f"https://api.telegram.org/bot{TELE_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELE_CHAT_ID,
-        "text": messaggio,
-        "parse_mode": "Markdown"
-    }
-    try:
-        requests.post(url, json=payload, timeout=5)
-    except Exception as e:
-        print(f"Errore Telegram: {e}")
-
-    try:
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        params = {"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}
-        r = requests.get(url, params=params, timeout=5)
-        if r.status_code != 200:
-            st.toast(f"Errore Telegram: {r.status_code}", icon="⚠️")
-    except Exception as e:
-        print(f"Errore: {e}")
 
 def get_now_rome():
     return datetime.now(rome_tz)
@@ -238,108 +216,124 @@ def detect_divergence(df):
     if curr_p > prev_max_p and curr_r < prev_max_r: return "📉 DECRESCITA"
     elif curr_p < prev_min_p and curr_r > prev_min_r: return "📈 CRESCITA"
     return "Neutrale"
-    
-# --- 2. FUNZIONI TECNICHE (AGGIORNATE) ---
 
-# ... (le altre funzioni save_history, send_telegram rimangono uguali, incolla da qui in giù) ...
+def send_telegram_msg(msg):
+    """Invia notifiche Telegram utilizzando i secrets configurati"""
+    url = f"https://api.telegram.org/bot{TELE_TOKEN}/sendMessage"
+    payload = {"chat_id": TELE_CHAT_ID, "text": msg, "parse_mode": "Markdown"}
+    try:
+        r = requests.post(url, json=payload, timeout=5)
+        if r.status_code != 200:
+            st.toast(f"Errore Telegram: {r.status_code}", icon="⚠️")
+    except Exception as e:
+        print(f"Errore invio Telegram: {e}")
 
 def update_signal_outcomes():
-    if st.session_state['signal_history'].empty: return
+    """Monitora i trade in corso, gestisce Break-Even e Trailing Stop 4-Step"""
+    if st.session_state['signal_history'].empty: 
+        return
+    
     df = st.session_state['signal_history']
     updates_made = False
+    COMMISSIONE_APPROX = 0.05 # Simulazione commissione fissa in €
     
     for idx, row in df[df['Stato'] == 'In Corso'].iterrows():
         try:
             ticker = asset_map[row['Asset']]
+            # Scarichiamo dati a 1m per massima precisione di uscita
             data = yf.download(ticker, period="1d", interval="1m", progress=False)
             if data.empty: continue
             
-            curr_p = float(data['Close'].iloc[-1])
+            # 1. Recupero Prezzi Attuali
+            current_close = float(data['Close'].iloc[-1])
+            current_high = float(data['High'].iloc[-1])
+            current_low = float(data['Low'].iloc[-1])
+            
+            # 2. Conversione Valori storici
             entry_v = float(str(row['Prezzo']).replace(',', '.'))
-            # Calcoliamo la distanza iniziale dello SL per calcolare i rapporti percentuali
-            dist_iniziale = abs(entry_v - float(str(row['SL']).replace(',', '.'))) if row['Stato_Prot'] == 'In Attesa' else abs(entry_v - float(str(row['SL']).replace(',', '.'))) # approssimazione
+            sl_v = float(str(row['SL']).replace(',', '.'))
+            tp_v = float(str(row['TP']).replace(',', '.'))
+            investimento = float(str(row['Investimento €']).replace(',', '.'))
             
-                # --- LOGICA 4-STEP "ONLY FORWARD" ---
-                # dist_10pct è la distanza di prezzo che rappresenta il tuo -10% iniziale
-                
-            # --- LOGICA 4-STEP FAST-TRACK ---
-            if row['Direzione'] in ['COMPRA', 'VENDI']:
-                # Calcoliamo il profitto in termini di unità (1 unità = dist_10pct)
-                # dist_10pct è lo scostamento di prezzo che rappresenta il 10% di ROI
-                if row['Direzione'] == 'COMPRA':
-                    profitto_prezzo = current_close - entry_v
-                else:
-                    profitto_prezzo = entry_v - current_close
+            # Calcoliamo la distanza base (il 10% di ROI target iniziale)
+            # Se non salvata, la ricalcoliamo come distanza tra entry e SL iniziale
+            dist_10pct = abs(entry_v - sl_v) 
             
-                # Determiniamo il miglior livello raggiungibile in questo istante
-                target_lvl = 0
-                nuovo_sl_val = None
-                prot_label = ""
+            # 3. Calcolo Profitto Direzionale
+            if row['Direzione'] == 'COMPRA':
+                profitto_prezzo = current_close - entry_v
+            else:
+                profitto_prezzo = entry_v - current_close
             
-                if profitto_prezzo >= (dist_10pct * 1.9): 
-                    target_lvl = 4
-                    nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
-                    prot_label = "Blindato +15%"
-                elif profitto_prezzo >= (dist_10pct * 1.5): 
-                    target_lvl = 3
-                    nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
-                    prot_label = "Blindato +10%"
-                elif profitto_prezzo >= (dist_10pct * 1.0): 
-                    target_lvl = 2
-                    nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
-                    prot_label = "Blindato +5%"
-                elif profitto_prezzo >= (dist_10pct * 0.5): 
-                    target_lvl = 1
-                    nuovo_sl_val = entry_v
-                    prot_label = "Pareggio (0%)"
+            # --- LOGICA DI PROTEZIONE AVANZATA ---
+            target_lvl = 0
+            nuovo_sl_val = None
+            prot_label = row['Protezione']
+
+            # STEP 0: BREAK-EVEN (Scatta al 1% di profitto prezzo per coprire spread/fee)
+            # (Un decimo della distanza dello Stop Loss standard)
+            if profitto_prezzo >= (dist_10pct * 0.1) and "Pareggio" not in row['Protezione']:
+                target_lvl = 0.5
+                nuovo_sl_val = entry_v 
+                prot_label = "Pareggio (Break-Even)"
+
+            # STEP 1-4: TRAILING STOP
+            if profitto_prezzo >= (dist_10pct * 1.9): 
+                target_lvl = 4
+                nuovo_sl_val = entry_v + (dist_10pct * 1.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.5)
+                prot_label = "Blindato +15%"
+            elif profitto_prezzo >= (dist_10pct * 1.5): 
+                target_lvl = 3
+                nuovo_sl_val = entry_v + (dist_10pct * 1.0) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 1.0)
+                prot_label = "Blindato +10%"
+            elif profitto_prezzo >= (dist_10pct * 1.0): 
+                target_lvl = 2
+                nuovo_sl_val = entry_v + (dist_10pct * 0.5) if row['Direzione'] == 'COMPRA' else entry_v - (dist_10pct * 0.5)
+                prot_label = "Blindato +5%"
+
+            # Applicazione Spostamento SL
+            current_lvl_num = float(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
+            if target_lvl > current_lvl_num and nuovo_sl_val is not None:
+                p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
+                df.at[idx, 'SL'] = p_fmt.format(nuovo_sl_val)
+                df.at[idx, 'Stato_Prot'] = f"LIVELLO_{target_lvl}"
+                df.at[idx, 'Protezione'] = prot_label
+                updates_made = True
+                play_safe_sound()
+                send_telegram_msg(f"🛡️ **Protezione {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({prot_label})")
+
+            # 4. CONTROLLO CHIUSURA (TARGET O STOP LOSS)
+            new_status = None
+            risultato_finale = 0.0
+
+            if row['Direzione'] == 'COMPRA':
+                if current_high >= tp_v: 
+                    new_status = '✅ TARGET'
+                    risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                elif current_low <= sl_v: 
+                    new_status = '🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'
+                    # Se SL dinamico, calcoliamo il profitto reale al momento dello stop
+                    variazione = (sl_v - entry_v) / entry_v
+                    risultato_finale = (investimento * variazione) - COMMISSIONE_APPROX
             
-                # Estraiamo il livello attuale (es. da "LIVELLO_1" prendiamo 1)
-                current_lvl_num = int(row['Stato_Prot'].split('_')[1]) if 'LIVELLO' in row['Stato_Prot'] else 0
-            
-                # AGGIORNIAMO SOLO SE IL TARGET È SUPERIORE AL LIVELLO ATTUALE
-                if target_lvl > current_lvl_num:
-                    p_fmt = "{:.5f}" if "JPY" not in row['Asset'] else "{:.3f}"
-                    df.at[idx, 'SL'] = p_fmt.format(nuovo_sl_val)
-                    df.at[idx, 'Stato_Prot'] = f"LIVELLO_{target_lvl}"
-                    df.at[idx, 'Protezione'] = prot_label
-                    updates_made = True
-                    play_safe_sound()
-                    send_telegram_msg(f"🛡️ **Protezione Avanzata {row['Asset']}**\nNuovo SL: {df.at[idx, 'SL']} ({df.at[idx, 'Protezione']})")
-                    
-                # --- CHIUSURA (CORRETTA INDENTAZIONE) ---
-                if row['Direzione'] == 'COMPRA':
-                    if current_high >= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_low <= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento 
-                            
-                elif row['Direzione'] == 'VENDI':
-                    if current_low <= tp_v: 
-                        new_status = '✅ TARGET'
-                        risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
-                    elif current_high >= sl_v: 
-                        if row.get('Stato_Prot') == 'Garantito':
-                            new_status = '🛡️ SL DINAMICO'
-                            risultato_finale = (investimento * 0.40) - COMMISSIONE_APPROX
-                        else:
-                            new_status = '❌ STOP LOSS'
-                            risultato_finale = -investimento
-                
-                if new_status:
-                    df.at[idx, 'Stato'] = new_status
-                    df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
-                    updates_made = True
-                    play_close_sound()
-                    msg = f"🔔 **CHIUSURA TRADE**\nAsset: {row['Asset']}\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€"
-                    send_telegram_msg(msg)
-                    
+            elif row['Direzione'] == 'VENDI':
+                if current_low <= tp_v: 
+                    new_status = '✅ TARGET'
+                    risultato_finale = (investimento * 2.0) - COMMISSIONE_APPROX
+                elif current_high >= sl_v: 
+                    new_status = '🛡️ SL DINAMICO' if target_lvl > 0 else '❌ STOP LOSS'
+                    variazione = (entry_v - sl_v) / entry_v
+                    risultato_finale = (investimento * variazione) - COMMISSIONE_APPROX
+
+            if new_status:
+                df.at[idx, 'Stato'] = new_status
+                df.at[idx, 'Risultato €'] = f"{risultato_finale:+.2f}"
+                updates_made = True
+                play_close_sound()
+                send_telegram_msg(f"🔔 **CHIUSURA {row['Asset']}**\nEsito: {new_status}\nNetto: {risultato_finale:+.2f}€")
+
         except Exception as e:
+            print(f"Errore aggiornamento trade {idx}: {e}")
             continue 
         
     if updates_made:
